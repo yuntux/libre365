@@ -1,14 +1,14 @@
-# Brique : Novu — centre de notifications unifie (etude 2.1 L.381-382)
-# Chart utilise : novuhq/helm-charts (chart officiel Novu)
-#   repo Helm : https://novuhq.github.io/helm-charts
+# Component: Novu — unified notification center (study 2.1 L.381-382)
+# Chart used: novuhq/helm-charts (official Novu chart)
+#   Helm repo: https://novuhq.github.io/helm-charts
 #   chart    : novu
 #
-# 2.1 L.382 — Novu retenu pour l'UI de centre de notif et l'infrastructure multi-canal ;
-# l'ingestion (connecteurs webhook Matrix Application Service, webhook/IMAP Grommunio,
-# webhook Seafile, webhook Vikunja) constitue le vrai chantier de developpement,
-# independant de l'outil retenu — hors perimetre de ce depot k8s (voir connectors/).
-# Reutilise egalement par la recherche unifiee (2.2 L.399) et l'agregateur de presence
-# (2.8 L.504), qui partagent la meme brique d'ingestion/connecteurs.
+# 2.1 L.382 — Novu chosen for the notification center UI and multi-channel
+# infrastructure; ingestion (Matrix Application Service webhook connectors,
+# Grommunio webhook/IMAP, Seafile webhook, Vikunja webhook) is the real development
+# project, independent of the tool chosen — out of scope for this k8s repository
+# (see connectors/). Also reused by unified search (2.2 L.399) and the presence
+# aggregator (2.8 L.504), which share the same ingestion/connectors component.
 
 api:
   replicaCount: 2
@@ -58,10 +58,10 @@ mongodb:
 redis:
   enabled: true
 
-# 1.7 — provisionnement des comptes/organisation via SSO Keycloak au niveau du portail
-# applicatif transverse (2.3) plutot que via l'auth native Novu (Novu n'est pas expose
-# directement aux consultants comme une application a part entiere, mais integre dans le
-# bandeau, cf. caddy-injection.yaml).
+# 1.7 — account/organization provisioning via Keycloak SSO at the level of the
+# cross-cutting application portal (2.3) rather than via Novu's native auth (Novu is
+# not exposed directly to consultants as a standalone application, but integrated
+# into the top bar, see caddy-injection.yaml).
 env:
   API_ROOT_URL: "https://notifications.libre365.example.org/api"
   WS_URL: "wss://notifications.libre365.example.org"
