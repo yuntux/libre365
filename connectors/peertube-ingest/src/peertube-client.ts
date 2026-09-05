@@ -4,9 +4,9 @@ import { MeetingMetadata } from "./types";
 const PEERTUBE_BASE_URL = process.env.PEERTUBE_BASE_URL ?? "https://tube.example.org";
 const PEERTUBE_ACCESS_TOKEN = process.env.PEERTUBE_ACCESS_TOKEN ?? "";
 const PEERTUBE_CHANNEL_ID = process.env.PEERTUBE_CHANNEL_ID ?? "1";
-// Visibilite par defaut des enregistrements deposes (etude 2.12 : "gestion de la
-// visibilite par video -- privee, interne, non repertoriee"). 2 = "internal" cote API
-// PeerTube (visible par les seuls utilisateurs connectes a l'instance).
+// Default visibility of uploaded recordings (study 2.12: "per-video visibility
+// management -- private, internal, unlisted"). 2 = "internal" on the PeerTube
+// API side (visible only to users logged into the instance).
 const PEERTUBE_DEFAULT_PRIVACY = Number(process.env.PEERTUBE_DEFAULT_PRIVACY ?? 2);
 
 export interface UploadOptions {
@@ -21,11 +21,11 @@ export interface UploadResult {
 }
 
 /**
- * Upload vers l'API PeerTube (`POST /api/v1/videos/upload`), avec association des
- * metadonnees de reunion dans le titre/description (etude 2.12 ligne 589).
- * L'API PeerTube attend un `multipart/form-data` ; construit ici a la main via
- * `FormData`/`Blob` (disponibles nativement depuis Node 18+) plutot qu'une dependance
- * supplementaire.
+ * Uploads to the PeerTube API (`POST /api/v1/videos/upload`), embedding
+ * meeting metadata in the title/description (study 2.12 line 589).
+ * The PeerTube API expects `multipart/form-data`; built here by hand via
+ * `FormData`/`Blob` (natively available since Node 18+) rather than an
+ * extra dependency.
  */
 export async function uploadToPeerTube(
   options: UploadOptions,
@@ -34,8 +34,8 @@ export async function uploadToPeerTube(
   const { metadata, objectKey } = options;
   const title = metadata.date ? `${metadata.title} (${metadata.date})` : metadata.title;
   const description = metadata.participants.length
-    ? `Participants : ${metadata.participants.join(", ")}\nSource : ${objectKey}`
-    : `Source : ${objectKey}`;
+    ? `Participants: ${metadata.participants.join(", ")}\nSource: ${objectKey}`
+    : `Source: ${objectKey}`;
 
   const form = new FormData();
   form.set("channelId", PEERTUBE_CHANNEL_ID);

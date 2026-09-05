@@ -1,5 +1,5 @@
-# Overlay de dimensionnement — 100 utilisateurs (etude 1.2 L.87)
-# Usage : helm upgrade --install synapse ananace-charts/matrix-synapse -f synapse.yaml -f synapse-100.yaml
+# Sizing overlay — 100 users (study 1.2 L.87)
+# Usage: helm upgrade --install synapse ananace-charts/matrix-synapse -f synapse.yaml -f synapse-100.yaml
 synapse:
   resources:
     requests:

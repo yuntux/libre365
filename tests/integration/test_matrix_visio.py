@@ -96,7 +96,7 @@ def test_room(base_urls, matrix_headers):
 
 def test_send_message_in_room(base_urls, matrix_headers, test_room):
     """Sends a text message in the test room and verifies its receipt."""
-    message_body = f"Message de test d'intégration {uuid.uuid4()}"
+    message_body = f"Integration test message {uuid.uuid4()}"
     transaction_id = uuid.uuid4().hex
 
     send_response = requests.put(

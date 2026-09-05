@@ -10,7 +10,7 @@ const candidate: IngestCandidate = {
 };
 
 describe("ingestObject", () => {
-  it("uploade avec succes et retourne l'id PeerTube", async () => {
+  it("uploads successfully and returns the PeerTube id", async () => {
     const deps = {
       getObjectTags: vi.fn(async () => ({})),
       getObjectStream: vi.fn(async () => Buffer.from("fake-video-bytes")),
@@ -29,7 +29,7 @@ describe("ingestObject", () => {
     );
   });
 
-  it("retourne une erreur sans faire echouer l'appelant", async () => {
+  it("returns an error without failing the caller", async () => {
     const deps = {
       getObjectTags: vi.fn(async () => ({})),
       getObjectStream: vi.fn(async () => {
@@ -47,7 +47,7 @@ describe("ingestObject", () => {
 });
 
 describe("ingestAll", () => {
-  it("ingere plusieurs candidats sequentiellement", async () => {
+  it("ingests several candidates sequentially", async () => {
     const order: string[] = [];
     const deps = {
       getObjectTags: vi.fn(async () => ({})),
@@ -69,7 +69,7 @@ describe("ingestAll", () => {
 });
 
 describe("filterVideoObjects", () => {
-  it("ne garde que les extensions video connues", () => {
+  it("keeps only known video extensions", () => {
     const objects: IngestCandidate[] = [
       { ...candidate, key: "a.mp4" },
       { ...candidate, key: "b.txt" },
