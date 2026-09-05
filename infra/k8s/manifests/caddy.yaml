@@ -1,20 +1,20 @@
-# Brique : Caddy — reverse proxy transverse + portail applicatif (etude 2.3 L.407-417)
-# Pas de chart Helm dedie retenu : manifest raw Deployment + ConfigMap, car l'image
-# Caddy doit etre construite avec le plugin `caddy2-html-injection-plugin` (xcaddy),
-# ce qui sort du perimetre d'un chart generique.
+# Component: Caddy — cross-cutting reverse proxy + application portal (study 2.3 L.407-417)
+# No dedicated Helm chart adopted: raw Deployment + ConfigMap manifest, because the
+# Caddy image must be built with the `caddy2-html-injection-plugin` plugin (xcaddy),
+# which is outside the scope of a generic chart.
 #
-# 2.3 L.408-417 — injection HTML cote reverse proxy retenue (et non un portail iframe,
-# ecarte pour raisons de securite : clickjacking, cookies tiers, degradation API
-# navigateur). Le bandeau applicatif transverse (menu, cloche notifications, recherche,
-# cf. caddy-injection.yaml) est injecte a la volee dans le HTML de chaque application,
-# qui reste par ailleurs en navigation plein ecran native — pas de contenu applicatif
-# embarque en iframe (exception ciblee : widget video Visio dans une room Matrix,
-# cf. 2.4, gere par Element/Matrix lui-meme, pas par Caddy).
+# 2.3 L.408-417 — HTML injection on the reverse proxy side chosen (rather than an
+# iframe portal, ruled out for security reasons: clickjacking, third-party cookies,
+# degraded browser API support). The cross-cutting application top bar (menu,
+# notification bell, search, see caddy-injection.yaml) is injected on the fly into
+# each application's HTML, which otherwise stays in native full-screen navigation —
+# no application content embedded as an iframe (targeted exception: the Visio video
+# widget in a Matrix room, see 2.4, handled by Element/Matrix itself, not by Caddy).
 #
-# Image a construire avec xcaddy :
+# Image to build with xcaddy:
 #   xcaddy build --with github.com/lolPants/caddy2-html-injection-plugin
-# (nom de module a verifier/ajuster selon le plugin communautaire retenu au moment du
-# build — plusieurs plugins d'injection HTML existent pour Caddy 2, cf. etude L.408).
+# (module name to check/adjust depending on the community plugin adopted at build
+# time — several HTML injection plugins exist for Caddy 2, see study L.408).
 
 apiVersion: v1
 kind: ConfigMap
@@ -26,19 +26,20 @@ metadata:
 data:
   Caddyfile: |
     {
-        # Build avec le module d'injection HTML (xcaddy), cf. commentaire d'en-tete.
+        # Built with the HTML injection module (xcaddy), see the header comment.
         order html_inject before respond
     }
 
-    # Portail d'onboarding statique (2.5 L.454-457) — hors injection, page autonome
+    # Static onboarding portal (2.5 L.454-457) — no injection, standalone page
     onboarding.libre365.example.org {
         root * /srv/onboarding
         file_server
     }
 
-    # 2.3 L.417 — chaque application reste en navigation plein ecran native ; le bandeau
-    # transverse est injecte via le plugin d'injection HTML avant </body>, point
-    # d'ancrage DOM fragile aux montees de version (2.3 L.413) a revalider a chaque MAJ.
+    # 2.3 L.417 — each application stays in native full-screen navigation; the
+    # cross-cutting top bar is injected via the HTML injection plugin before
+    # </body>, a DOM anchor point fragile to version upgrades (2.3 L.413) to be
+    # revalidated on every update.
     chat.libre365.example.org {
         reverse_proxy element-web.libre365.svc.cluster.local:80
         html_inject {
