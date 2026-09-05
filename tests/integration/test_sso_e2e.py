@@ -81,34 +81,35 @@ SSO_TARGETS = [
 @pytest.mark.parametrize("target", SSO_TARGETS, ids=[t.name for t in SSO_TARGETS])
 def test_keycloak_token_accepted_end_to_end(base_urls, keycloak_token, target: SsoTarget):
     """
-    Pour chaque brique: une requête sans token doit être rejetée (401/403,
-    selon le mécanisme propre à la brique), et la même requête avec le
-    Bearer token Keycloak obtenu via la fixture `keycloak_token` doit être
-    acceptée.
+    For each component: a request without a token must be rejected (401/403,
+    depending on the component's own mechanism), and the same request with
+    the Bearer Keycloak token obtained via the `keycloak_token` fixture must
+    be accepted.
 
-    NB: certaines briques (OnlyOffice, Grommunio) n'exposent pas Keycloak au
-    même niveau applicatif que Seafile/Vikunja/Matrix (délégation via proxy
-    ou JWT applicatif propre) - leurs codes attendus sont volontairement
-    larges pour ce test générique. Un test dédié plus strict existe pour
-    chacune dans son propre fichier de scénario quand la sémantique du code
-    de retour est spécifique (voir test_coedition_onlyoffice.py par exemple).
+    NB: some components (OnlyOffice, Grommunio) do not expose Keycloak at
+    the same application level as Seafile/Vikunja/Matrix (delegation via a
+    proxy or their own application-level JWT) - their expected codes are
+    deliberately broad for this generic test. A stricter dedicated test
+    exists for each of them in its own scenario file when the semantics of
+    the return code are specific (see test_coedition_onlyoffice.py for
+    example).
     """
     url = target.url_builder(base_urls)
 
     unauthenticated_response = _request(target.method, url, headers=None)
     assert unauthenticated_response.status_code in target.unauthenticated_statuses, (
-        f"[{target.name}] Requête sans token: attendu un code parmi "
-        f"{target.unauthenticated_statuses}, obtenu {unauthenticated_response.status_code} "
-        f"sur {url}."
+        f"[{target.name}] Request without a token: expected a code among "
+        f"{target.unauthenticated_statuses}, got {unauthenticated_response.status_code} "
+        f"on {url}."
     )
 
     authenticated_response = _request(
         target.method, url, headers={"Authorization": f"Bearer {keycloak_token}"}
     )
     assert authenticated_response.status_code in target.authenticated_statuses, (
-        f"[{target.name}] Requête avec token Keycloak: attendu un code parmi "
-        f"{target.authenticated_statuses}, obtenu {authenticated_response.status_code} "
-        f"sur {url}. Le SSO bout-en-bout n'est pas fonctionnel pour cette brique."
+        f"[{target.name}] Request with Keycloak token: expected a code among "
+        f"{target.authenticated_statuses}, got {authenticated_response.status_code} "
+        f"on {url}. End-to-end SSO is not working for this component."
     )
 
 
@@ -117,7 +118,7 @@ def _request(method: str, url: str, headers: Optional[dict]) -> requests.Respons
         return requests.request(method, url, headers=headers, timeout=15)
     except requests.exceptions.RequestException as exc:
         pytest.fail(
-            f"Échec de connexion vers {url}: {type(exc).__name__}: {exc}. "
-            "Vérifier que le service est démarré et que la fixture wait_for_service "
-            "a bien été satisfaite avant ce test."
+            f"Connection failed to {url}: {type(exc).__name__}: {exc}. "
+            "Check that the service is started and that the wait_for_service "
+            "fixture was satisfied before this test."
         )

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { consolidatePresence } from "../src/consolidate";
 
 describe("consolidatePresence", () => {
-  it("priorise 'en reunion' meme si Matrix affiche online", () => {
+  it("prioritizes 'in meeting' even if Matrix shows online", () => {
     const status = consolidatePresence({
       matrix: "online",
       grommunio: { inMeetingNow: true },
@@ -11,7 +11,7 @@ describe("consolidatePresence", () => {
     expect(status).toBe("in-meeting");
   });
 
-  it("priorise 'en reunion' si l'utilisateur est dans un appel LiveKit", () => {
+  it("prioritizes 'in meeting' if the user is in a LiveKit call", () => {
     const status = consolidatePresence({
       matrix: "offline",
       grommunio: null,
@@ -20,7 +20,7 @@ describe("consolidatePresence", () => {
     expect(status).toBe("in-meeting");
   });
 
-  it("retombe sur online quand aucune reunion n'est en cours", () => {
+  it("falls back to online when no meeting is in progress", () => {
     const status = consolidatePresence({
       matrix: "online",
       grommunio: { inMeetingNow: false },
@@ -29,7 +29,7 @@ describe("consolidatePresence", () => {
     expect(status).toBe("online");
   });
 
-  it("retourne unavailable quand Matrix est unavailable et pas de reunion", () => {
+  it("returns unavailable when Matrix is unavailable and there is no meeting", () => {
     const status = consolidatePresence({
       matrix: "unavailable",
       grommunio: null,
@@ -38,12 +38,12 @@ describe("consolidatePresence", () => {
     expect(status).toBe("unavailable");
   });
 
-  it("retourne offline par defaut quand aucune source n'est active", () => {
+  it("returns offline by default when no source is active", () => {
     const status = consolidatePresence({ matrix: null, grommunio: null, livekit: null });
     expect(status).toBe("offline");
   });
 
-  it("retourne offline quand Matrix est explicitement offline", () => {
+  it("returns offline when Matrix is explicitly offline", () => {
     const status = consolidatePresence({
       matrix: "offline",
       grommunio: { inMeetingNow: false },

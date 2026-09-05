@@ -1,28 +1,28 @@
 ---
-# Defaults du rôle keycloak_realm — étude 1.7 : Keycloak en SSO/IAM central,
-# TOTP + WebAuthn/FIDO2 activés nativement dès le déploiement initial.
+# Defaults for the keycloak_realm role — study 1.7: Keycloak as the central
+# SSO/IAM, TOTP + WebAuthn/FIDO2 natively enabled from the initial deployment.
 
 keycloak_realm_name: "libre365"
 keycloak_realm_display_name: "Libre365"
 
-# MFA — étude 1.7, ligne ~264-265 : TOTP et WebAuthn/FIDO2 "nativement
-# supportés, sans développement". SMS et OTP mail sont volontairement absents
-# de cette liste : ils nécessitent un SPI Keycloak custom non couvert par ce
-# rôle (cf. chantiers à développer, fin de l'étude).
+# MFA — study 1.7, line ~264-265: TOTP and WebAuthn/FIDO2 "natively
+# supported, with no development needed". SMS and email OTP are deliberately
+# absent from this list: they require a custom Keycloak SPI not covered by
+# this role (see the future development items at the end of the study).
 keycloak_realm_otp_policy_type: "totp"
 keycloak_realm_otp_policy_algorithm: "HmacSHA1"
 keycloak_realm_otp_policy_digits: 6
 keycloak_realm_otp_policy_period: 30
 keycloak_realm_webauthn_enabled: true
-keycloak_realm_webauthn_passwordless_enabled: true # WebAuthn comme facteur principal sans mot de passe (passkey), cf. 1.7
+keycloak_realm_webauthn_passwordless_enabled: true # WebAuthn as the primary passwordless factor (passkey), see 1.7
 
-# Clients OIDC — un par brique de la stack supportant nativement OIDC (étude
-# 1.7, critères de choix : "à vérifier service par service ; Grommunio, Seafile,
-# Vikunja et OnlyOffice supportent OIDC ; Matrix/Synapse également via
-# provider OIDC"). Grommunio lui-même n'est PAS ajouté ici : le SSO applicatif
-# de grommunio-web n'est pas retenu comme prioritaire par l'étude (l'admin web
-# reste de toute façon désactivée, cf. playbooks/grommunio.yml) — laissé en
-# commentaire pour extension future si un besoin de SSO webmail émerge.
+# OIDC clients — one per stack component that natively supports OIDC (study
+# 1.7, selection criteria: "to be checked service by service; Grommunio,
+# Seafile, Vikunja and OnlyOffice support OIDC; Matrix/Synapse too via an
+# OIDC provider"). Grommunio itself is NOT added here: application SSO for
+# grommunio-web is not treated as a priority by the study (the web admin
+# stays disabled anyway, see playbooks/grommunio.yml) — left as a comment
+# for future extension should a webmail SSO need emerge.
 keycloak_oidc_clients:
   - client_id: "seafile"
     name: "Seafile"
@@ -60,7 +60,7 @@ keycloak_oidc_clients:
     public_client: false
 
   - client_id: "novu"
-    name: "Novu (centre de notifications)"
+    name: "Novu (notification center)"
     root_url: "https://notify.{{ libre365_domain }}"
     redirect_uris:
       - "https://notify.{{ libre365_domain }}/auth/oidc/callback"

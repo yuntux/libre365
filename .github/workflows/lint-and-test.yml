@@ -1,16 +1,16 @@
 name: Lint & test
 
-# Pipeline "socle" de la chaine CI/CD decrite au chapitre 5 de l'etude
-# (sortie-office365-etude.md, lignes 769-802) : c'est le premier maillon de
-# "veille sur les nouvelles versions -> recette ephemere -> promotion"
-# (5.3/5.4), applique ici a chaque changement de code plutot qu'a une nouvelle
-# version de brique detectee par Renovate (voir renovate.json et
-# ephemeral-staging.yml pour la suite du cycle).
+# "Baseline" pipeline of the CI/CD chain described in chapter 5 of the study
+# (office365-exit-study.md, lines 769-802): this is the first link of
+# "monitoring for new versions -> ephemeral staging -> promotion" (5.3/5.4),
+# applied here to every code change rather than to a new component version
+# detected by Renovate (see renovate.json and ephemeral-staging.yml for the
+# rest of the cycle).
 #
-# Le depot est peuple en parallele par plusieurs equipes/agents sur
-# infra/, connectors/, docker-compose/ et tests/integration/ : chaque job
-# verifie donc l'existence de son propre perimetre avant de s'executer et
-# n'echoue jamais uniquement parce qu'un sous-repertoire n'existe pas encore.
+# The repo is populated in parallel by several teams/agents working on
+# infra/, connectors/, docker-compose/ and tests/integration/: each job
+# therefore checks for the existence of its own scope before running and
+# never fails solely because a subdirectory does not exist yet.
 
 on:
   pull_request:
@@ -35,7 +35,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::infra/terraform absent pour l'instant (repertoire en cours de peuplement) - job ignore."
+            echo "::notice::infra/terraform not present yet (directory still being populated) - job skipped."
           fi
 
       - name: Setup Terraform
@@ -50,7 +50,7 @@ jobs:
         run: terraform fmt -check -recursive
         continue-on-error: true
 
-      - name: terraform init (backend-less, validation seulement)
+      - name: terraform init (backend-less, validation only)
         if: steps.check.outputs.present == 'true'
         working-directory: infra/terraform
         run: terraform init -backend=false
@@ -74,7 +74,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::infra/ansible absent pour l'instant - job ignore."
+            echo "::notice::infra/ansible not present yet - job skipped."
           fi
 
       - name: Set up Python
@@ -93,7 +93,7 @@ jobs:
         continue-on-error: true
 
   helm-values-yamllint:
-    name: yamllint values Helm
+    name: yamllint Helm values
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -105,7 +105,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::infra/k8s absent pour l'instant - job ignore."
+            echo "::notice::infra/k8s not present yet - job skipped."
           fi
 
       - name: Set up Python

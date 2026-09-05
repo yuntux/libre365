@@ -1,7 +1,7 @@
 {
   "name": "@libre365/onlyoffice-mentions",
   "version": "1.0.0",
-  "description": "Handler onRequestUsers / onRequestSendNotify OnlyOffice, relais vers notification-hub (etude 2.7)",
+  "description": "OnlyOffice onRequestUsers / onRequestSendNotify handler, relaying to notification-hub (study 2.7)",
   "private": true,
   "main": "dist/server.js",
   "scripts": {

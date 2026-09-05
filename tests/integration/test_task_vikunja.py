@@ -1,14 +1,13 @@
 """
-Scénario critique (étude 4.5): "création et notification d'une tâche
-(Vikunja)".
+Critical scenario (study 4.5): "creating and notifying a task (Vikunja)".
 
-Vérifie d'abord la création via l'API REST Vikunja, puis la notification
-associée. Le connecteur notification-hub (2.1 dans l'étude) est le centre de
-notifications utilisateur cible: quand il est présent et joignable, on
-vérifie qu'il a bien relayé l'événement de création de tâche. Sinon (par
-exemple en environnement docker-compose minimal sans les connecteurs
-démarrés), on se rabat sur la vérification de l'état de la tâche créée côté
-Vikunja lui-même, pour que ce test reste rejouable de façon autonome.
+First verifies creation via the Vikunja REST API, then the associated
+notification. The notification-hub connector (2.1 in the study) is the
+target user notification center: when it is present and reachable, we
+verify that it did relay the task-creation event. Otherwise (e.g. in a
+minimal docker-compose environment without the connectors started), we fall
+back to checking the state of the created task on the Vikunja side itself,
+so this test remains independently replayable.
 """
 
 from __future__ import annotations
@@ -31,8 +30,8 @@ def vikunja_ready(base_urls, wait_for_service):
 @pytest.fixture(scope="module")
 def vikunja_token(base_urls, test_user, vikunja_ready) -> str:
     """
-    Authentification native Vikunja. Le scénario SSO Vikunja via Keycloak
-    (OpenID Connect) est couvert séparément dans test_sso_e2e.py.
+    Native Vikunja authentication. The Vikunja SSO scenario via Keycloak
+    (OpenID Connect) is covered separately in test_sso_e2e.py.
     """
     response = requests.post(
         f"{base_urls.vikunja}/api/v1/login",
@@ -44,12 +43,12 @@ def vikunja_token(base_urls, test_user, vikunja_ready) -> str:
     )
     if response.status_code != 200:
         pytest.fail(
-            f"Échec de connexion Vikunja sur {base_urls.vikunja}: "
+            f"Vikunja login failed on {base_urls.vikunja}: "
             f"HTTP {response.status_code} - {response.text[:300]}"
         )
     token = response.json().get("token")
     if not token:
-        pytest.fail(f"Réponse de login Vikunja sans token: {response.text[:300]}")
+        pytest.fail(f"Vikunja login response without a token: {response.text[:300]}")
     return token
 
 
@@ -60,7 +59,7 @@ def vikunja_headers(vikunja_token: str) -> dict:
 
 @pytest.fixture()
 def test_project(base_urls, vikunja_headers):
-    """Crée un projet Vikunja de test et le nettoie (suppression) en fin de test."""
+    """Creates a test Vikunja project and cleans it up (deletion) at the end of the test."""
     project_title = f"integration-test-{uuid.uuid4().hex[:8]}"
     create_response = requests.put(
         f"{base_urls.vikunja}/api/v1/projects",
@@ -70,7 +69,7 @@ def test_project(base_urls, vikunja_headers):
     )
     if create_response.status_code not in (200, 201):
         pytest.fail(
-            "Échec de création du projet Vikunja de test: "
+            "Failed to create the test Vikunja project: "
             f"HTTP {create_response.status_code} - {create_response.text[:300]}"
         )
     project_id = create_response.json()["id"]
@@ -86,13 +85,14 @@ def test_project(base_urls, vikunja_headers):
 
 def test_create_task_and_notification(base_urls, vikunja_headers, test_project):
     """
-    Crée une tâche dans le projet de test, puis vérifie:
-    1. que la tâche existe bien côté Vikunja avec les attributs attendus;
-    2. si notification-hub est joignable, qu'il a bien relayé l'événement
-       (vérification best-effort, ne bloque pas le scénario si le connecteur
-       n'est pas démarré dans cet environnement).
+    Creates a task in the test project, then verifies:
+    1. that the task does exist on the Vikunja side with the expected
+       attributes;
+    2. if notification-hub is reachable, that it did relay the event
+       (best-effort check, does not block the scenario if the connector is
+       not started in this environment).
     """
-    task_title = f"Tâche de test {uuid.uuid4()}"
+    task_title = f"Test task {uuid.uuid4()}"
 
     create_response = requests.put(
         f"{base_urls.vikunja}/api/v1/projects/{test_project}/tasks",
@@ -101,7 +101,7 @@ def test_create_task_and_notification(base_urls, vikunja_headers, test_project):
         timeout=15,
     )
     assert create_response.status_code in (200, 201), (
-        f"Échec de création de la tâche Vikunja: HTTP {create_response.status_code} - "
+        f"Failed to create the Vikunja task: HTTP {create_response.status_code} - "
         f"{create_response.text[:300]}"
     )
     task_id = create_response.json()["id"]
@@ -112,7 +112,7 @@ def test_create_task_and_notification(base_urls, vikunja_headers, test_project):
         timeout=15,
     )
     assert get_response.status_code == 200, (
-        f"Tâche créée (id={task_id}) introuvable à la relecture: "
+        f"Created task (id={task_id}) not found when reading it back: "
         f"HTTP {get_response.status_code}"
     )
     assert get_response.json()["title"] == task_title
@@ -126,20 +126,20 @@ def _assert_notification_relayed_if_hub_available(base_urls, task_id: int, task_
         health_response = requests.get(hub_health_url, timeout=5)
     except requests.exceptions.RequestException:
         pytest.skip(
-            "notification-hub non joignable dans cet environnement: "
-            "vérification de notification limitée à l'état de la tâche Vikunja."
+            "notification-hub not reachable in this environment: "
+            "notification check limited to the Vikunja task state."
         )
         return
 
     if health_response.status_code != 200:
         pytest.skip(
-            f"notification-hub répond mais en échec ({health_response.status_code}): "
-            "vérification de notification ignorée."
+            f"notification-hub responds but with a failure ({health_response.status_code}): "
+            "notification check skipped."
         )
         return
 
-    # Poll de l'historique des notifications relayées pour cette tâche
-    # (endpoint attendu du connecteur notification-hub, 2.1 de l'étude).
+    # Polling the history of notifications relayed for this task
+    # (endpoint expected of the notification-hub connector, study 2.1).
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         notifications_response = requests.get(
@@ -156,6 +156,6 @@ def _assert_notification_relayed_if_hub_available(base_urls, task_id: int, task_
         time.sleep(2)
 
     pytest.fail(
-        f"Aucune notification relayée par notification-hub trouvée pour la "
-        f"tâche Vikunja {task_id} ({task_title!r}) après 30s."
+        f"No notification relayed by notification-hub found for Vikunja "
+        f"task {task_id} ({task_title!r}) after 30s."
     )

@@ -1,44 +1,45 @@
 # onlyoffice-mentions
 
-Handler des evenements de mention OnlyOffice Document Server (etude 2.7). Implemente les
-deux points d'extension exposes par OnlyOffice pour les commentaires :
+Handler for OnlyOffice Document Server mention events (study 2.7). Implements the
+two extension points exposed by OnlyOffice for comments:
 
-- **`onRequestUsers`** (`GET /onlyoffice/request-users`) : liste des utilisateurs proposes
-  a la frappe de `@`/`+`, interrogeant l'annuaire via l'API Admin Keycloak (stub simple).
-- **`onRequestSendNotify`** (`POST /onlyoffice/request-send-notify`) : declenche quand un
-  commentaire mentionnant quelqu'un est soumis ; ce connecteur relaie chaque mention vers
-  `notification-hub` (`POST /webhooks/onlyoffice-mention`, cf. `connectors/notification-hub`)
-  avec le lien d'action fourni nativement par OnlyOffice.
+- **`onRequestUsers`** (`GET /onlyoffice/request-users`): list of users suggested
+  when typing `@`/`+`, querying the directory via the Keycloak Admin API (simple stub).
+- **`onRequestSendNotify`** (`POST /onlyoffice/request-send-notify`): triggered when
+  a comment mentioning someone is submitted; this connector relays each mention to
+  `notification-hub` (`POST /webhooks/onlyoffice-mention`, see `connectors/notification-hub`)
+  with the action link natively provided by OnlyOffice.
 
-Ce connecteur est le pont entre OnlyOffice et le reste de l'infrastructure de notification
-(etude 2.1 ligne 487 : "ce connecteur rejoint la liste de ceux a developper en 2.1").
+This connector is the bridge between OnlyOffice and the rest of the notification
+infrastructure (study 2.1 line 487: "this connector joins the list of those to be
+developed in 2.1").
 
-## Configuration cote OnlyOffice
+## OnlyOffice-side configuration
 
-Dans la configuration de l'editeur (Document Server), pointer :
-- `editorConfig.customization.chat: false` (etude 2.6, desactivation du tchat interne)
-- `editorConfig.plugins` / webhook mentions vers ce service : `onRequestUsers` ->
+In the editor configuration (Document Server), point to:
+- `editorConfig.customization.chat: false` (study 2.6, disabling the internal chat)
+- `editorConfig.plugins` / mention webhooks to this service: `onRequestUsers` ->
   `GET /onlyoffice/request-users`, `onRequestSendNotify` -> `POST /onlyoffice/request-send-notify`.
 
 ## Endpoints
 
-| Methode | Route | Description |
+| Method | Route | Description |
 |---|---|---|
-| GET | `/onlyoffice/request-users` | Liste des utilisateurs pour l'autocompletion `@` |
-| POST | `/onlyoffice/request-send-notify` | Relais d'une mention vers notification-hub |
-| GET | `/healthz` | Sonde de sante |
+| GET | `/onlyoffice/request-users` | List of users for `@` autocompletion |
+| POST | `/onlyoffice/request-send-notify` | Relays a mention to notification-hub |
+| GET | `/healthz` | Health probe |
 
-## Variables d'environnement
+## Environment variables
 
-| Variable | Defaut | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `4004` | Port d'ecoute HTTP |
-| `KEYCLOAK_BASE_URL` | `https://auth.example.org` | URL du serveur Keycloak |
-| `KEYCLOAK_REALM` | `libre365` | Realm Keycloak |
-| `KEYCLOAK_ADMIN_TOKEN` | (vide) | Token de service (Admin API, role `view-users`) |
-| `NOTIFICATION_HUB_URL` | `http://notification-hub:4001` | URL du centre de notifications |
+| `PORT` | `4004` | HTTP listen port |
+| `KEYCLOAK_BASE_URL` | `https://auth.example.org` | Keycloak server URL |
+| `KEYCLOAK_REALM` | `libre365` | Keycloak realm |
+| `KEYCLOAK_ADMIN_TOKEN` | (empty) | Service token (Admin API, `view-users` role) |
+| `NOTIFICATION_HUB_URL` | `http://notification-hub:4001` | Notification center URL |
 
-## Developpement
+## Development
 
 ```bash
 npm install
