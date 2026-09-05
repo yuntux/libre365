@@ -1,17 +1,17 @@
 """
-Scénario critique (étude 4.5): "co-édition d'un document (OnlyOffice)".
+Critical scenario (study 4.5): "co-editing a document (OnlyOffice)".
 
-OnlyOffice Document Server ne co-édite pas via une action isolée: un client
-(ici notre test) demande au serveur d'ouvrir un document pour édition en lui
-fournissant une configuration signée en JWT (si JWT activé, ce qui est la
-configuration recommandée en production - voir point ouvert 1.5 de l'étude
-sur Euro-Office comme candidat de remplacement, à réévaluer plus tard mais
-sans impact sur ce test qui cible l'API Document Server générique).
+OnlyOffice Document Server does not co-edit via a single isolated action: a
+client (here, our test) asks the server to open a document for editing by
+supplying it a JWT-signed configuration (if JWT is enabled, which is the
+recommended configuration in production - see study open point 1.5 about
+Euro-Office as a replacement candidate, to be re-evaluated later but with no
+impact on this test, which targets the generic Document Server API).
 
-On simule ici un deuxième "éditeur" en interrogeant à nouveau l'endpoint de
-conversion/health avec le même clé de document (`key`), ce qui est
-l'équivalent côté API du "deux utilisateurs ouvrent le même document":
-Document Server répond que la session d'édition pour cette clé existe déjà.
+Here we simulate a second "editor" by querying the conversion/health
+endpoint again with the same document key (`key`), which is the API-side
+equivalent of "two users open the same document": Document Server responds
+that the editing session for that key already exists.
 """
 
 from __future__ import annotations
@@ -30,13 +30,13 @@ pytestmark = [pytest.mark.timeout(90)]
 
 @pytest.fixture(scope="module")
 def onlyoffice_ready(base_urls, wait_for_service):
-    # /healthcheck est l'endpoint standard de Document Server (retourne "true").
+    # /healthcheck is Document Server's standard endpoint (returns "true").
     wait_for_service(f"{base_urls.onlyoffice}/healthcheck", expected_statuses=(200,))
 
 
 def _onlyoffice_jwt_secret() -> Optional[str]:
-    # Vide/absent si JWT est désactivé sur ce Document Server (déconseillé en
-    # production mais toléré en environnement de test minimal).
+    # Empty/absent if JWT is disabled on this Document Server (discouraged in
+    # production but tolerated in a minimal test environment).
     return os.environ.get("ONLYOFFICE_JWT_SECRET") or None
 
 
@@ -46,15 +46,15 @@ def _sign_config(config: dict, secret: str) -> str:
 
 def test_open_document_for_editing(base_urls, onlyoffice_ready):
     """
-    Construit une configuration d'édition OnlyOffice pour un document de test
-    accessible en HTTP par le Document Server, l'envoie à l'endpoint de
-    conversion/commande, et vérifie que le serveur accepte la session
-    d'édition (pas d'erreur de configuration/signature).
+    Builds an OnlyOffice editing configuration for a test document reachable
+    over HTTP by the Document Server, sends it to the conversion/command
+    endpoint, and verifies that the server accepts the editing session (no
+    configuration/signature error).
     """
     document_key = f"integration-test-{uuid.uuid4().hex}"
-    # Document minimal accessible par le Document Server: on réutilise un
-    # fichier public de démonstration servi par Document Server lui-même,
-    # pour ne pas dépendre d'un stockage de fichiers tiers dans ce test.
+    # Minimal document reachable by the Document Server: we reuse a public
+    # demo file served by Document Server itself, so as not to depend on a
+    # third-party file store for this test.
     document_url = os.environ.get(
         "ONLYOFFICE_TEST_DOCUMENT_URL",
         f"{base_urls.onlyoffice}/web-apps/apps/documenteditor/main/resources/help/en/images/logo.png",
@@ -83,10 +83,10 @@ def test_open_document_for_editing(base_urls, onlyoffice_ready):
         payload_body["token"] = _sign_config(config, secret)
         headers["Authorization"] = f"Bearer {payload_body['token']}"
 
-    # L'endpoint /coauthoring/CommandService.ashx accepte des commandes de
-    # gestion de session (ici "info", non destructive) pour une clé de
-    # document donnée: c'est le point d'entrée utilisé pour vérifier que
-    # Document Server répond correctement, y compris la validation JWT.
+    # The /coauthoring/CommandService.ashx endpoint accepts session
+    # management commands (here "info", non-destructive) for a given
+    # document key: this is the entry point used to verify that Document
+    # Server responds correctly, including JWT validation.
     command_body = {"c": "info", "key": document_key}
     if secret:
         command_body["token"] = _sign_config(command_body, secret)
@@ -99,25 +99,25 @@ def test_open_document_for_editing(base_urls, onlyoffice_ready):
     )
 
     assert response.status_code == 200, (
-        "Le Document Server OnlyOffice a refusé la commande de session "
-        f"d'édition: HTTP {response.status_code} - {response.text[:300]}"
+        "The OnlyOffice Document Server rejected the editing session "
+        f"command: HTTP {response.status_code} - {response.text[:300]}"
     )
 
     result = response.json()
-    # error == 0 est la convention OnlyOffice pour "commande traitée avec succès".
+    # error == 0 is the OnlyOffice convention for "command processed successfully".
     assert result.get("error", 1) == 0, (
-        f"Document Server a renvoyé une erreur pour la clé {document_key!r}: {result}. "
-        "Vérifier la configuration JWT (ONLYOFFICE_JWT_SECRET) si JWT est activé "
-        "sur ce Document Server."
+        f"Document Server returned an error for key {document_key!r}: {result}. "
+        "Check the JWT configuration (ONLYOFFICE_JWT_SECRET) if JWT is enabled "
+        "on this Document Server."
     )
 
 
 def test_second_editor_joins_same_document_session(base_urls, onlyoffice_ready):
     """
-    Approxime la co-édition: deux appels successifs de commande "info" sur la
-    même clé de document doivent tous deux réussir, ce qui démontre que
-    Document Server accepte plusieurs participants sur une session d'édition
-    partagée (pas de verrou exclusif empêchant un second éditeur).
+    Approximates co-editing: two successive "info" command calls on the same
+    document key must both succeed, which demonstrates that Document Server
+    accepts multiple participants on a shared editing session (no exclusive
+    lock preventing a second editor).
     """
     document_key = f"integration-test-coedit-{uuid.uuid4().hex}"
     secret = _onlyoffice_jwt_secret()
@@ -132,15 +132,15 @@ def test_second_editor_joins_same_document_session(base_urls, onlyoffice_ready):
             timeout=20,
         )
         assert response.status_code == 200, (
-            f"Commande OnlyOffice refusée: HTTP {response.status_code} - {response.text[:300]}"
+            f"OnlyOffice command rejected: HTTP {response.status_code} - {response.text[:300]}"
         )
         return response.json()
 
     first_result = _send_info_command()
-    time.sleep(1)  # laisser le temps au serveur d'enregistrer la session
+    time.sleep(1)  # give the server time to register the session
     second_result = _send_info_command()
 
-    for label, result in (("premier éditeur", first_result), ("second éditeur", second_result)):
+    for label, result in (("first editor", first_result), ("second editor", second_result)):
         assert result.get("error", 1) == 0, (
-            f"Échec de la commande pour le {label} sur la clé {document_key!r}: {result}"
+            f"Command failed for the {label} on key {document_key!r}: {result}"
         )

@@ -1,31 +1,31 @@
 ---
-# Configuration post-déploiement de la VM appliance Grommunio (étude 1.1, 2.13,
-# 4.3). L'appliance elle-même est provisionnée par Terraform
-# (infra/terraform/grommunio.tf) ; ce playbook intervient une fois l'appliance
-# installée et accessible en SSH.
+# Post-deployment configuration of the Grommunio appliance VM (study 1.1,
+# 2.13, 4.3). The appliance itself is provisioned by Terraform
+# (infra/terraform/grommunio.tf); this playbook takes over once the appliance
+# is installed and reachable over SSH.
 
-- name: "Configurer la VM appliance Grommunio"
+- name: "Configure the Grommunio appliance VM"
   hosts: grommunio
   become: true
   vars:
     grommunio_dav_config_path: /etc/gromox/dav/grommunio-dav.cfg
-    # GAL en CardDAV — étude 2.13, ligne ~608-616 : fonctionnalité native
-    # ajoutée en 2026.06.1, désactivée par défaut, à activer dès le déploiement
-    # initial pour que Thunderbird/Apple Mail disposent du GAL comme Outlook
-    # en MAPI/EWS.
+    # GAL over CardDAV — study 2.13, line ~608-616: native feature added in
+    # 2026.06.1, disabled by default, to be enabled from the initial
+    # deployment so that Thunderbird/Apple Mail have the GAL like Outlook
+    # over MAPI/EWS.
     grommunio_gal_enabled: true
-    # TTL par défaut de l'ordre de l'heure : équilibre fraîcheur de l'annuaire
-    # (arrivées/départs de consultants) et charge sur le serveur DAV (2.13,
-    # ligne ~613) — 3600 secondes retenu comme valeur de référence.
+    # Default TTL on the order of an hour: balances directory freshness
+    # (consultants joining/leaving) against load on the DAV server (2.13,
+    # line ~613) — 3600 seconds kept as the reference value.
     grommunio_gal_cache_ttl_seconds: 3600
-    # Admin web désactivée pour rester sous le seuil des 5 utilisateurs
-    # gratuits de la console Grommunio (étude 1.1, ligne ~53 : "piloté sans
-    # l'interface d'administration web (CLI/API/fichiers de configuration)
-    # pour éviter le coût de licence au-delà de 5 utilisateurs").
+    # Web admin disabled to stay under the 5-free-user threshold of the
+    # Grommunio console (study 1.1, line ~53: "operated without the web
+    # administration interface (CLI/API/config files) to avoid the license
+    # cost beyond 5 users").
     grommunio_admin_web_enabled: false
 
   tasks:
-    - name: "S'assurer que le répertoire de configuration grommunio-dav existe"
+    - name: "Ensure the grommunio-dav configuration directory exists"
       ansible.builtin.file:
         path: "{{ grommunio_dav_config_path | dirname }}"
         state: directory
@@ -33,7 +33,7 @@
         group: root
         mode: "0755"
 
-    - name: "Activer le GAL en CardDAV (GAL_ENABLED, GAL_CACHE_TTL) — étude 2.13"
+    - name: "Enable GAL over CardDAV (GAL_ENABLED, GAL_CACHE_TTL) — study 2.13"
       ansible.builtin.lineinfile:
         path: "{{ grommunio_dav_config_path }}"
         create: true
@@ -45,44 +45,44 @@
       loop:
         - { key: "GAL_ENABLED", value: "{{ grommunio_gal_enabled | lower }}" }
         - { key: "GAL_CACHE_TTL", value: "{{ grommunio_gal_cache_ttl_seconds }}" }
-      notify: "Redémarrer grommunio-dav"
+      notify: "Restart grommunio-dav"
 
-    - name: "Désactiver l'interface d'administration web Grommunio"
+    - name: "Disable the Grommunio web administration interface"
       ansible.builtin.systemd:
         name: gromox-adaptor.service
         enabled: false
         state: stopped
       when: not grommunio_admin_web_enabled
-      ignore_errors: true # le nom exact du service dépend de la version d'appliance installée ; à ajuster en recette
+      ignore_errors: true # exact service name depends on the installed appliance version; adjust during staging
 
-    - name: "Bloquer l'accès réseau à la console d'admin web en complément (défense en profondeur)"
+    - name: "Also block network access to the web admin console (defense in depth)"
       community.general.ufw:
         rule: deny
         port: "8080"
         proto: tcp
       when: not grommunio_admin_web_enabled
-      ignore_errors: true # ufw peut ne pas être le pare-feu retenu sur l'appliance ; adapter selon l'image
+      ignore_errors: true # ufw may not be the firewall used on the appliance; adapt depending on the image
 
-    - name: "S'assurer que le connecteur EWS est actif (compatibilité Outlook, Apple Mail, Thunderbird — étude 1.9)"
+    - name: "Ensure the EWS connector is active (Outlook, Apple Mail, Thunderbird compatibility — study 1.9)"
       ansible.builtin.systemd:
         name: gromox-http.service
         state: started
         enabled: true
 
-    - name: "S'assurer que le connecteur EAS/ActiveSync est actif (mobile — étude 1.1)"
+    - name: "Ensure the EAS/ActiveSync connector is active (mobile — study 1.1)"
       ansible.builtin.systemd:
         name: gromox-zcore.service
         state: started
         enabled: true
 
-    - name: "S'assurer que MAPI/RPC-HTTP est actif (compatibilité Outlook native — étude 1.1)"
+    - name: "Ensure MAPI/RPC-HTTP is active (native Outlook compatibility — study 1.1)"
       ansible.builtin.systemd:
         name: gromox-http.service
         state: started
         enabled: true
 
   handlers:
-    - name: "Redémarrer grommunio-dav"
+    - name: "Restart grommunio-dav"
       ansible.builtin.systemd:
         name: gromox-dav.service
         state: restarted

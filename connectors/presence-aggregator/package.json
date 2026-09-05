@@ -1,7 +1,7 @@
 {
   "name": "@libre365/presence-aggregator",
   "version": "1.0.0",
-  "description": "Agregateur de presence Matrix/Grommunio-EWS/LiveKit consolidee pour le bandeau du portail (etude 2.8)",
+  "description": "Matrix/Grommunio-EWS/LiveKit presence aggregator, consolidated for the portal status bar (study 2.8)",
   "private": true,
   "main": "dist/server.js",
   "scripts": {

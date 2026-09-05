@@ -1,15 +1,15 @@
 ---
-# Variables communes à tous les playbooks. Les secrets réels (mots de passe,
-# clés API) doivent être injectés via Ansible Vault ou un coffre-fort externe
-# (Vault/OpenBao) — étude 4.5 : "jamais en clair dans le dépôt de code".
-# Les valeurs ci-dessous sont des exemples de structure, pas des secrets réels.
+# Variables common to all playbooks. Real secrets (passwords, API keys)
+# must be injected via Ansible Vault or an external vault (Vault/OpenBao) —
+# study 4.5: "never in plaintext in the code repository".
+# The values below are structural examples, not real secrets.
 
 libre365_domain: "libre365.example.internal"
 
 keycloak_base_url: "https://sso.{{ libre365_domain }}"
 keycloak_admin_realm: "master"
 keycloak_target_realm: "libre365"
-# À fournir via `--extra-vars` ou un fichier vault, jamais en clair ici :
+# To be supplied via `--extra-vars` or a vault file, never in plaintext here:
 keycloak_admin_user: "{{ vault_keycloak_admin_user | default('admin') }}"
 keycloak_admin_password: "{{ vault_keycloak_admin_password | default(omit) }}"
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Attend que les services docker-compose declarant un healthcheck soient
-# "healthy" (et fait un simple TCP-check pour ceux qui n'en declarent pas,
-# ex. grommunio-dev - cf. commentaire dans docker-compose.yml), avant de
-# lancer la suite tests/integration/ en CI (etude, chapitre 5.5).
+# Waits for docker-compose services declaring a healthcheck to become
+# "healthy" (and does a simple TCP check for those that don't declare one,
+# e.g. grommunio-dev - see comment in docker-compose.yml), before running
+# the tests/integration/ suite in CI (study, chapter 5.5).
 #
 # Usage:
 #   ./scripts/wait-for-healthy.sh [timeout_seconds]
 #
-# A executer depuis le repertoire docker-compose/ (ou en lui passant
-# COMPOSE_FILE/COMPOSE_PROJECT_NAME dans l'environnement).
+# To be run from the docker-compose/ directory (or by passing
+# COMPOSE_FILE/COMPOSE_PROJECT_NAME in the environment).
 
 set -euo pipefail
 
@@ -20,14 +20,14 @@ TIMEOUT="${1:-600}"
 INTERVAL=5
 ELAPSED=0
 
-# Services sans HEALTHCHECK Docker natif dans docker-compose.yml : verifies
-# par un simple TCP-check sur le port publie plutot que par `docker compose
-# ps` (qui les rapporterait toujours comme "running", pas "healthy").
+# Services with no native Docker HEALTHCHECK in docker-compose.yml: checked
+# with a simple TCP check on the published port rather than via `docker
+# compose ps` (which would always report them as "running", not "healthy").
 declare -A TCP_ONLY_SERVICES=(
   [grommunio-dev]="${GROMMUNIO_DEV_HTTP_PORT:-8443}"
 )
 
-echo "==> Attente de la disponibilite de la stack libre365 (dev/test)..."
+echo "==> Waiting for the libre365 stack (dev/test) to become available..."
 
 compose_services() {
   docker compose config --services
@@ -46,8 +46,8 @@ is_healthy_via_compose() {
     return 0
   fi
   if [ "${status}" = "no-healthcheck" ]; then
-    # Pas de healthcheck declare pour ce service : on considere "running"
-    # comme suffisant, sauf s'il figure dans TCP_ONLY_SERVICES ci-dessus.
+    # No healthcheck declared for this service: "running" is considered
+    # sufficient, unless it appears in TCP_ONLY_SERVICES above.
     local running
     running="$(docker inspect --format '{{.State.Running}}' "${cid}" 2>/dev/null || echo "false")"
     [ "${running}" = "true" ]
@@ -68,23 +68,23 @@ while true; do
     if [ -n "${TCP_ONLY_SERVICES[${service}]:-}" ]; then
       if ! is_tcp_open "${TCP_ONLY_SERVICES[${service}]}"; then
         ALL_OK=false
-        echo "  - ${service}: en attente (TCP:${TCP_ONLY_SERVICES[${service}]})"
+        echo "  - ${service}: waiting (TCP:${TCP_ONLY_SERVICES[${service}]})"
       fi
       continue
     fi
     if ! is_healthy_via_compose "${service}"; then
       ALL_OK=false
-      echo "  - ${service}: en attente"
+      echo "  - ${service}: waiting"
     fi
   done
 
   if [ "${ALL_OK}" = "true" ]; then
-    echo "==> Tous les services sont disponibles."
+    echo "==> All services are available."
     exit 0
   fi
 
   if [ "${ELAPSED}" -ge "${TIMEOUT}" ]; then
-    echo "==> Timeout (${TIMEOUT}s) atteint : la stack n'est pas entierement disponible." >&2
+    echo "==> Timeout (${TIMEOUT}s) reached: the stack is not fully available." >&2
     docker compose ps >&2 || true
     exit 1
   fi

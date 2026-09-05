@@ -1,5 +1,5 @@
-# Build context attendu : le repertoire connectors/ (pas ce sous-dossier).
-# docker build -f presence-aggregator/Dockerfile -t presence-aggregator .   # depuis connectors/
+# Expected build context: the connectors/ directory (not this subfolder).
+# docker build -f presence-aggregator/Dockerfile -t presence-aggregator .   # from connectors/
 FROM node:20.17-alpine AS build
 WORKDIR /app
 COPY tsconfig.base.json /tsconfig.base.json

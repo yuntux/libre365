@@ -3,9 +3,9 @@ import { SearchResultItem } from "../types";
 const VIKUNJA_BASE_URL = process.env.VIKUNJA_BASE_URL ?? "https://vikunja.example.org";
 
 /**
- * Interroge l'API Vikunja `tasks/all?s=` avec le token de l'utilisateur relaye tel quel
- * (etude 2.2 ligne 391) : seules les taches des projets auxquels l'utilisateur a acces
- * sont retournees, sans logique de permission dupliquee ici.
+ * Queries the Vikunja `tasks/all?s=` API with the user's token relayed as-is
+ * (study 2.2 line 391): only tasks from projects the user has access to
+ * are returned, with no permission logic duplicated here.
  */
 export async function searchVikunja(
   query: string,
@@ -33,7 +33,7 @@ export async function searchVikunja(
   return (data ?? []).map((task) => ({
     source: "vikunja" as const,
     id: String(task.id ?? ""),
-    title: task.title ?? "(tache)",
+    title: task.title ?? "(task)",
     snippet: task.description,
     url: `${VIKUNJA_BASE_URL}/tasks/${task.id ?? ""}`,
     timestamp: task.updated,

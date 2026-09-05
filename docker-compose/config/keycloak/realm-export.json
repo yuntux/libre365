@@ -8,15 +8,15 @@
   "accessTokenLifespan": 3600,
   "roles": {
     "realm": [
-      { "name": "consultant", "description": "Utilisateur standard libre365 (etude 1.7)" },
-      { "name": "admin", "description": "Administration libre365" }
+      { "name": "consultant", "description": "Standard libre365 user (study 1.7)" },
+      { "name": "admin", "description": "libre365 administration" }
     ]
   },
   "clients": [
     {
       "clientId": "libre365-integration-tests",
       "name": "Suite de tests d'integration (tests/integration)",
-      "description": "Client OIDC utilise par la suite pytest pour obtenir des tokens SSO de bout en bout contre chaque brique (etude 4.5, 5.5).",
+      "description": "OIDC client used by the pytest suite to obtain end-to-end SSO tokens against each building block (study 4.5, 5.5).",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,

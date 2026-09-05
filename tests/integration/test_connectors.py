@@ -131,27 +131,28 @@ def presence_aggregator_ready(base_urls, wait_for_service):
 
 def test_presence_aggregator_returns_consolidated_status(base_urls, presence_aggregator_ready, test_user):
     """
-    Interroge le statut de présence consolidé d'un utilisateur de test.
-    Le connecteur est censé combiner au minimum la présence Matrix et l'état
-    "en réunion" issu de Visio (2.8): on vérifie ici seulement la forme de
-    la réponse (statut connu, horodatage), pas la véracité métier du statut
-    - celle-ci dépend de l'état réel des briques sources au moment du test.
+    Queries the consolidated presence status of a test user. The connector
+    is expected to combine at least Matrix presence and the "in meeting"
+    state coming from Visio (2.8): here we only check the shape of the
+    response (known status, timestamp), not the business accuracy of the
+    status - that depends on the actual state of the source components at
+    test time.
     """
     response = requests.get(
         f"{base_urls.presence_aggregator}/presence/{test_user.username}",
         timeout=15,
     )
     assert response.status_code == 200, (
-        f"presence-aggregator a échoué pour l'utilisateur {test_user.username}: "
+        f"presence-aggregator failed for user {test_user.username}: "
         f"HTTP {response.status_code} - {response.text[:300]}"
     )
 
     payload = response.json()
     assert "status" in payload, (
-        f"Réponse presence-aggregator sans champ 'status': {payload}"
+        f"presence-aggregator response without a 'status' field: {payload}"
     )
     known_statuses = {"online", "offline", "busy", "in_meeting", "away", "unknown"}
     assert payload["status"] in known_statuses, (
-        f"Statut de présence inattendu {payload['status']!r} pour "
-        f"{test_user.username}, attendu un de {sorted(known_statuses)}."
+        f"Unexpected presence status {payload['status']!r} for "
+        f"{test_user.username}, expected one of {sorted(known_statuses)}."
     )

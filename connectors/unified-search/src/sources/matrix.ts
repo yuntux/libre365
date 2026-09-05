@@ -3,9 +3,9 @@ import { SearchResultItem } from "../types";
 const MATRIX_BASE_URL = process.env.MATRIX_BASE_URL ?? "https://matrix.example.org";
 
 /**
- * Interroge l'endpoint `/search` du Client-Server API Matrix, avec le token Bearer
- * de l'utilisateur relaye tel quel (etude 2.2 ligne 391) : Matrix applique ses propres
- * regles de visibilite de room a la recherche, aucune ACL n'est dupliquee ici.
+ * Queries the `/search` endpoint of the Matrix Client-Server API, with the user's
+ * Bearer token relayed as-is (study 2.2 line 391): Matrix applies its own
+ * room visibility rules to the search, no ACL is duplicated here.
  */
 export async function searchMatrix(
   query: string,

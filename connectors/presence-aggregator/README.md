@@ -1,45 +1,45 @@
 # presence-aggregator
 
-Agregateur de presence unifiee (etude 2.8). Consulte trois sources disjointes et republie
-un statut consolide par utilisateur pour le bandeau du portail applicatif (etude 2.3) :
+Unified presence aggregator (study 2.8). Queries three disjoint sources and republishes
+a consolidated status per user for the application portal's status bar (study 2.3):
 
-- **Matrix** : `m.presence` (online/unavailable/offline) via l'API cliente/serveur.
-- **Grommunio/EWS** : etat "en reunion" derive de `GetUserAvailability` (SOAP), stub
-  d'appel structure et commente dans `src/sources/grommunio-ews.ts`.
-- **Visio/LiveKit** : liste des participants connectes a une room, via
+- **Matrix**: `m.presence` (online/unavailable/offline) via the client-server API.
+- **Grommunio/EWS**: "in meeting" state derived from `GetUserAvailability` (SOAP), a
+  structured, commented call stub in `src/sources/grommunio-ews.ts`.
+- **Video/LiveKit**: list of participants connected to a room, via
   `livekit-server-sdk` (`RoomServiceClient.listRooms`/`listParticipants`).
 
-## Regle de consolidation
+## Consolidation rule
 
-`src/consolidate.ts` est une fonction pure, sans dependance reseau, donc testable
-unitairement sans mock HTTP : priorite **en reunion > en ligne Matrix > absent**
-(etude 2.8 ligne 504).
+`src/consolidate.ts` is a pure function, with no network dependency, so it is
+unit-testable without HTTP mocks: priority **in meeting > online on Matrix > away**
+(study 2.8 line 504).
 
 ## Endpoints
 
-| Methode | Route | Description |
+| Method | Route | Description |
 |---|---|---|
-| GET | `/presence/:userId` | Statut consolide instantane pour un utilisateur |
-| GET | `/presence/stream?userIds=a,b,c` | Flux SSE, rafraichi toutes les `PRESENCE_STREAM_INTERVAL_MS` |
-| GET | `/healthz` | Sonde de sante |
+| GET | `/presence/:userId` | Instant consolidated status for a user |
+| GET | `/presence/stream?userIds=a,b,c` | SSE stream, refreshed every `PRESENCE_STREAM_INTERVAL_MS` |
+| GET | `/healthz` | Health probe |
 
-## Variables d'environnement
+## Environment variables
 
-| Variable | Defaut | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `4003` | Port d'ecoute HTTP |
-| `PRESENCE_STREAM_INTERVAL_MS` | `5000` | Intervalle de rafraichissement SSE |
-| `MATRIX_BASE_URL` | `https://matrix.example.org` | URL du homeserver Matrix |
-| `MATRIX_SERVICE_TOKEN` | (vide) | Token de service Matrix pour lire la presence de tout utilisateur |
-| `GROMMUNIO_EWS_URL` | `https://mail.example.org/EWS/Exchange.asmx` | Endpoint SOAP EWS |
-| `LIVEKIT_URL` | `https://visio.example.org` | URL du serveur LiveKit |
-| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | (vide) | Identifiants API serveur LiveKit |
+| `PORT` | `4003` | HTTP listen port |
+| `PRESENCE_STREAM_INTERVAL_MS` | `5000` | SSE refresh interval |
+| `MATRIX_BASE_URL` | `https://matrix.example.org` | Matrix homeserver URL |
+| `MATRIX_SERVICE_TOKEN` | (empty) | Matrix service token to read any user's presence |
+| `GROMMUNIO_EWS_URL` | `https://mail.example.org/EWS/Exchange.asmx` | EWS SOAP endpoint |
+| `LIVEKIT_URL` | `https://visio.example.org` | LiveKit server URL |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | (empty) | LiveKit server API credentials |
 
-## Developpement
+## Development
 
 ```bash
 npm install
-npm test        # vitest sur src/consolidate.ts, sans reseau
+npm test        # vitest on src/consolidate.ts, no network access
 npm run build
 npm start
 ```

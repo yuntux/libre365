@@ -7,7 +7,7 @@ function delayed<T>(value: T, ms: number): Promise<T> {
 }
 
 describe("fanOutSearch", () => {
-  it("agrege les resultats des sources qui repondent a temps", async () => {
+  it("aggregates results from sources that respond in time", async () => {
     const matrix: SourceSearchFn = vi.fn(async () =>
       delayed(
         [{ source: "matrix", id: "1", title: "hello", url: "http://x", timestamp: "2026-01-01T00:00:00Z" }],
@@ -34,11 +34,11 @@ describe("fanOutSearch", () => {
 
     const merged = mergeResults(outcomes);
     expect(merged).toHaveLength(2);
-    // Trie par date desc : seafile (fevrier) doit apparaitre avant matrix (janvier).
+    // Sorted by date desc: seafile (February) should appear before matrix (January).
     expect(merged[0].source).toBe("seafile");
   });
 
-  it("isole un service lent par un timeout sans bloquer les autres", async () => {
+  it("isolates a slow service via a timeout without blocking the others", async () => {
     const fast: SourceSearchFn = async () =>
       delayed([{ source: "vikunja", id: "1", title: "task", url: "http://x" }], 10);
     const slow: SourceSearchFn = async () => delayed([], 500);
@@ -58,7 +58,7 @@ describe("fanOutSearch", () => {
     expect(grommunioOutcome?.error).toContain("timeout");
   });
 
-  it("un rejet d'une source n'empeche pas l'agregation des autres", async () => {
+  it("a rejection from one source does not prevent aggregating the others", async () => {
     const failing: SourceSearchFn = async () => {
       throw new Error("service unavailable");
     };
@@ -79,7 +79,7 @@ describe("fanOutSearch", () => {
     expect(outcomes.find((o) => o.source === "matrix")?.ok).toBe(true);
   });
 
-  it("relaie le meme token utilisateur a toutes les sources sans le modifier", async () => {
+  it("relays the same user token to all sources without modifying it", async () => {
     const spy = vi.fn(async () => []);
     await fanOutSearch(
       "q",

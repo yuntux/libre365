@@ -1,20 +1,19 @@
 """
-Scénario critique (étude 4.5): "envoi de message et démarrage d'une visio
-depuis une room (Matrix/Element/Visio)".
+Critical scenario (study 4.5): "sending a message and starting a call from a
+room (Matrix/Element/Visio)".
 
-Utilise directement l'API cliente Matrix (Client-Server API, `/_matrix/client/v3/...`)
-via `requests`, sans SDK Matrix, pour rester léger et explicite sur les
-appels réellement effectués par Element.
+Uses the Matrix client API directly (Client-Server API,
+`/_matrix/client/v3/...`) via `requests`, without a Matrix SDK, to stay
+lightweight and explicit about the calls actually made by Element.
 
-Point ouvert de l'étude (voir note de bas de document): le bouton
-d'intégration visio complet depuis Grommunio est conditionné à la
-disponibilité d'une API de création de room côté Visio (à confirmer auprès
-de la DINUM). En attendant, la solution de repli retenue est un lien
-réutilisable (widget statique). Ce test couvre donc le "démarrage d'une
-visio" au niveau du widget de room Matrix (ajout d'un state event
-`im.vector.modular.widgets` pointant vers le lien Visio), qui est le
-mécanisme réellement disponible aujourd'hui - pas un appel à une API Visio
-dédiée qui n'existe pas encore.
+Open point of the study (see the footnote at the end of the document): the
+full Visio integration button from Grommunio is conditioned on the
+availability of a room-creation API on the Visio side (to be confirmed with
+DINUM). In the meantime, the fallback solution adopted is a reusable link
+(static widget). This test therefore covers "starting a call" at the level
+of the Matrix room widget (adding an `im.vector.modular.widgets` state event
+pointing to the Visio link), which is the mechanism actually available
+today - not a call to a dedicated Visio API that does not exist yet.
 """
 
 from __future__ import annotations
