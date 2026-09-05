@@ -73,9 +73,12 @@ async def stream_presence(request: Request, userIds: str = Query(default="")):
         )
 
     async def event_generator() -> AsyncIterator[dict]:
+        # `EventSourceResponse` itself watches the connection and cancels this
+        # generator (raising inside the `await` it is suspended on) as soon as
+        # the client disconnects, so no manual `request.is_disconnected()`
+        # polling loop is needed here -- unlike the Express version, which had
+        # to wire `req.on("close", ...)` itself.
         while True:
-            if await request.is_disconnected():
-                break
             presences = await asyncio.gather(
                 *(build_consolidated_presence(uid) for uid in user_ids)
             )

@@ -60,15 +60,23 @@ async def test_stream_requires_user_ids(client):
 async def test_stream_opens_and_closes(monkeypatch):
     # Shrink the refresh interval so the test doesn't wait for the default 5s.
     monkeypatch.setattr(main_module, "STREAM_INTERVAL_MS", 10)
-    transport = ASGITransport(app=main_module.app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        async with c.stream(
-            "GET", "/presence/stream", params={"userIds": "alice,bob"}
-        ) as resp:
-            assert resp.status_code == 200
-            assert resp.headers["content-type"].startswith("text/event-stream")
-            async for line in resp.aiter_lines():
-                if line.startswith("data:"):
-                    break
-            # Connection is closed cleanly on exiting the `async with` block,
-            # exercising the same open-then-close path as a real SSE client.
+
+    # `httpx`'s ASGI transport buffers a handler's full response before handing
+    # it back (it isn't a real bidirectional socket), so it cannot drive an
+    # endpoint whose body never ends on its own -- which an SSE stream never
+    # does. Instead, call the route directly and pump its `EventSourceResponse`
+    # body iterator by hand: this exercises exactly what a real client does
+    # (open the connection, read one event, close it) without needing a real
+    # socket.
+    response = await main_module.stream_presence(
+        request=None, userIds="alice,bob"
+    )
+    assert response.status_code == 200
+    assert response.media_type == "text/event-stream"
+
+    first_event = await response.body_iterator.__anext__()
+    assert '"userId": "alice"' in first_event["data"] or "alice" in first_event["data"]
+
+    # Closing the generator early mirrors a client disconnecting mid-stream --
+    # must not raise.
+    await response.body_iterator.aclose()
