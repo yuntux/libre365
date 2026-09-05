@@ -2,8 +2,13 @@
 
 Unified search via real-time fan-out (study 2.2). `GET /search?q=...` queries Matrix
 (`/search`), Seafile (search API), Vikunja (`tasks/all?s=`) and Grommunio (IMAP SEARCH,
-structured stub) in parallel, with a per-service timeout (2s by default) that isolates a
+structured stub) concurrently, with a per-service timeout (2s by default) that isolates a
 slow service without blocking the other responses.
+
+Implemented in Python (FastAPI + uvicorn, with `uvloop` as the event loop), for
+consistency with the rest of the repository (`tests/integration/`,
+`scripts/sync_platform.py`) and I/O-bound performance on par with the previous
+Node/Express implementation.
 
 ## Key point: token relay, no re-authentication
 
@@ -15,10 +20,10 @@ central index (see the discussion in study 2.2).
 
 ## Grommunio / IMAP
 
-Grommunio does not expose a generic REST search API. `src/sources/grommunio.ts`
-lays out the structure of an IMAP SEARCH call via `imapflow` (commented out, ready to
-be enabled) and documents the XOAUTH2 authentication mechanism that lets the same
-user token be relayed to IMAP. The active implementation is a simplified stub that
+Grommunio does not expose a generic REST search API. `app/sources/grommunio.py`
+lays out the structure of an IMAP SEARCH call via an async IMAP client (commented out,
+ready to be enabled) and documents the XOAUTH2 authentication mechanism that lets the
+same user token be relayed to IMAP. The active implementation is a simplified stub that
 simulates network latency, so the fan-out/timeout logic can be exercised end to end.
 
 ## Endpoints
@@ -42,16 +47,26 @@ simulates network latency, so the fan-out/timeout logic can be exercised end to 
 
 ## Structure
 
-- `src/fanout.ts` — pure fan-out/timeout/aggregation core, sources are injected as a
-  parameter to stay testable without network access (`test/fanout.test.ts`).
-- `src/sources/*.ts` — one HTTP/IMAP connector per service, relaying the user token.
-- `src/server.ts` — Express `/search` route, extracting the token from `Authorization`.
+- `app/fanout.py` — pure fan-out/timeout/aggregation core (`asyncio.gather(...,
+  return_exceptions=True)` + `asyncio.wait_for` per service, the exact equivalent of
+  `Promise.allSettled` + per-call timeout on the TS side). Sources are injected as a
+  parameter to stay testable without network access (`tests/test_fanout.py`).
+- `app/sources/*.py` — one async HTTP/IMAP connector per service (via
+  `httpx.AsyncClient`), relaying the user token.
+- `app/main.py` — FastAPI `/search` route, extracting the token from `Authorization`.
 
 ## Development
 
 ```bash
-npm install
-npm test
-npm run build
-npm start
+pip install -r requirements.txt
+pytest
+uvicorn app.main:app --reload --port 4002
+```
+
+## Docker
+
+```bash
+# from connectors/unified-search/ (self-contained build context)
+docker build -t unified-search .
+docker run -p 4002:4002 unified-search
 ```

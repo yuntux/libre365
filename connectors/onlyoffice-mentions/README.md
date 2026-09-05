@@ -14,6 +14,10 @@ This connector is the bridge between OnlyOffice and the rest of the notification
 infrastructure (study 2.1 line 487: "this connector joins the list of those to be
 developed in 2.1").
 
+Implemented in Python (FastAPI + uvicorn/uvloop), async end to end: both the
+Keycloak Admin API call and the relay to `notification-hub` go through a shared
+`httpx.AsyncClient`.
+
 ## OnlyOffice-side configuration
 
 In the editor configuration (Document Server), point to:
@@ -33,7 +37,7 @@ In the editor configuration (Document Server), point to:
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `4004` | HTTP listen port |
+| `PORT` | `4004` | HTTP listen port (set via the uvicorn `--port` flag / Docker `EXPOSE`) |
 | `KEYCLOAK_BASE_URL` | `https://auth.example.org` | Keycloak server URL |
 | `KEYCLOAK_REALM` | `libre365` | Keycloak realm |
 | `KEYCLOAK_ADMIN_TOKEN` | (empty) | Service token (Admin API, `view-users` role) |
@@ -42,8 +46,18 @@ In the editor configuration (Document Server), point to:
 ## Development
 
 ```bash
-npm install
-npm test
-npm run build
-npm start
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+pytest                                             # unit tests
+uvicorn app.main:app --host 0.0.0.0 --port 4004    # run locally
+```
+
+## Docker
+
+Build context is this directory itself:
+
+```bash
+cd connectors/onlyoffice-mentions
+docker build -t onlyoffice-mentions .
 ```

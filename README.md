@@ -45,7 +45,7 @@ actually already happened once in this repository (the default ports in
 [`platform.yaml`](./platform.yaml) is now the only authorized source for
 these values. It feeds:
 - the image tags in `docker-compose/docker-compose.yml` and the
-  `FROM node:...` lines of `connectors/*/Dockerfile`;
+  `FROM python:...` lines of `connectors/*/Dockerfile`;
 - `image.repository`/`image.tag` in `infra/k8s/helm-values/*.yaml` (and the
   raw `image:` line of `infra/k8s/manifests/gokapi.yaml`);
 - the generated ports block in `docker-compose/.env.example`;

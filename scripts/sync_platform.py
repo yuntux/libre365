@@ -114,12 +114,15 @@ def compute_compose_changes(platform: dict) -> list[Change]:
 
 
 def compute_dockerfile_changes(platform: dict) -> list[Change]:
-    node_tag = platform["shared"]["node"]
+    # Connector Dockerfiles are Python/FastAPI (`FROM python:<tag>`); `node` is
+    # only used by the dev-tier Novu mock inside docker-compose.yml itself
+    # (handled by compute_compose_changes), not by any connector Dockerfile.
+    python_tag = platform["shared"]["python"]
     changes = []
     for dockerfile in sorted((REPO_ROOT / "connectors").glob("*/Dockerfile")):
         text = dockerfile.read_text()
-        new_text = sub_from_tag(text, "node", node_tag)
-        changes.append(Change(dockerfile, new_text, f"{dockerfile.relative_to(REPO_ROOT)} (Node base image)"))
+        new_text = sub_from_tag(text, "python", python_tag)
+        changes.append(Change(dockerfile, new_text, f"{dockerfile.relative_to(REPO_ROOT)} (Python base image)"))
     return changes
 
 

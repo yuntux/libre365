@@ -5,9 +5,16 @@ Unified notification center (study 2.1 and 2.7). Receives webhooks from Matrix
 each event to the common format `{source, eventType, userId, title, body, actionUrl, timestamp}`,
 then triggers a Novu notification via the REST API (`events/trigger`).
 
-## Why not `@novu/node`?
+## Why not a Novu SDK?
+
 Direct REST call to keep the connector thin (study 2.1, line 374: "reproducible in
 a few hundred lines"), with no extra SDK dependency to maintain.
+
+## Stack
+
+Python (async), **FastAPI** served by **uvicorn** with the **uvloop** event loop for
+Node-equivalent throughput on this I/O-bound workload, and `httpx.AsyncClient` for the
+non-blocking outbound call to Novu.
 
 ## Endpoints
 
@@ -31,25 +38,32 @@ a few hundred lines"), with no extra SDK dependency to maintain.
 
 ## Structure
 
-- `src/normalize.ts` — pure normalization functions, one per source. No side
+- `app/normalize.py` — pure normalization functions, one per source. No side
   effects, testable without network access.
-- `src/novu-client.ts` — REST relay to Novu.
-- `src/server.ts` — Express routes, wiring normalization -> Novu.
+- `app/novu_client.py` — async REST relay to Novu (`httpx.AsyncClient`).
+- `app/main.py` — FastAPI routes, wiring normalization -> Novu.
+- `app/types.py` — shared type aliases / `TypedDict` for the normalized event shape.
+
+## Dependencies convention
+
+- `requirements.txt` — runtime dependencies only (fastapi, uvicorn[standard], uvloop, httpx).
+- `requirements-dev.txt` — `-r requirements.txt` plus test tooling (pytest, pytest-asyncio).
 
 ## Development
 
 ```bash
-npm install
-npm test        # vitest on src/normalize.ts
-npm run build
-npm start
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest                       # unit tests (app/normalize.py) + light endpoint tests (app/main.py)
+uvicorn app.main:app --reload --port 4001
 ```
 
 ## Docker
 
-The build requires the shared `../tsconfig.base.json` file: build with the
-`connectors/` directory as the context.
+Self-contained build: the build context is this directory itself (no shared file
+outside it), consistent with `docker-compose/docker-compose.yml`'s
+`context: ../connectors/notification-hub`.
 
 ```bash
-docker build -f notification-hub/Dockerfile -t notification-hub .   # from connectors/
+docker build -t notification-hub .   # from connectors/notification-hub/
 ```
