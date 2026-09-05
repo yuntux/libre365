@@ -87,10 +87,20 @@ jobs:
         if: steps.check.outputs.present == 'true'
         run: pip install "ansible-lint>=6.22,<7" "ansible-core>=2.15,<2.17"
 
-      - name: ansible-lint infra/ansible
+      - name: Install Galaxy collections
         if: steps.check.outputs.present == 'true'
-        run: ansible-lint infra/ansible
-        continue-on-error: true
+        working-directory: infra/ansible
+        run: ansible-galaxy collection install -r requirements.yml
+
+      # Run from infra/ansible (not the repo root) so that ansible.cfg's
+      # `roles_path = roles` resolves the same way it does for a real
+      # ansible-playbook invocation (see infra/ansible/README.md) - running
+      # `ansible-lint infra/ansible` from the repo root left ansible.cfg
+      # undiscovered and made the `keycloak_realm` role unresolvable.
+      - name: ansible-lint
+        if: steps.check.outputs.present == 'true'
+        working-directory: infra/ansible
+        run: ansible-lint .
 
   helm-values-yamllint:
     name: yamllint Helm values

@@ -9,9 +9,9 @@ locals {
       # Grommunio (study 1.1, line ~56): "100 users: ~4-8 GB RAM / 4 cores".
       # High-end value kept as a precaution (large mailboxes from the start).
       grommunio = {
-        cpu_cores  = 4
-        memory_mb  = 8192
-        disk_gb    = 200 # sized by mailbox size, not by connection count (1.1)
+        cpu_cores = 4
+        memory_mb = 8192
+        disk_gb   = 200 # sized by mailbox size, not by connection count (1.1)
       }
 
       # Keycloak (study 1.7, line ~271): "2-4 cores / 4-8 GB RAM with a
