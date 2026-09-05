@@ -1,19 +1,19 @@
-# Brique : Visio (DINUM/LaSuite numérique "Meet") — etude 1.3 L.106-120
-# Chart utilise : suitenumerique/meet (si publie sur https://github.com/suitenumerique/meet
-#   /charts) — a defaut de chart Helm officiel publie au moment de la redaction, se
-#   rabattre sur un manifest raw (Deployment/Service/Ingress) derive de l'image officielle
-#   `lasuite/meet-backend` + `lasuite/meet-frontend` (Django REST Framework, cf. etude
-#   2.9 L.519). Ce fichier de values est ecrit au format "chart" pour rester coherent
-#   avec la convention du depot ; a adapter en manifests raw si aucun chart n'est
-#   effectivement disponible au moment du deploiement.
+# Component: Visio (DINUM/LaSuite numérique "Meet") — study 1.3 L.106-120
+# Chart used: suitenumerique/meet (if published at https://github.com/suitenumerique/meet
+#   /charts) — failing an official Helm chart published at the time of writing, fall
+#   back to a raw manifest (Deployment/Service/Ingress) derived from the official
+#   `lasuite/meet-backend` + `lasuite/meet-frontend` image (Django REST Framework, see
+#   study 2.9 L.519). This values file is written in "chart" format to stay consistent
+#   with the repository's convention; to be adapted into raw manifests if no chart is
+#   actually available at deployment time.
 #
-# backend visio = LiveKit (1.3 L.106), meme cluster LiveKit que Element Call (2.4 L.432).
-# Egress des enregistrements vers MinIO S3 (2.12 L.585-592).
+# visio backend = LiveKit (1.3 L.106), the same LiveKit cluster as Element Call (2.4 L.432).
+# Recording egress to MinIO S3 (2.12 L.585-592).
 
 backend:
   image:
     repository: lasuite/meet-backend
-    tag: "latest" # a figer sur un tag versionne avant mise en production
+    tag: "latest" # to be pinned to a versioned tag before going to production
   replicaCount: 2
   resources:
     requests:
@@ -29,11 +29,11 @@ backend:
     OIDC_OP_TOKEN_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/token"
     OIDC_OP_USER_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/userinfo"
     OIDC_RP_CLIENT_ID: "visio-meet"
-    # secret client OIDC : cf. secret oidc-client-secrets, non versionne
+    # OIDC client secret: see the oidc-client-secrets secret, not versioned
     LIVEKIT_API_URL: "https://livekit.libre365.example.org"
-    # 2.12 L.587 — MinIO auto-heberge comme destination S3 de LiveKit Egress, plutot
-    # qu'un volume reseau partage (NFS) entre pods pour un fichier ecrit en local par le
-    # pod Egress.
+    # 2.12 L.587 — self-hosted MinIO as the S3 destination for LiveKit Egress, rather
+    # than a shared network volume (NFS) between pods for a file written locally by
+    # the Egress pod.
     AWS_S3_ENDPOINT_URL: "http://minio.libre365.svc.cluster.local:9000"
     AWS_STORAGE_BUCKET_NAME: "visio-recordings"
     RECORDING_ENABLE: "true"
@@ -59,11 +59,11 @@ postgresql:
 
 redis:
   enabled: true
-  # session/cache Django
+  # Django session/cache
 
-# 2.12 L.585-589 — Egress LiveKit configure pour ecrire vers le bucket MinIO
-# "visio-recordings" (cf. minio.yaml), pas de retention geree ici (fixee au niveau du
-# bucket / cf. politique de cycle de vie MinIO).
+# 2.12 L.585-589 — LiveKit Egress configured to write to the MinIO bucket
+# "visio-recordings" (see minio.yaml), no retention managed here (set at the bucket
+# level / see the MinIO lifecycle policy).
 liveKitEgress:
   s3:
     endpoint: "http://minio.libre365.svc.cluster.local:9000"

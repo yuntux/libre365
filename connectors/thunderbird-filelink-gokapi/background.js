@@ -1,13 +1,13 @@
 /**
- * Provider Filelink Thunderbird pour Gokapi (etude 2.11 ligne 562).
+ * Thunderbird Filelink provider for Gokapi (study 2.11 line 562).
  *
- * Suit le patron des providers Filelink existants (Dropbox/Box/WebDAV) : implemente
- * les evenements de l'API `cloudFile` (https://webextension-api.thunderbird.net/en/latest/cloudFile.html),
- * en s'appuyant sur l'API REST de Gokapi pour l'upload et la generation de lien.
+ * Follows the pattern of existing Filelink providers (Dropbox/Box/WebDAV): implements
+ * the events of the `cloudFile` API (https://webextension-api.thunderbird.net/en/latest/cloudFile.html),
+ * relying on Gokapi's REST API for upload and link generation.
  *
- * Configuration (URL de l'instance Gokapi + cle API) stockee via `browser.storage.local`,
- * saisie dans `management.html` (page de compte Filelink, une entree par compte
- * Thunderbird configure pour ce provider -- cf. `accountId` transmis a chaque callback).
+ * Configuration (Gokapi instance URL + API key) stored via `browser.storage.local`,
+ * entered in `management.html` (Filelink account page, one entry per Thunderbird
+ * account configured for this provider -- see `accountId` passed to each callback).
  */
 
 const GOKAPI_API_TIMEOUT_MS = 60000;
@@ -18,23 +18,23 @@ async function getAccountConfig(accountId) {
   const config = stored[key];
   if (!config || !config.baseUrl || !config.apiKey) {
     throw new Error(
-      "Compte Gokapi non configure : renseignez l'URL de l'instance et la cle API dans les parametres du compte Filelink."
+      "Gokapi account not configured: enter the instance URL and API key in the Filelink account settings."
     );
   }
   return config;
 }
 
 /**
- * Declenche a chaque piece jointe deposee au-dessus du seuil Filelink (etude 2.11
- * ligne 562 : "au-dela d'un seuil de taille configurable, Thunderbird propose
- * automatiquement d'envoyer la piece jointe via un fournisseur Filelink").
+ * Fires for each attachment uploaded above the Filelink threshold (study 2.11
+ * line 562: "beyond a configurable size threshold, Thunderbird automatically
+ * offers to send the attachment via a Filelink provider").
  */
 browser.cloudFile.onFileUpload.addListener(async (account, { id, name, data }) => {
   try {
     const config = await getAccountConfig(account.id);
 
-    // API Gokapi : POST /api/files/upload (multipart/form-data), cf. documentation
-    // Gokapi (`gokapi-cli` s'appuie sur le meme endpoint REST).
+    // Gokapi API: POST /api/files/upload (multipart/form-data), see Gokapi
+    // documentation (`gokapi-cli` relies on the same REST endpoint).
     const form = new FormData();
     form.append("file", data, name);
     if (config.allowedDownloads) {
@@ -59,22 +59,22 @@ browser.cloudFile.onFileUpload.addListener(async (account, { id, name, data }) =
     }
 
     if (!response.ok) {
-      throw new Error(`Gokapi a repondu avec le statut ${response.status}`);
+      throw new Error(`Gokapi responded with status ${response.status}`);
     }
 
     const result = await response.json();
-    // Reponse Gokapi attendue : { FilesInfo: { Id, UrlDownload, ... } } (structure
-    // simplifiee ici -- a ajuster a la version exacte de l'API Gokapi deployee).
+    // Expected Gokapi response: { FilesInfo: { Id, UrlDownload, ... } } (simplified
+    // structure here -- to be adjusted to the exact deployed Gokapi API version).
     const downloadUrl = result?.FilesInfo?.UrlDownload ?? result?.Url ?? result?.url;
     const fileId = result?.FilesInfo?.Id ?? result?.Id ?? id;
 
     if (!downloadUrl) {
-      throw new Error("Reponse Gokapi inattendue : lien de telechargement absent.");
+      throw new Error("Unexpected Gokapi response: download link missing.");
     }
 
-    // Conserve la correspondance id-piece-jointe <-> id-fichier-Gokapi, necessaire a
-    // `onFileDeleted` pour purger le fichier cote serveur si l'utilisateur retire la
-    // piece jointe avant l'envoi du mail.
+    // Keeps the attachment-id <-> Gokapi-file-id mapping, needed by
+    // `onFileDeleted` to purge the file server-side if the user removes the
+    // attachment before sending the mail.
     await browser.storage.local.set({ [`upload-${account.id}-${id}`]: fileId });
 
     return { url: downloadUrl };
@@ -84,9 +84,9 @@ browser.cloudFile.onFileUpload.addListener(async (account, { id, name, data }) =
 });
 
 /**
- * Declenche quand l'utilisateur retire une piece jointe Filelink avant l'envoi du mail,
- * ou apres l'envoi selon la politique de retention choisie par l'utilisateur. Purge le
- * fichier cote Gokapi pour ne pas laisser de fichiers orphelins.
+ * Fires when the user removes a Filelink attachment before sending the mail,
+ * or after sending depending on the retention policy chosen by the user. Purges the
+ * file on the Gokapi side to avoid leaving orphaned files.
  */
 browser.cloudFile.onFileDeleted.addListener(async (account, id) => {
   try {
@@ -105,14 +105,14 @@ browser.cloudFile.onFileDeleted.addListener(async (account, id) => {
 
     await browser.storage.local.remove(key);
   } catch (error) {
-    // La suppression est best-effort : un fichier expire de toute facon selon la
-    // politique de retention Gokapi (`expiryDays`) configuree a l'upload.
-    console.warn("gokapi-filelink: echec de suppression distante", error);
+    // Deletion is best-effort: the file expires anyway according to the
+    // Gokapi retention policy (`expiryDays`) configured at upload time.
+    console.warn("gokapi-filelink: remote deletion failed", error);
   }
 });
 
-// Optionnel mais attendu par certains providers Filelink : nettoyage local quand
-// Thunderbird supprime completement le compte Filelink cote client.
+// Optional but expected by some Filelink providers: local cleanup when
+// Thunderbird fully removes the Filelink account on the client side.
 browser.cloudFile.onAccountDeleted.addListener(async (accountId) => {
   await browser.storage.local.remove(`account-${accountId}`);
 });

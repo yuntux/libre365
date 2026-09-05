@@ -12,22 +12,22 @@
     </style>
   </head>
   <body>
-    <h3>Parametres du compte Gokapi</h3>
-    <p>Ces informations sont utilisees par <code>background.js</code> pour deposer les pieces jointes.</p>
+    <h3>Gokapi account settings</h3>
+    <p>This information is used by <code>background.js</code> to upload attachments.</p>
 
-    <label for="baseUrl">URL de l'instance Gokapi</label>
+    <label for="baseUrl">Gokapi instance URL</label>
     <input id="baseUrl" type="url" placeholder="https://gokapi.example.org" />
 
-    <label for="apiKey">Cle API Gokapi</label>
-    <input id="apiKey" type="password" placeholder="Cle associee au compte OIDC de l'expediteur" />
+    <label for="apiKey">Gokapi API key</label>
+    <input id="apiKey" type="password" placeholder="Key associated with the sender's OIDC account" />
 
-    <label for="expiryDays">Duree de conservation (jours, optionnel)</label>
-    <input id="expiryDays" type="number" min="1" placeholder="ex: 14" />
+    <label for="expiryDays">Retention duration (days, optional)</label>
+    <input id="expiryDays" type="number" min="1" placeholder="e.g. 14" />
 
-    <label for="allowedDownloads">Nombre maximum de telechargements (optionnel)</label>
-    <input id="allowedDownloads" type="number" min="1" placeholder="ex: 10" />
+    <label for="allowedDownloads">Maximum number of downloads (optional)</label>
+    <input id="allowedDownloads" type="number" min="1" placeholder="e.g. 10" />
 
-    <button id="save">Enregistrer</button>
+    <button id="save">Save</button>
     <div id="status"></div>
 
     <script src="management.js"></script>
