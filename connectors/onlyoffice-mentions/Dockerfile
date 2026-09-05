@@ -1,19 +1,15 @@
-# Expected build context: the connectors/ directory (not this subfolder).
-# docker build -f onlyoffice-mentions/Dockerfile -t onlyoffice-mentions .   # from connectors/
-FROM node:20.17-alpine AS build
+# Self-contained build context: this directory only (see docker-compose.yml,
+# `context: ../connectors/onlyoffice-mentions`).
+# docker build -t onlyoffice-mentions .   # from connectors/onlyoffice-mentions/
+FROM python:3.12-slim
 WORKDIR /app
-COPY tsconfig.base.json /tsconfig.base.json
-COPY onlyoffice-mentions/package.json ./
-COPY onlyoffice-mentions/tsconfig.json ./
-COPY onlyoffice-mentions/src ./src
-RUN npm install
-RUN npm run build
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-FROM node:20.17-alpine
-WORKDIR /app
-ENV NODE_ENV=production
-COPY onlyoffice-mentions/package.json ./
-RUN npm install --omit=dev
-COPY --from=build /app/dist ./dist
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
 EXPOSE 4004
-CMD ["node", "dist/server.js"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "4004"]

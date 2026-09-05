@@ -1,19 +1,16 @@
-# Expected build context: the connectors/ directory (not this subfolder), so the
-# shared tsconfig.base.json is accessible: `docker build -f notification-hub/Dockerfile .`
-FROM node:20.17-alpine AS build
-WORKDIR /app
-COPY tsconfig.base.json /tsconfig.base.json
-COPY notification-hub/package.json ./
-COPY notification-hub/tsconfig.json ./
-COPY notification-hub/src ./src
-RUN npm install
-RUN npm run build
+# Self-contained build: build context is this directory (notification-hub/),
+# consistent with docker-compose/docker-compose.yml's `context: ../connectors/notification-hub`.
+FROM python:3.12-slim
 
-FROM node:20.17-alpine
 WORKDIR /app
-ENV NODE_ENV=production
-COPY notification-hub/package.json ./
-RUN npm install --omit=dev
-COPY --from=build /app/dist ./dist
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
 EXPOSE 4001
-CMD ["node", "dist/server.js"]
+ENV PORT=4001
+
+# Shell form so the PORT env var (read the same way app/main.py does) is honored.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --loop uvloop

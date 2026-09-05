@@ -1,8 +1,8 @@
 # Integration connectors (chapter 2 of the study)
 
 Integration modules developed to bridge the lack of native integration between the
-"best of breed" bricks of the stack (see `sortie-office365-etude.md`, chapter 2). Five
-Node.js/TypeScript services and one browser extension (Thunderbird).
+"best of breed" bricks of the stack (see `office365-exit-study.md`, chapter 2). Five
+Python/FastAPI services and one browser extension (Thunderbird).
 
 | Connector | Study | Default port | Key environment variable |
 |---|---|---|---|
@@ -31,28 +31,49 @@ Node.js/TypeScript services and one browser extension (Thunderbird).
 - **thunderbird-filelink-gokapi** — Thunderbird WebExtension (not a backend service)
   implementing the `cloudFile` API for Gokapi.
 
-## Common structure (Node services)
+## Common structure (Python services)
 
-Each Node service has its own `package.json`, `tsconfig.json` (extending
-`connectors/tsconfig.base.json`), a multi-stage `Dockerfile`, a `README.md`, and
-unit tests (Vitest). Non-trivial business logic is isolated in pure functions
-(`normalize.ts`, `fanout.ts`, `consolidate.ts`, `transform.ts`, `metadata.ts`/`ingest.ts`
-depending on the connector) to keep it testable without network dependencies.
+Each service is a self-contained FastAPI app, served asynchronously by
+**uvicorn** with the **uvloop** event loop for I/O-heavy webhook/fan-out
+workloads. Chosen for consistency with the rest of the repo — already
+Python in `tests/integration/` and `scripts/sync_platform.py` — and for
+async performance on par with the previous Node/Express implementation on
+this kind of I/O-bound traffic (a synchronous Flask-style app would not
+have matched it).
+
+Each connector has its own `requirements.txt` (runtime deps: `fastapi`,
+`uvicorn[standard]`, `uvloop`, `httpx`, plus whatever the connector needs)
+and `requirements-dev.txt` (test deps: `pytest`, `pytest-asyncio`, etc.), a
+self-contained `Dockerfile` (base `python:3.12-slim`, no shared file needed
+across connectors), a `README.md`, and unit tests (`pytest`). Non-trivial
+business logic is isolated in pure functions/modules (`normalize.py`,
+`fanout.py`, `consolidate.py`, `transform.py`, `metadata.py`/`ingest.py`
+depending on the connector) to keep it testable without network
+dependencies.
+
+The app entrypoint is always `app/main.py` (FastAPI instance named `app`),
+so every connector is served the same way:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port <default-port> --loop uvloop
+```
 
 ## Docker build
 
-Each `Dockerfile` copies `../tsconfig.base.json`: build with `connectors/` as the
-build context, for example:
+Each `Dockerfile` is self-contained — build context is the connector's own
+directory, matching `docker-compose/docker-compose.yml`'s
+`context: ../connectors/<name>`:
 
 ```bash
-cd connectors
-docker build -f notification-hub/Dockerfile -t notification-hub .
+cd connectors/notification-hub
+docker build -t notification-hub .
 ```
 
 ## Tests
 
 ```bash
 cd connectors/<connector-name>
-npm install
-npm test
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pytest
 ```

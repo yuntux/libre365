@@ -1,19 +1,12 @@
-# Expected build context: the connectors/ directory (not this subfolder).
-# docker build -f presence-aggregator/Dockerfile -t presence-aggregator .   # from connectors/
-FROM node:20.17-alpine AS build
+# Build context: this directory (connectors/presence-aggregator), self-contained.
+# docker build -t presence-aggregator .   # from connectors/presence-aggregator/
+FROM python:3.12-slim
 WORKDIR /app
-COPY tsconfig.base.json /tsconfig.base.json
-COPY presence-aggregator/package.json ./
-COPY presence-aggregator/tsconfig.json ./
-COPY presence-aggregator/src ./src
-RUN npm install
-RUN npm run build
 
-FROM node:20.17-alpine
-WORKDIR /app
-ENV NODE_ENV=production
-COPY presence-aggregator/package.json ./
-RUN npm install --omit=dev
-COPY --from=build /app/dist ./dist
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
 EXPOSE 4003
-CMD ["node", "dist/server.js"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "4003"]

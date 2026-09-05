@@ -1,19 +1,15 @@
-# Expected build context: the connectors/ directory (not this subfolder).
-# docker build -f unified-search/Dockerfile -t unified-search .   # from connectors/
-FROM node:20.17-alpine AS build
-WORKDIR /app
-COPY tsconfig.base.json /tsconfig.base.json
-COPY unified-search/package.json ./
-COPY unified-search/tsconfig.json ./
-COPY unified-search/src ./src
-RUN npm install
-RUN npm run build
+# Self-contained build context: this directory only
+# (docker-compose/docker-compose.yml builds with `context: ../connectors/unified-search`).
+# docker build -t unified-search .   # from connectors/unified-search/
+FROM python:3.12-slim
 
-FROM node:20.17-alpine
 WORKDIR /app
-ENV NODE_ENV=production
-COPY unified-search/package.json ./
-RUN npm install --omit=dev
-COPY --from=build /app/dist ./dist
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+
 EXPOSE 4002
-CMD ["node", "dist/server.js"]
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "4002"]

@@ -136,17 +136,22 @@ jobs:
           yamllint -d '{extends: relaxed, rules: {line-length: disable}}' infra/k8s
 
   connectors:
-    name: Node connectors (build + tests)
+    name: Python connectors (install + tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.12'
 
-      - name: Build & test each connector
+      # Each connector (notification-hub, unified-search, presence-aggregator,
+      # onlyoffice-mentions, peertube-ingest) is a self-contained FastAPI app
+      # with its own requirements.txt - see connectors/README.md. Excludes
+      # thunderbird-filelink-gokapi, a Thunderbird WebExtension (plain JS, not
+      # a backend service), which this job never touches.
+      - name: Install & test each connector
         run: |
           set -e
           if [ ! -d "connectors" ]; then
@@ -154,25 +159,25 @@ jobs:
             exit 0
           fi
           found=0
-          for pkg in connectors/*/package.json; do
-            [ -e "$pkg" ] || continue
+          for req in connectors/*/requirements.txt; do
+            [ -e "$req" ] || continue
             found=1
-            dir=$(dirname "$pkg")
+            dir=$(dirname "$req")
             echo "::group::$dir"
             (
               cd "$dir"
-              if [ -f package-lock.json ]; then
-                npm ci
-              else
-                npm install
-              fi
-              npm run build --if-present
-              npm test --if-present
+              python -m venv .venv
+              . .venv/bin/activate
+              pip install --upgrade pip
+              pip install -r requirements.txt
+              [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt
+              python -c "import app.main" # import smoke test: catches broken FastAPI wiring early
+              pytest
             )
             echo "::endgroup::"
           done
           if [ "$found" -eq 0 ]; then
-            echo "::notice::No connector (package.json) found under connectors/*/ - job skipped."
+            echo "::notice::No connector (requirements.txt) found under connectors/*/ - job skipped."
           fi
 
   docker-compose-config:

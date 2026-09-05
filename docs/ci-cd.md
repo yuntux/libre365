@@ -26,7 +26,7 @@ pipeline targeting Kubernetes.
 
 ## Files created
 
-- `.github/workflows/lint-and-test.yml` — continuous quality baseline (Terraform, Ansible, Helm values, Node connectors, docker-compose), triggered on every PR/push. This isn't directly a numbered requirement of chapter 5, but it's the foundation that makes the rest of the cycle reliable (a broken image or manifest must not reach ephemeral staging).
+- `.github/workflows/lint-and-test.yml` — continuous quality baseline (Terraform, Ansible, Helm values, Python connectors, docker-compose), triggered on every PR/push. This isn't directly a numbered requirement of chapter 5, but it's the foundation that makes the rest of the cycle reliable (a broken image or manifest must not reach ephemeral staging).
 - `.github/workflows/cve-scan.yml` — study 5.2.
 - `renovate.json` — study 5.3.
 - `.github/workflows/ephemeral-staging.yml` — study 5.4 and 5.5.
