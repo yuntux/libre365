@@ -1,9 +1,9 @@
 import { DirectoryUser, OnlyOfficeUserEntry, OnRequestSendNotifyPayload } from "./types";
 
 /**
- * Transforme l'annuaire (Keycloak Admin API) au format attendu par OnlyOffice pour
- * `onRequestUsers` (etude 2.7 ligne 484 : "liste des utilisateurs proposes a la frappe
- * du signe +/@"). Fonction pure, testable sans appel reseau.
+ * Transforms the directory (Keycloak Admin API) into the format expected by OnlyOffice
+ * for `onRequestUsers` (study 2.7 line 484: "list of users suggested when typing
+ * the +/@ character"). Pure function, testable without a network call.
  */
 export function toOnlyOfficeUserList(users: DirectoryUser[]): OnlyOfficeUserEntry[] {
   return users
@@ -16,9 +16,9 @@ export function toOnlyOfficeUserList(users: DirectoryUser[]): OnlyOfficeUserEntr
 }
 
 /**
- * Construit le payload attendu par `notification-hub` (`POST /webhooks/onlyoffice-mention`,
- * cf. connectors/notification-hub/src/types.ts `OnlyOfficeMentionPayload`) a partir de
- * l'evenement natif OnlyOffice `onRequestSendNotify` (etude 2.7 ligne 487).
+ * Builds the payload expected by `notification-hub` (`POST /webhooks/onlyoffice-mention`,
+ * see connectors/notification-hub/src/types.ts `OnlyOfficeMentionPayload`) from
+ * the native OnlyOffice `onRequestSendNotify` event (study 2.7 line 487).
  */
 export function toNotificationHubPayload(payload: OnRequestSendNotifyPayload): {
   actionLink?: string;

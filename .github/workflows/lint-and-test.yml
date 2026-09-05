@@ -120,13 +120,13 @@ jobs:
 
       - name: yamllint infra/k8s
         if: steps.check.outputs.present == 'true'
-        # Config permissive (pas de .yamllint versionne impose ici) : on
-        # verifie surtout la validite syntaxique des values Helm, pas le style.
+        # Permissive config (no versioned .yamllint enforced here): this
+        # mainly checks the syntactic validity of the Helm values, not style.
         run: |
           yamllint -d '{extends: relaxed, rules: {line-length: disable}}' infra/k8s
 
   connectors:
-    name: Connecteurs Node (build + tests)
+    name: Node connectors (build + tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -140,7 +140,7 @@ jobs:
         run: |
           set -e
           if [ ! -d "connectors" ]; then
-            echo "::notice::connectors/ absent pour l'instant - job ignore."
+            echo "::notice::connectors/ not present yet - job skipped."
             exit 0
           fi
           found=0
@@ -162,11 +162,11 @@ jobs:
             echo "::endgroup::"
           done
           if [ "$found" -eq 0 ]; then
-            echo "::notice::Aucun connecteur (package.json) trouve sous connectors/*/ - job ignore."
+            echo "::notice::No connector (package.json) found under connectors/*/ - job skipped."
           fi
 
   docker-compose-config:
-    name: Validation syntaxique docker-compose
+    name: docker-compose syntax validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -176,21 +176,21 @@ jobs:
           set -e
           compose_file="docker-compose/docker-compose.yml"
           if [ ! -f "$compose_file" ]; then
-            echo "::notice::$compose_file absent pour l'instant - job ignore."
+            echo "::notice::$compose_file not present yet - job skipped."
             exit 0
           fi
           docker compose -f "$compose_file" config
 
   platform-drift-check:
-    name: Dérive versions/ports (platform.yaml)
+    name: Version/port drift (platform.yaml)
     runs-on: ubuntu-latest
-    # platform.yaml (racine) est la source unique des tags d'image et des
-    # ports partagés par docker-compose/ ET infra/k8s/helm-values/ (voir son
-    # en-tête). Ce job garantit qu'aucun de ces fichiers consommateurs n'a été
-    # édité à la main sans repasser par `scripts/sync_platform.py` — faute de
-    # quoi le tier dev/test et la cible de production divergeraient
-    # silencieusement, exactement le risque que platform.yaml existe pour
-    # éliminer.
+    # platform.yaml (repo root) is the single source of truth for the image
+    # tags and ports shared by docker-compose/ AND infra/k8s/helm-values/
+    # (see its header). This job guarantees that none of these consuming
+    # files was hand-edited without going back through
+    # `scripts/sync_platform.py` — otherwise the dev/test tier and the
+    # production target would silently drift apart, exactly the risk
+    # platform.yaml exists to eliminate.
     steps:
       - uses: actions/checkout@v4
 
@@ -205,7 +205,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::platform.yaml absent pour l'instant - job ignore."
+            echo "::notice::platform.yaml not present yet - job skipped."
           fi
 
       - name: Install scripts/requirements.txt
