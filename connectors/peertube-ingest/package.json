@@ -1,7 +1,7 @@
 {
   "name": "@libre365/peertube-ingest",
   "version": "1.0.0",
-  "description": "Depot des enregistrements de reunion MinIO -> PeerTube, webhook temps reel + batch (etude 2.12)",
+  "description": "Uploads MinIO meeting recordings to PeerTube, real-time webhook + batch (study 2.12)",
   "private": true,
   "main": "dist/server.js",
   "scripts": {

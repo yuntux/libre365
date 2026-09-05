@@ -1,43 +1,43 @@
-name: Recette ephemere (manuelle)
+name: Ephemeral staging (manual)
 
-# Materialise l'etude 5.4 "Declenchement automatique d'un environnement de
-# recette" (lignes 786-791) et 5.5 "Rejeu des scenarios de test" (793-797).
+# Implements study 5.4 "Automatically triggering a staging environment"
+# (lines 786-791) and 5.5 "Replaying the test scenarios" (793-797).
 #
-# Choix explicite (a documenter aussi dans docs/ci-cd.md) : l'etude decrit un
-# environnement de recette EPHEMERE provisionne depuis la definition IaC
-# Kubernetes/Terraform (chapitre 4), avec un jeu de donnees de test dedie et
-# un declenchement automatique a chaque nouvelle version detectee (5.3/5.4).
-# Reproduire ce provisionnement Kubernetes complet depuis un runner GitHub
-# Actions hebergeria un cluster ephemere hors du perimetre de cette tache
-# (creation de noeuds, ingress, DNS, volumes...) : ce workflow se limite donc,
-# pour l'instant, a demarrer l'environnement docker-compose (echelle
-# dev/test, cf. chapitre 4.6) comme substitut fonctionnel testable en CI. Il
-# valide le CYCLE (demarrage -> attente sante -> rejeu des scenarios ->
-# rapport -> decision de promotion) independamment du provisionneur reel ;
-# faire pointer ce meme cycle sur un vrai environnement Kubernetes ephemere
-# (via infra/terraform + infra/k8s) est un chantier separe, cf. docs/ci-cd.md.
+# Explicit choice (to also document in docs/ci-cd.md): the study describes
+# an EPHEMERAL staging environment provisioned from the Kubernetes/Terraform
+# IaC definition (chapter 4), with a dedicated test dataset and an automatic
+# trigger on every new version detected (5.3/5.4). Reproducing that full
+# Kubernetes provisioning from a GitHub Actions runner would mean hosting an
+# ephemeral cluster, which is outside the scope of this task (node creation,
+# ingress, DNS, volumes...): for now this workflow is therefore limited to
+# starting the docker-compose environment (dev/test scale, cf. chapter 4.6)
+# as a functional, CI-testable substitute. It validates the CYCLE (startup ->
+# wait for health -> replay scenarios -> report -> promotion decision)
+# independently of the real provisioner; pointing this same cycle at a real
+# ephemeral Kubernetes environment (via infra/terraform + infra/k8s) is a
+# separate effort, cf. docs/ci-cd.md.
 #
-# Declenchement manuel (workflow_dispatch) ici plutot qu'automatique sur
-# detection Renovate (5.3) : faire declencher directement une PR Renovate
-# n'est pas encore cable (necessiterait un evenement dedie type
-# `pull_request` filtre sur l'auteur "renovate[bot]" + branche par brique) ;
-# ce workflow est la brique d'execution du cycle, invocable manuellement des
-# maintenant et branchable plus tard sur un declencheur automatique.
+# Manual trigger (workflow_dispatch) here rather than automatic on Renovate
+# detection (5.3): having a Renovate PR trigger this directly is not wired
+# up yet (would require a dedicated event, e.g. `pull_request` filtered on
+# the "renovate[bot]" author + a per-component branch); this workflow is the
+# execution building block of the cycle, invokable manually as of now and
+# connectable later to an automatic trigger.
 
 on:
   workflow_dispatch:
     inputs:
       brique:
         description: >-
-          Brique dont la nouvelle version est a valider (ex. synapse,
-          seafile, onlyoffice, vikunja, keycloak, grommunio). Informatif pour
-          l'instant : le docker-compose de dev demarre l'ensemble de la
-          stack, la mise a jour cible d'une seule image sera branchee quand
-          les recettes Kubernetes par brique existeront (cf. docs/ci-cd.md).
+          Component whose new version is to be validated (e.g. synapse,
+          seafile, onlyoffice, vikunja, keycloak, grommunio). Informational
+          for now: the dev docker-compose starts the whole stack, targeting
+          the update at a single image will be wired up once per-component
+          Kubernetes staging exists (cf. docs/ci-cd.md).
         required: true
         type: string
       version:
-        description: Version de la brique a valider en recette.
+        description: Version of the component to validate in staging.
         required: true
         type: string
 
