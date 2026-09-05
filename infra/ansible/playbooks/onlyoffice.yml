@@ -1,27 +1,27 @@
 ---
-# Configuration OnlyOffice Document Server — étude 1.5 (brique retenue,
-# Community Edition >= 9.4) et 2.6 (tchat interne désactivé par défaut, au
-# profit du tchat d'entreprise Matrix).
+# OnlyOffice Document Server configuration — study 1.5 (component chosen,
+# Community Edition >= 9.4) and 2.6 (internal chat disabled by default, in
+# favor of the Matrix enterprise chat).
 #
-# OnlyOffice Document Server est déployé par Helm dans le cluster Kubernetes
-# (infra/k8s/helm-values/onlyoffice.yaml, hors périmètre de cette tâche) ; ce
-# playbook porte le réglage `document.permissions.chat`, appliqué à l'ouverture
-# de chaque document depuis Seafile via la configuration de l'éditeur transmise
-# côté connecteur Seafile↔OnlyOffice (pas un fichier de configuration serveur
-# global — cf. note ci-dessous).
+# OnlyOffice Document Server is deployed via Helm in the Kubernetes cluster
+# (infra/k8s/helm-values/onlyoffice.yaml, out of scope for this task); this
+# playbook carries the `document.permissions.chat` setting, applied when
+# each document is opened from Seafile via the editor configuration passed
+# on the Seafile<->OnlyOffice connector side (not a global server config
+# file — see the note below).
 
-- name: "Positionner document.permissions.chat: false par défaut"
+- name: "Set document.permissions.chat: false by default"
   hosts: onlyoffice
   connection: local
   gather_facts: false
   vars:
     onlyoffice_namespace: "onlyoffice"
-    # Étude 2.6, ligne ~469 : "document.permissions.chat: false [...] distinct
-    # de document.permissions.comment (qui peut rester activé)" — ce réglage
-    # est positionné côté config de l'éditeur transmise par le connecteur
-    # d'intégration (connectors/seafile-onlyoffice, hors périmètre de cette
-    # tâche), pas dans un fichier de config global du Document Server : ce
-    # playbook ne fait que porter la valeur par défaut du connecteur.
+    # Study 2.6, line ~469: "document.permissions.chat: false [...] distinct
+    # from document.permissions.comment (which can remain enabled)" — this
+    # setting is set on the editor config side passed by the integration
+    # connector (connectors/seafile-onlyoffice, out of scope for this task),
+    # not in a global Document Server config file: this playbook only
+    # carries the connector's default value.
     onlyoffice_default_editor_permissions:
       chat: false
       comment: true
@@ -30,13 +30,13 @@
       print: true
 
   tasks:
-    - name: "Publier les permissions par défaut de l'éditeur comme ConfigMap consommée par le connecteur Seafile↔OnlyOffice"
+    - name: "Publish the editor's default permissions as a ConfigMap consumed by the Seafile<->OnlyOffice connector"
       ansible.builtin.template:
         src: ../templates/onlyoffice-editor-defaults.json.j2
         dest: "{{ playbook_dir }}/../rendered/onlyoffice-editor-defaults.json"
         mode: "0640"
 
-    - name: "Appliquer la ConfigMap au cluster Kubernetes"
+    - name: "Apply the ConfigMap to the Kubernetes cluster"
       ansible.builtin.command: >-
         kubectl create configmap onlyoffice-editor-defaults
         --namespace {{ onlyoffice_namespace }}
@@ -45,14 +45,14 @@
       register: onlyoffice_configmap_manifest
       changed_when: false
 
-    - name: "kubectl apply de la ConfigMap"
+    - name: "kubectl apply the ConfigMap"
       ansible.builtin.shell: |
         echo '{{ onlyoffice_configmap_manifest.stdout }}' | kubectl apply -f -
       changed_when: true
 
-    - name: "Redémarrer le connecteur d'intégration Seafile↔OnlyOffice pour prendre en compte les nouveaux défauts"
+    - name: "Restart the Seafile<->OnlyOffice integration connector to pick up the new defaults"
       ansible.builtin.command: >-
         kubectl rollout restart deployment/seafile-onlyoffice-connector
         --namespace {{ onlyoffice_namespace }}
       changed_when: true
-      ignore_errors: true # le connecteur peut ne pas encore être déployé selon l'avancement du chantier (2.6)
+      ignore_errors: true # the connector may not yet be deployed depending on project progress (2.6)

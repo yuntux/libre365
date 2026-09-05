@@ -7,7 +7,7 @@ import { ConsolidatedPresence, PresenceSources } from "./types";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4003);
-// Intervalle de rafraichissement du flux SSE (etude 2.8 : bandeau du portail 2.3).
+// SSE stream refresh interval (study 2.8: portal status bar 2.3).
 const STREAM_INTERVAL_MS = Number(process.env.PRESENCE_STREAM_INTERVAL_MS ?? 5000);
 
 async function buildConsolidatedPresence(userId: string): Promise<ConsolidatedPresence> {
@@ -31,7 +31,7 @@ app.get("/presence/:userId", async (req: Request, res: Response) => {
   res.status(200).json(presence);
 });
 
-// Server-Sent Events pour le bandeau du portail applicatif (etude 2.3, 2.8).
+// Server-Sent Events for the application portal's status bar (study 2.3, 2.8).
 app.get("/presence/stream", (req: Request, res: Response) => {
   const userIds = String(req.query.userIds ?? "")
     .split(",")

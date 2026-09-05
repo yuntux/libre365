@@ -3,16 +3,17 @@ import { GrommunioAvailability } from "../types";
 const EWS_URL = process.env.GROMMUNIO_EWS_URL ?? "https://mail.example.org/EWS/Exchange.asmx";
 
 /**
- * Derive l'etat "en reunion" depuis le calendrier via `GetUserAvailability` (EWS),
- * cf. etude 2.8 ligne 499 : Grommunio/EWS ne publie pas de presence a proprement
- * parler, mais permet cette derivation calendaire -- a l'image de l'ancienne
- * integration Cisco Unified Presence <-> Exchange.
+ * Derives the "in meeting" state from the calendar via `GetUserAvailability` (EWS),
+ * see study 2.8 line 499: Grommunio/EWS does not publish presence as such,
+ * but allows this calendar-based derivation -- similar to the old
+ * Cisco Unified Presence <-> Exchange integration.
  *
- * `GetUserAvailability` est une operation SOAP (namespace
- * http://schemas.microsoft.com/exchange/services/2006/messages), pas REST/JSON --
- * d'ou l'enveloppe XML construite a la main ci-dessous plutot qu'un simple fetch JSON.
- * Le parsing de la reponse est simplifie (extraction du premier `<BusyType>` par regex)
- * plutot qu'un vrai parseur XML/SOAP, la structure de l'appel etant le point a fournir ici.
+ * `GetUserAvailability` is a SOAP operation (namespace
+ * http://schemas.microsoft.com/exchange/services/2006/messages), not REST/JSON --
+ * hence the hand-built XML envelope below rather than a simple JSON fetch.
+ * Response parsing is simplified (extracting the first `<BusyType>` via regex)
+ * rather than a real XML/SOAP parser, since the structure of the call is the point
+ * to provide here.
  */
 export async function getGrommunioAvailability(
   userEmail: string,
@@ -35,8 +36,8 @@ export async function getGrommunioAvailability(
     }
 
     const xml = await response.text();
-    // Simplification assumee : un vrai client SOAP parserait le XML proprement
-    // (ex. `fast-xml-parser`) plutot que cette extraction textuelle.
+    // Deliberate simplification: a real SOAP client would parse the XML properly
+    // (e.g. `fast-xml-parser`) rather than this text-based extraction.
     const busyTypeMatch = xml.match(/<BusyType>(\w+)<\/BusyType>/);
     const busyType = busyTypeMatch?.[1];
 

@@ -1,19 +1,18 @@
 """
-Scénario critique (étude 4.5): "authentification SSO bout en bout (Keycloak)
-sur chacune des briques précédentes".
+Critical scenario (study 4.5): "end-to-end SSO authentication (Keycloak) on
+each of the previous components".
 
-Ce test est paramétré brique par brique (une entrée par service: Grommunio,
-Seafile, Vikunja, OnlyOffice, Matrix) plutôt qu'écrit comme cinq fonctions de
-test séparées, parce que l'assertion est structurellement identique pour
-chaque brique ("l'endpoint protégé refuse sans token, l'accepte avec le
-token Keycloak") - seule l'URL et le code de statut "sans token" attendu
-changent d'une brique à l'autre. La paramétrisation rend aussi trivial
-l'ajout d'une future brique SSO sans dupliquer la logique de test.
+This test is parametrized per component (one entry per service: Grommunio,
+Seafile, Vikunja, OnlyOffice, Matrix) rather than written as five separate
+test functions, because the assertion is structurally identical for each
+component ("the protected endpoint rejects without a token, accepts it with
+the Keycloak token") - only the URL and the expected "without token" status
+code change from one component to another. Parametrization also makes it
+trivial to add a future SSO component without duplicating test logic.
 
-Chaque brique a un mécanisme de délégation Keycloak différent (OIDC direct,
-proxy, plugin d'auth), donc l'endpoint et l'en-tête exact varient: ils sont
-définis dans la table SSO_TARGETS ci-dessous plutôt que déduits
-dynamiquement.
+Each component has a different Keycloak delegation mechanism (direct OIDC,
+proxy, auth plugin), so the exact endpoint and header vary: they are defined
+in the SSO_TARGETS table below rather than derived dynamically.
 """
 
 from __future__ import annotations
@@ -28,11 +27,11 @@ import requests
 @dataclasses.dataclass(frozen=True)
 class SsoTarget:
     name: str
-    # Construit l'URL à interroger à partir de `base_urls`.
+    # Builds the URL to query from `base_urls`.
     url_builder: Callable[..., str]
-    # Code(s) HTTP attendu(s) quand la requête est faite SANS token.
+    # Expected HTTP code(s) when the request is made WITHOUT a token.
     unauthenticated_statuses: tuple
-    # Code(s) HTTP attendu(s) quand la requête est faite AVEC le token Keycloak.
+    # Expected HTTP code(s) when the request is made WITH the Keycloak token.
     authenticated_statuses: tuple
     method: str = "GET"
 
@@ -58,10 +57,10 @@ SSO_TARGETS = [
     ),
     SsoTarget(
         name="onlyoffice",
-        # Le endpoint de gestion OnlyOffice utilisé pour la vérification JWT
-        # (voir test_coedition_onlyoffice.py); ici on vérifie qu'un token
-        # Keycloak seul (sans le JWT propre à OnlyOffice) ne suffit pas à
-        # contourner la protection JWT du Document Server.
+        # The OnlyOffice management endpoint used for JWT verification (see
+        # test_coedition_onlyoffice.py); here we check that a Keycloak token
+        # alone (without OnlyOffice's own JWT) is not enough to bypass the
+        # Document Server's JWT protection.
         url_builder=lambda b: f"{b.onlyoffice}/coauthoring/CommandService.ashx",
         unauthenticated_statuses=(200, 401, 403),
         authenticated_statuses=(200, 401, 403),
@@ -69,8 +68,8 @@ SSO_TARGETS = [
     ),
     SsoTarget(
         name="grommunio",
-        # Endpoint web JMAP/REST de Grommunio protégé par le proxy
-        # d'authentification délégué à Keycloak (mod_auth_openidc côté Caddy).
+        # Grommunio's web JMAP/REST endpoint protected by the auth proxy
+        # delegated to Keycloak (mod_auth_openidc on the Caddy side).
         url_builder=lambda b: f"{b.caddy}/grommunio/api/whoami",
         unauthenticated_statuses=(401, 403, 404),
         authenticated_statuses=(200, 404),

@@ -1,42 +1,42 @@
 ---
-# Configuration Seafile — étude 1.4 (brique retenue) et 2.11 (interdiction des
-# liens de partage non authentifiés, complémentaire de Gokapi pour le partage
-# externe, 1.8) et 1.5 (connecteur OnlyOffice).
+# Seafile configuration — study 1.4 (component chosen) and 2.11 (ban on
+# unauthenticated share links, complementary to Gokapi for external sharing,
+# 1.8) and 1.5 (OnlyOffice connector).
 #
-# Seafile est déployé par Helm dans le cluster Kubernetes
-# (infra/k8s/helm-values/seafile.yaml, hors périmètre de cette tâche) ; ce
-# playbook porte la configuration applicative (seahub_settings.py) via
+# Seafile is deployed via Helm in the Kubernetes cluster
+# (infra/k8s/helm-values/seafile.yaml, out of scope for this task); this
+# playbook carries the application configuration (seahub_settings.py) via a
 # ConfigMap.
 
-- name: "Configurer seahub_settings.py (partage authentifié, connecteur OnlyOffice)"
+- name: "Configure seahub_settings.py (authenticated sharing, OnlyOffice connector)"
   hosts: seafile
   connection: local
   gather_facts: false
   vars:
     seafile_namespace: "seafile"
     seafile_configmap: "seahub-settings"
-    # Étude 2.11, ligne ~564-565 : "SHARE_LINK_LOGIN_REQUIRED = True [...] force
-    # la connexion pour consulter tout lien de partage" — pour que tout partage
-    # externe non authentifié passe exclusivement par Gokapi (1.8).
+    # Study 2.11, line ~564-565: "SHARE_LINK_LOGIN_REQUIRED = True [...] forces
+    # login to view any share link" — so that any unauthenticated external
+    # sharing goes exclusively through Gokapi (1.8).
     seafile_share_link_login_required: true
-    # Permission désactivable par rôle plutôt que seulement restreindre la
-    # consultation (2.11) — ici positionnée globalement par défaut ; le
-    # découpage par rôle précis (seahub_settings.py, ROLE_PERMISSIONS) est un
-    # réglage à affiner en recette selon les profils de consultants.
+    # Permission that can be disabled per role rather than only restricting
+    # viewing (2.11) — set globally by default here; the precise per-role
+    # breakdown (seahub_settings.py, ROLE_PERMISSIONS) is a setting to refine
+    # during staging depending on consultant profiles.
     seafile_can_generate_share_link_default: true
-    # Connecteur OnlyOffice — étude 1.5 : "OFFICE_SERVER_TYPE" documenté par
-    # Seafile lui-même pour l'intégration OnlyOffice/Collabora.
+    # OnlyOffice connector — study 1.5: "OFFICE_SERVER_TYPE" documented by
+    # Seafile itself for OnlyOffice/Collabora integration.
     seafile_office_server_type: "OnlyOffice"
     seafile_onlyoffice_url: "https://{{ onlyoffice_domain }}"
 
   tasks:
-    - name: "Rendre seahub_settings.py"
+    - name: "Render seahub_settings.py"
       ansible.builtin.template:
         src: ../templates/seahub_settings.py.j2
         dest: "{{ playbook_dir }}/../rendered/seahub_settings.py"
         mode: "0640"
 
-    - name: "Publier seahub_settings.py comme ConfigMap Kubernetes"
+    - name: "Publish seahub_settings.py as a Kubernetes ConfigMap"
       ansible.builtin.command: >-
         kubectl create configmap {{ seafile_configmap }}
         --namespace {{ seafile_namespace }}
@@ -45,12 +45,12 @@
       register: seafile_configmap_manifest
       changed_when: false
 
-    - name: "kubectl apply de la configuration Seafile"
+    - name: "kubectl apply the Seafile configuration"
       ansible.builtin.shell: |
         echo '{{ seafile_configmap_manifest.stdout }}' | kubectl apply -f -
       changed_when: true
 
-    - name: "Redémarrer les pods Seahub pour prendre en compte la configuration"
+    - name: "Restart the Seahub pods to pick up the configuration"
       ansible.builtin.command: >-
         kubectl rollout restart deployment/seahub
         --namespace {{ seafile_namespace }}

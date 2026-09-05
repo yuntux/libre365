@@ -3,12 +3,12 @@ export type ConsolidatedStatus = "in-meeting" | "online" | "unavailable" | "offl
 export type MatrixPresence = "online" | "unavailable" | "offline" | null;
 
 export interface GrommunioAvailability {
-  /** Derive de GetUserAvailability (EWS) : true si un evenement de calendrier est en cours. */
+  /** Derived from GetUserAvailability (EWS): true if a calendar event is currently in progress. */
   inMeetingNow: boolean;
 }
 
 export interface LiveKitPresence {
-  /** true si l'utilisateur est actuellement participant d'au moins une room LiveKit active. */
+  /** true if the user is currently a participant in at least one active LiveKit room. */
   inCall: boolean;
 }
 

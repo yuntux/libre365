@@ -35,9 +35,9 @@ def matrix_ready(base_urls, wait_for_service):
 @pytest.fixture(scope="module")
 def matrix_access_token(base_urls, test_user, matrix_ready) -> str:
     """
-    Login natif Matrix (m.login.password) pour obtenir un access_token
-    utilisateur. Le scénario SSO Matrix via Keycloak (m.login.sso /
-    OIDC delegation) est couvert séparément dans test_sso_e2e.py.
+    Native Matrix login (m.login.password) to obtain a user access_token.
+    The Matrix SSO scenario via Keycloak (m.login.sso / OIDC delegation) is
+    covered separately in test_sso_e2e.py.
     """
     username = os.environ.get("TEST_MATRIX_USERNAME", test_user.username)
     password = os.environ.get("TEST_MATRIX_PASSWORD", test_user.password)
@@ -53,12 +53,12 @@ def matrix_access_token(base_urls, test_user, matrix_ready) -> str:
     )
     if response.status_code != 200:
         pytest.fail(
-            f"Échec de connexion Matrix sur {base_urls.matrix}: "
+            f"Matrix login failed on {base_urls.matrix}: "
             f"HTTP {response.status_code} - {response.text[:300]}"
         )
     token = response.json().get("access_token")
     if not token:
-        pytest.fail(f"Réponse de login Matrix sans access_token: {response.text[:300]}")
+        pytest.fail(f"Matrix login response without an access_token: {response.text[:300]}")
     return token
 
 
@@ -69,7 +69,7 @@ def matrix_headers(matrix_access_token: str) -> dict:
 
 @pytest.fixture()
 def test_room(base_urls, matrix_headers):
-    """Crée une room de test et la nettoie (leave) en fin de test."""
+    """Creates a test room and cleans it up (leave) at the end of the test."""
     room_name = f"integration-test-{uuid.uuid4().hex[:8]}"
     create_response = requests.post(
         f"{base_urls.matrix}/_matrix/client/v3/createRoom",
@@ -79,7 +79,7 @@ def test_room(base_urls, matrix_headers):
     )
     if create_response.status_code != 200:
         pytest.fail(
-            "Échec de création de room Matrix: "
+            "Matrix room creation failed: "
             f"HTTP {create_response.status_code} - {create_response.text[:300]}"
         )
     room_id = create_response.json()["room_id"]
@@ -95,7 +95,7 @@ def test_room(base_urls, matrix_headers):
 
 
 def test_send_message_in_room(base_urls, matrix_headers, test_room):
-    """Envoie un message texte dans la room de test et vérifie sa réception."""
+    """Sends a text message in the test room and verifies its receipt."""
     message_body = f"Message de test d'intégration {uuid.uuid4()}"
     transaction_id = uuid.uuid4().hex
 
@@ -106,19 +106,19 @@ def test_send_message_in_room(base_urls, matrix_headers, test_room):
         timeout=15,
     )
     assert send_response.status_code == 200, (
-        f"Échec d'envoi de message dans la room {test_room}: "
+        f"Failed to send message in room {test_room}: "
         f"HTTP {send_response.status_code} - {send_response.text[:300]}"
     )
     event_id = send_response.json()["event_id"]
 
-    # Vérification de réception: relecture de l'event depuis la room.
+    # Receipt check: reading the event back from the room.
     get_response = requests.get(
         f"{base_urls.matrix}/_matrix/client/v3/rooms/{test_room}/event/{event_id}",
         headers=matrix_headers,
         timeout=15,
     )
     assert get_response.status_code == 200, (
-        f"Message envoyé (event {event_id}) introuvable à la relecture: "
+        f"Sent message (event {event_id}) not found when reading it back: "
         f"HTTP {get_response.status_code} - {get_response.text[:300]}"
     )
     assert get_response.json()["content"]["body"] == message_body
@@ -126,11 +126,11 @@ def test_send_message_in_room(base_urls, matrix_headers, test_room):
 
 def test_start_visio_widget_in_room(base_urls, matrix_headers, test_room):
     """
-    Démarre une "visio" depuis la room au sens du mécanisme actuellement
-    disponible (solution de repli documentée dans l'étude): ajout d'un
-    widget de room pointant vers un lien de visioconférence réutilisable,
-    puis vérification que l'état de la room expose bien ce widget - c'est ce
-    qu'Element affiche comme bouton d'appel dans la room.
+    Starts a "call" from the room in the sense of the mechanism currently
+    available (fallback solution documented in the study): adding a room
+    widget pointing to a reusable videoconference link, then verifying that
+    the room state does expose that widget - this is what Element displays
+    as the call button in the room.
     """
     visio_url = os.environ.get(
         "TEST_VISIO_ROOM_URL", "https://visio.libre365.test/room/integration-test"
@@ -142,7 +142,7 @@ def test_start_visio_widget_in_room(base_urls, matrix_headers, test_room):
         f"/state/im.vector.modular.widgets/{widget_id}",
         headers=matrix_headers,
         json={
-            "type": "jitsi",  # type de widget générique reconnu par Element pour la visio
+            "type": "jitsi",  # generic widget type recognized by Element for video calls
             "url": visio_url,
             "name": "Visio",
             "data": {"widgetId": widget_id},
@@ -150,7 +150,7 @@ def test_start_visio_widget_in_room(base_urls, matrix_headers, test_room):
         timeout=15,
     )
     assert put_response.status_code == 200, (
-        f"Échec de création du widget visio dans la room {test_room}: "
+        f"Failed to create the call widget in room {test_room}: "
         f"HTTP {put_response.status_code} - {put_response.text[:300]}"
     )
 
@@ -161,6 +161,6 @@ def test_start_visio_widget_in_room(base_urls, matrix_headers, test_room):
         timeout=15,
     )
     assert state_response.status_code == 200, (
-        f"Widget visio {widget_id} introuvable après création dans la room {test_room}"
+        f"Call widget {widget_id} not found after being created in room {test_room}"
     )
     assert state_response.json().get("url") == visio_url
