@@ -1,0 +1,28 @@
+# Overlay de dimensionnement — 2000 utilisateurs
+# Extrapolation du scenario de reference 1.5 L.195-196 (100 x 20 documents = 2000
+# connexions) a l'echelle 2000 utilisateurs : le nombre de replicas Document Server
+# augmente pour absorber le volume de connexions simultanees, chaque replica restant
+# dimensionne comme en 100 (~8 coeurs/16 Go), conformement au principe de scaling
+# horizontal du cluster retenu en 1.5 L.198.
+# Usage : helm upgrade --install onlyoffice onlyoffice/docs-cloud -f onlyoffice.yaml -f onlyoffice-2000.yaml
+replicaCount: 4
+
+resources:
+  requests:
+    cpu: "2"
+    memory: "4Gi"
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+# soit ~16 coeurs / 32 Go RAM cumules sur les 4 replicas, a affiner par test de charge
+# reel (JMeter, 1.5 L.196) avant mise en production a cette echelle.
+
+redis:
+  master:
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"

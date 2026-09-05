@@ -1,0 +1,12 @@
+---
+# Réalm Keycloak principal + clients OIDC — étude 1.7. Interroge l'API REST
+# Keycloak (déjà déployé via Helm dans le cluster Kubernetes, cf.
+# infra/k8s/helm-values/keycloak.yaml, hors périmètre de cette tâche) — pas de
+# connexion SSH nécessaire, d'où l'exécution sur le groupe control_apis.
+
+- name: "Provisionner le realm Keycloak et les clients OIDC de la stack"
+  hosts: keycloak
+  connection: local
+  gather_facts: false
+  roles:
+    - keycloak_realm

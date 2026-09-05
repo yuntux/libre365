@@ -1,0 +1,63 @@
+# Brique : OnlyOffice Document Server Community Edition >= 9.4 — etude 1.5 L.192-199
+# Chart utilise : chart communautaire `onlyoffice/docs-cloud` (ArtifactHub) ou a defaut
+#   manifest raw derive de l'image officielle `onlyoffice/documentserver`.
+#   repo Helm : https://onlyoffice.github.io/docs-cloud-chart (a valider au deploiement)
+#
+# 1.5 L.198 — architecture cible retenue DES LA CONCEPTION INITIALE : cluster Document
+# Server + load balancer + Redis (stockage de session), plutot qu'une instance unique a
+# faire evoluer plus tard — plus simple a anticiper en infra qu'a retrofitter.
+#
+# Convention : ce fichier porte les valeurs communes (image, Redis, integration Seafile
+# WOPI/connecteur officiel) ; le dimensionnement chiffre (replicas/resources) est dans
+# les overlays onlyoffice-100.yaml / onlyoffice-2000.yaml.
+
+image:
+  repository: onlyoffice/documentserver
+  tag: "9.4"
+
+# 1.5 L.198 — cluster explicite : plusieurs replicas Document Server derriere un load
+# balancer (Service ClusterIP + Ingress), avec Redis partage pour la session.
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    existingSecret: onlyoffice-redis-secret
+
+env:
+  JWT_ENABLED: "true"
+  JWT_SECRET:
+    valueFrom:
+      secretKeyRef:
+        name: onlyoffice-jwt-secret
+        key: secret
+  # 2.6 L.469 — `document.permissions.chat: false` : ce parametre se positionne au niveau
+  # de la CONFIG DE CHAQUE DOCUMENT ouvert (config JS transmise a l'ouverture depuis
+  # l'integrateur), pas au niveau serveur global de Document Server — Document Server
+  # n'expose pas de flag global equivalent. Il est donc positionne cote connecteur
+  # Seafile<->OnlyOffice (voir connectors/, hors perimetre de ce depot), qui doit inclure
+  # `"permissions": {"chat": false}` dans le JSON de config de chaque document ouvert
+  # depuis Seafile. Documente ici pour memoire (2.6 L.469-473).
+
+persistence:
+  data:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: office.open365.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: onlyoffice-tls
+      hosts:
+        - office.open365.example.org

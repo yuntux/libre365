@@ -1,0 +1,125 @@
+---
+# Rôle keycloak_realm — création du realm principal, activation MFA native
+# (TOTP + WebAuthn/FIDO2, étude 1.7), et clients OIDC pour chaque brique.
+#
+# Utilise community.general.keycloak_* (module officiel), plutôt que l'API
+# REST via `uri`, pour bénéficier de l'idempotence native de ces modules —
+# cohérent avec l'esprit déclaratif de l'IaC retenu au chapitre 4.
+
+- name: "Vérifier la présence de community.general"
+  ansible.builtin.command: ansible-doc -l community.general.keycloak_realm
+  register: keycloak_module_check
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  run_once: true
+
+- name: "Avertir si la collection community.general est absente"
+  ansible.builtin.debug:
+    msg: >-
+      La collection community.general (modules keycloak_*) semble absente.
+      Installer avec `ansible-galaxy collection install community.general`
+      avant de rejouer ce rôle.
+  when: keycloak_module_check.rc != 0
+
+- name: "Créer/mettre à jour le realm {{ keycloak_realm_name }}"
+  community.general.keycloak_realm:
+    auth_keycloak_url: "{{ keycloak_base_url }}"
+    auth_realm: "{{ keycloak_admin_realm }}"
+    auth_username: "{{ keycloak_admin_user }}"
+    auth_password: "{{ keycloak_admin_password }}"
+    id: "{{ keycloak_realm_name }}"
+    realm: "{{ keycloak_realm_name }}"
+    display_name: "{{ keycloak_realm_display_name }}"
+    enabled: true
+    registration_allowed: false
+    reset_password_allowed: true
+    remember_me: true
+    verify_email: true
+    # Politique OTP — TOTP activé nativement (étude 1.7, ligne ~264).
+    otp_policy_type: "{{ keycloak_realm_otp_policy_type }}"
+    otp_policy_algorithm: "{{ keycloak_realm_otp_policy_algorithm }}"
+    otp_policy_digits: "{{ keycloak_realm_otp_policy_digits }}"
+    otp_policy_period: "{{ keycloak_realm_otp_policy_period }}"
+    # Politique WebAuthn/FIDO2 — deuxième facteur ET facteur principal sans mot
+    # de passe (passkey), cf. 1.7 : "à la fois comme second facteur et comme
+    # facteur principal sans mot de passe".
+    web_authn_policy_rp_entity_name: "{{ keycloak_realm_display_name }}"
+    web_authn_policy_rp_id: "{{ open365_domain }}"
+    web_authn_policy_signature_algorithms:
+      - "ES256"
+      - "RS256"
+    web_authn_policy_user_verification_requirement: "preferred"
+    web_authn_policy_passwordless_rp_entity_name: "{{ keycloak_realm_display_name }}"
+    web_authn_policy_passwordless_rp_id: "{{ open365_domain }}"
+    state: present
+  no_log: true # évite de journaliser le mot de passe admin transmis en clair dans les paramètres du module
+
+- name: "Activer explicitement WebAuthn et WebAuthn Passwordless dans le browser flow"
+  community.general.keycloak_authentication:
+    auth_keycloak_url: "{{ keycloak_base_url }}"
+    auth_realm: "{{ keycloak_admin_realm }}"
+    auth_username: "{{ keycloak_admin_user }}"
+    auth_password: "{{ keycloak_admin_password }}"
+    realm: "{{ keycloak_realm_name }}"
+    alias: "browser"
+    copy_from: "browser"
+    authentication_executions:
+      - providerId: "webauthn-authenticator"
+        requirement: "ALTERNATIVE"
+      - providerId: "webauthn-authenticator-passwordless"
+        requirement: "ALTERNATIVE"
+    state: present
+  no_log: true
+  when: keycloak_realm_webauthn_enabled | bool
+
+- name: "Créer/mettre à jour les clients OIDC de la stack"
+  community.general.keycloak_client:
+    auth_keycloak_url: "{{ keycloak_base_url }}"
+    auth_realm: "{{ keycloak_admin_realm }}"
+    auth_username: "{{ keycloak_admin_user }}"
+    auth_password: "{{ keycloak_admin_password }}"
+    realm: "{{ keycloak_realm_name }}"
+    client_id: "{{ item.client_id }}"
+    name: "{{ item.name }}"
+    root_url: "{{ item.root_url }}"
+    redirect_uris: "{{ item.redirect_uris }}"
+    public_client: "{{ item.public_client | default(false) }}"
+    protocol: "openid-connect"
+    standard_flow_enabled: true
+    direct_access_grants_enabled: false
+    service_accounts_enabled: false
+    full_scope_allowed: false
+    state: present
+  no_log: true
+  loop: "{{ keycloak_oidc_clients }}"
+  loop_control:
+    label: "{{ item.client_id }}"
+  register: keycloak_clients_result
+
+- name: "Récupérer le secret généré de chaque client confidentiel"
+  community.general.keycloak_client_secret_info:
+    auth_keycloak_url: "{{ keycloak_base_url }}"
+    auth_realm: "{{ keycloak_admin_realm }}"
+    auth_username: "{{ keycloak_admin_user }}"
+    auth_password: "{{ keycloak_admin_password }}"
+    realm: "{{ keycloak_realm_name }}"
+    id: "{{ item.client_id }}"
+  no_log: true
+  loop: "{{ keycloak_oidc_clients }}"
+  loop_control:
+    label: "{{ item.client_id }}"
+  when: not (item.public_client | default(false))
+  register: keycloak_client_secrets
+
+- name: "Écrire les secrets clients sur le contrôleur (répertoire hors dépôt versionné)"
+  ansible.builtin.template:
+    src: client-secret.env.j2
+    dest: "{{ keycloak_client_secrets_output_dir }}/{{ item.item.client_id }}.env"
+    mode: "0600"
+  delegate_to: localhost
+  no_log: true
+  loop: "{{ keycloak_client_secrets.results }}"
+  loop_control:
+    label: "{{ item.item.client_id }}"
+  when: item.skipped is not defined

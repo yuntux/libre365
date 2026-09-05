@@ -1,0 +1,55 @@
+# Brique : Keycloak — SSO/IAM central (etude 1.7 L.270-271)
+# Chart utilise : bitnami/keycloak
+#   repo Helm : https://charts.bitnami.com/bitnami
+#   chart    : keycloak
+#
+# 1.7 L.271 — cluster Keycloak en haute disponibilite retenu DES LA CIBLE INITIALE (SSO
+# = point individuel de defaillance critique pour toute la stack). Keycloak est nativement
+# concu pour du clustering horizontal (plusieurs noeuds derriere un load balancer, cache
+# distribue Infinispan) : aucune difficulte connue pour suivre la croissance au-dela de
+# 2000 utilisateurs.
+#
+# Dimensionnement pilote par le nombre de connexions/seconde, pas le nombre total
+# d'utilisateurs (1.7 L.262) — la meme fourchette 2-4 coeurs/4-8 Go est retenue pour les
+# deux echelles (1.7 L.271), le curseur principal etant plutot replicaCount (HA) que les
+# ressources par pod. Voir overlays keycloak-100.yaml / keycloak-2000.yaml.
+
+image:
+  repository: bitnami/keycloak
+  tag: "26.0.7"
+
+auth:
+  adminUser: admin
+  existingSecret: keycloak-admin-secret
+
+# 1.7 L.271 — cache distribue Infinispan pour le mode cluster HA
+cache:
+  enabled: true
+  stack: kubernetes
+
+proxy: edge
+
+extraEnvVars:
+  - name: KC_HOSTNAME
+    value: "sso.open365.example.org"
+  # 1.7 — MFA natif : TOTP + WebAuthn/FIDO2 actives dans les flux d'authentification
+  # standards de Keycloak (configuration de realm, pas une variable d'environnement) —
+  # a positionner via Ansible/import de realm (cf. infra/ansible/, hors perimetre ici).
+  # OTP par SMS et par mail : non couverts nativement, necessitent un SPI Keycloak
+  # custom (1.7 L.266-268) — chantier de developpement, hors perimetre de ce depot k8s.
+
+postgresql:
+  enabled: true
+  auth:
+    database: keycloak
+    existingSecret: keycloak-postgres-secret
+
+ingress:
+  enabled: true
+  ingressClassName: ""
+  hostname: sso.open365.example.org
+  tls: true
+  extraTls:
+    - hosts:
+        - sso.open365.example.org
+      secretName: keycloak-tls

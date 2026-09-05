@@ -1,0 +1,23 @@
+# Overlay de dimensionnement — 2000 utilisateurs (etude 1.7 L.271 : 2-4 coeurs / 4-8 Go
+# par noeud, meme fourchette qu'a 100 -> le nombre de replicas augmente pour absorber la
+# charge de connexions/seconde plutot que les ressources par pod).
+# Usage : helm upgrade --install keycloak bitnami/keycloak -f keycloak.yaml -f keycloak-2000.yaml
+replicaCount: 4
+
+resources:
+  requests:
+    cpu: "2"
+    memory: "4Gi"
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+
+postgresql:
+  primary:
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"

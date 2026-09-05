@@ -1,0 +1,19 @@
+---
+# Variables communes à tous les playbooks. Les secrets réels (mots de passe,
+# clés API) doivent être injectés via Ansible Vault ou un coffre-fort externe
+# (Vault/OpenBao) — étude 4.5 : "jamais en clair dans le dépôt de code".
+# Les valeurs ci-dessous sont des exemples de structure, pas des secrets réels.
+
+open365_domain: "open365.example.internal"
+
+keycloak_base_url: "https://sso.{{ open365_domain }}"
+keycloak_admin_realm: "master"
+keycloak_target_realm: "open365"
+# À fournir via `--extra-vars` ou un fichier vault, jamais en clair ici :
+keycloak_admin_user: "{{ vault_keycloak_admin_user | default('admin') }}"
+keycloak_admin_password: "{{ vault_keycloak_admin_password | default(omit) }}"
+
+grommunio_domain: "mail.{{ open365_domain }}"
+matrix_domain: "matrix.{{ open365_domain }}"
+seafile_domain: "files.{{ open365_domain }}"
+onlyoffice_domain: "docs.{{ open365_domain }}"

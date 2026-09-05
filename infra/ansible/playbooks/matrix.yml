@@ -1,0 +1,58 @@
+---
+# Configuration du domaine Matrix/Synapse et du provider OIDC vers Keycloak —
+# étude 1.2 (Matrix/Synapse retenu, mode workers dès la conception) et 1.7
+# (SSO Keycloak central pour l'ensemble de la stack).
+#
+# Synapse lui-même est déployé par Helm dans le cluster Kubernetes
+# (infra/k8s/helm-values/synapse.yaml, hors périmètre de cette tâche) ; ce
+# playbook porte uniquement la configuration applicative (homeserver.yaml,
+# provider OIDC) rendue via template puis appliquée par rollout Kubernetes.
+
+- name: "Configurer le domaine Matrix/Synapse et le SSO OIDC"
+  hosts: matrix
+  connection: local
+  gather_facts: false
+  vars:
+    synapse_server_name: "{{ matrix_domain }}"
+    synapse_config_configmap: "synapse-homeserver-config"
+    synapse_namespace: "matrix"
+    # Client OIDC créé par le rôle keycloak_realm (client_id: matrix-synapse) ;
+    # le secret correspondant est lu depuis le fichier généré par ce rôle
+    # plutôt que redemandé/recréé ici.
+    synapse_oidc_client_id: "matrix-synapse"
+    synapse_oidc_client_secret_file: "{{ playbook_dir }}/../secrets/keycloak-clients/matrix-synapse.env"
+
+  tasks:
+    - name: "Charger le secret client OIDC généré pour Synapse"
+      ansible.builtin.set_fact:
+        synapse_oidc_client_secret: >-
+          {{ (lookup('file', synapse_oidc_client_secret_file)
+              | regex_search('KEYCLOAK_CLIENT_SECRET=(.*)', '\\1'))[0] }}
+      no_log: true
+
+    - name: "Rendre la configuration homeserver.yaml (extrait OIDC + server_name)"
+      ansible.builtin.template:
+        src: ../templates/synapse-homeserver-oidc.yaml.j2
+        dest: "{{ playbook_dir }}/../rendered/synapse-homeserver-oidc.yaml"
+        mode: "0640"
+      no_log: true
+
+    - name: "Appliquer la configuration au cluster Kubernetes (kubectl create configmap --dry-run + apply)"
+      ansible.builtin.command: >-
+        kubectl create configmap {{ synapse_config_configmap }}
+        --namespace {{ synapse_namespace }}
+        --from-file=homeserver-oidc.yaml={{ playbook_dir }}/../rendered/synapse-homeserver-oidc.yaml
+        --dry-run=client -o yaml
+      register: synapse_configmap_manifest
+      changed_when: false
+
+    - name: "kubectl apply de la configmap Synapse"
+      ansible.builtin.shell: |
+        echo '{{ synapse_configmap_manifest.stdout }}' | kubectl apply -f -
+      changed_when: true
+
+    - name: "Redémarrer les pods Synapse (rollout restart) pour prendre en compte la config OIDC"
+      ansible.builtin.command: >-
+        kubectl rollout restart deployment/synapse-main
+        --namespace {{ synapse_namespace }}
+      changed_when: true

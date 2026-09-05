@@ -1,0 +1,50 @@
+{
+  "realm": "open365",
+  "enabled": true,
+  "displayName": "open365 (dev)",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginTheme": "keycloak",
+  "accessTokenLifespan": 3600,
+  "roles": {
+    "realm": [
+      { "name": "consultant", "description": "Utilisateur standard open365 (etude 1.7)" },
+      { "name": "admin", "description": "Administration open365" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "open365-integration-tests",
+      "name": "Suite de tests d'integration (tests/integration)",
+      "description": "Client OIDC utilise par la suite pytest pour obtenir des tokens SSO de bout en bout contre chaque brique (etude 4.5, 5.5).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "devonly-changeme-client-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "redirectUris": ["http://localhost/*"],
+      "webOrigins": ["*"]
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "testuser@open365.localhost",
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "devonly-changeme-testuser",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["consultant"]
+    }
+  ]
+}

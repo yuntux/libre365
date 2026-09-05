@@ -1,0 +1,138 @@
+name: Recette ephemere (manuelle)
+
+# Materialise l'etude 5.4 "Declenchement automatique d'un environnement de
+# recette" (lignes 786-791) et 5.5 "Rejeu des scenarios de test" (793-797).
+#
+# Choix explicite (a documenter aussi dans docs/ci-cd.md) : l'etude decrit un
+# environnement de recette EPHEMERE provisionne depuis la definition IaC
+# Kubernetes/Terraform (chapitre 4), avec un jeu de donnees de test dedie et
+# un declenchement automatique a chaque nouvelle version detectee (5.3/5.4).
+# Reproduire ce provisionnement Kubernetes complet depuis un runner GitHub
+# Actions hebergeria un cluster ephemere hors du perimetre de cette tache
+# (creation de noeuds, ingress, DNS, volumes...) : ce workflow se limite donc,
+# pour l'instant, a demarrer l'environnement docker-compose (echelle
+# dev/test, cf. chapitre 4.6) comme substitut fonctionnel testable en CI. Il
+# valide le CYCLE (demarrage -> attente sante -> rejeu des scenarios ->
+# rapport -> decision de promotion) independamment du provisionneur reel ;
+# faire pointer ce meme cycle sur un vrai environnement Kubernetes ephemere
+# (via infra/terraform + infra/k8s) est un chantier separe, cf. docs/ci-cd.md.
+#
+# Declenchement manuel (workflow_dispatch) ici plutot qu'automatique sur
+# detection Renovate (5.3) : faire declencher directement une PR Renovate
+# n'est pas encore cable (necessiterait un evenement dedie type
+# `pull_request` filtre sur l'auteur "renovate[bot]" + branche par brique) ;
+# ce workflow est la brique d'execution du cycle, invocable manuellement des
+# maintenant et branchable plus tard sur un declencheur automatique.
+
+on:
+  workflow_dispatch:
+    inputs:
+      brique:
+        description: >-
+          Brique dont la nouvelle version est a valider (ex. synapse,
+          seafile, onlyoffice, vikunja, keycloak, grommunio). Informatif pour
+          l'instant : le docker-compose de dev demarre l'ensemble de la
+          stack, la mise a jour cible d'une seule image sera branchee quand
+          les recettes Kubernetes par brique existeront (cf. docs/ci-cd.md).
+        required: true
+        type: string
+      version:
+        description: Version de la brique a valider en recette.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  recette-ephemere:
+    name: Recette ephemere docker-compose (${{ inputs.brique }} @ ${{ inputs.version }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verifier la presence de l'environnement docker-compose
+        id: check
+        run: |
+          if [ ! -f "docker-compose/docker-compose.yml" ]; then
+            echo "::error::docker-compose/docker-compose.yml absent - impossible de demarrer la recette ephemere."
+            exit 1
+          fi
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      - name: Demarrer l'environnement (brique=${{ inputs.brique }}, version=${{ inputs.version }})
+        working-directory: docker-compose
+        env:
+          RECETTE_BRIQUE: ${{ inputs.brique }}
+          RECETTE_VERSION: ${{ inputs.version }}
+        run: |
+          # Jeu de donnees de test represente ici par la configuration par
+          # defaut du docker-compose de dev (5.4, point 2 : "pas les donnees
+          # reelles de production") ; le pilotage fin de la version demarree
+          # pour ${{ inputs.brique }} se fera via une variable d'environnement
+          # ou un fichier d'override docker-compose, a cabler par la brique
+          # concernee (hors perimetre de ce workflow generique).
+          if [ -f .env.example ] && [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+          docker compose up -d
+
+      - name: Attendre que les services soient sains
+        working-directory: docker-compose
+        run: |
+          script="scripts/wait-for-healthy.sh"
+          if [ ! -x "$script" ] && [ ! -f "$script" ]; then
+            echo "::error::$script introuvable (script attendu, ecrit par ailleurs dans le depot) - impossible de valider la sante de l'environnement."
+            exit 1
+          fi
+          chmod +x "$script" || true
+          "$script"
+
+      - name: Afficher l'etat des services en cas d'echec
+        if: failure()
+        working-directory: docker-compose
+        run: docker compose ps && docker compose logs --tail=200
+
+      - name: Installer les dependances des tests d'integration
+        working-directory: tests/integration
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Rejouer les scenarios critiques (pytest -m smoke)
+        id: pytest
+        working-directory: tests/integration
+        env:
+          RECETTE_BRIQUE: ${{ inputs.brique }}
+          RECETTE_VERSION: ${{ inputs.version }}
+        run: |
+          # Rapport HTML = "rapport de resultats (succes/echec par scenario)"
+          # qui conditionne la decision de promotion (etude 5.5, ligne 797).
+          # continue-on-error au niveau du step (pas du job) : on veut publier
+          # le rapport meme en cas d'echec de scenario, la decision de
+          # promotion restant humaine/automatisee en aval de ce workflow.
+          pytest -m smoke --html=report.html --self-contained-html
+        continue-on-error: true
+
+      - name: Publier le rapport de recette en artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-recette-${{ inputs.brique }}-${{ inputs.version }}
+          path: tests/integration/report.html
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Statut final des scenarios
+        if: always()
+        run: |
+          if [ "${{ steps.pytest.outcome }}" = "failure" ]; then
+            echo "::error::Au moins un scenario smoke a echoue - promotion en production NON recommandee (etude 5.5). Voir le rapport HTML en artifact."
+            exit 1
+          fi
+          echo "Tous les scenarios smoke ont reussi - rapport joint en artifact pour decision de promotion."
+
+      - name: Arreter l'environnement (nettoyage de la recette ephemere)
+        if: always()
+        working-directory: docker-compose
+        run: docker compose down -v

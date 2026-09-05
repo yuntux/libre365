@@ -1,0 +1,80 @@
+# Brique : PeerTube — plateforme video d'entreprise (etude 2.12 L.576-592)
+# Chart utilise : chart communautaire `peertube-helm/peertube` (ArtifactHub, plusieurs
+#   forks communautaires existent — a valider au moment du deploiement) ou a defaut
+#   manifest raw derive de l'image officielle `chocobozzz/peertube`.
+#   repo Helm : https://peertube-helm.github.io/charts (a valider)
+#
+# 2.12 L.581-582 — configuration de base : organisation par chaines/playlists (une
+# chaine par equipe ou type de reunion), federation ActivityPub desactivee (usage
+# interne strict, la federation n'est pas un besoin exprime, cf. 2.12 L.583).
+# Alimentee par le connecteur de depot MinIO -> PeerTube (batch quotidien, cf. 2.12
+# L.589, developpement hors perimetre de ce depot k8s, voir connectors/).
+
+image:
+  repository: chocobozzz/peertube
+  tag: "v6.3.2-bookworm"
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+config:
+  webserver:
+    hostname: "videos.open365.example.org"
+  # 2.12 L.583 — federation ActivityPub desactivee : usage interne strict.
+  federation:
+    videos:
+      federate_unlisted: false
+    prevent_search_indexation:
+      enabled: true
+
+  # 2.12 L.581-582 — visibilite par defaut "interne" (non listee publiquement, mais
+  # visible pour tout utilisateur authentifie de l'instance), plutot que "publique" ou
+  # "non repertoriee".
+  defaults:
+    publish:
+      privacy: 3 # 1=publique, 2=non repertoriee, 3=privee(interne selon config instance), 4=mot de passe — a valider selon la version PeerTube exacte
+
+  # 1.7 — SSO Keycloak (plugin OpenID Connect PeerTube, officiel)
+  plugins:
+    openid_connect:
+      enabled: true
+      discover_url: "https://sso.open365.example.org/realms/open365/.well-known/openid-configuration"
+      client_id: "peertube"
+
+  signup:
+    enabled: false # comptes provisionnes via SSO Keycloak uniquement
+
+postgresql:
+  enabled: true
+  auth:
+    database: peertube
+    existingSecret: peertube-postgres-secret
+
+redis:
+  enabled: true
+
+persistence:
+  storage:
+    enabled: true
+    size: 1Ti
+    storageClass: ""
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: videos.open365.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: peertube-tls
+      hosts:
+        - videos.open365.example.org

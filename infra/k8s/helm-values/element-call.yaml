@@ -1,0 +1,73 @@
+# Brique : Element Call — application de visioconference native Matrix, protocole
+# MatrixRTC, backend SFU LiveKit (etude 1.3 L.107).
+# Pas de chart Helm officiel maintenu par Element pour le moment (element-call est
+# packagee comme conteneur unique servant l'application statique + un petit service
+# d'auth JWT LiveKit) : manifest raw base sur un Deployment generique, values ci-dessous
+# au format "chart-like" pour rester coherent avec la convention du depot si un chart
+# communautaire est adopte plus tard (ex. via un chart generique type
+# `bjw-s/app-template`).
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/element-hq/element-call
+  tag: "latest-ce" # a figer sur un tag versionne avant mise en production
+
+env:
+  # 1.3 L.107 — backend LiveKit partage avec Visio pour la partie SFU media.
+  - name: LIVEKIT_URL
+    value: "wss://livekit.open365.example.org"
+  - name: LIVEKIT_JWT_SERVICE_URL
+    value: "http://element-call-auth.open365.svc.cluster.local:8080"
+  - name: MATRIX_HOMESERVER_URL
+    value: "https://matrix.open365.example.org"
+  - name: DEFAULT_HOMESERVER
+    value: "open365.example.org"
+
+# Service d'auth JWT LiveKit dedie a Element Call (echange token Matrix <-> token LiveKit)
+authService:
+  enabled: true
+  image:
+    repository: ghcr.io/element-hq/lk-jwt-service
+    tag: "latest"
+  env:
+    - name: LIVEKIT_URL
+      value: "wss://livekit.open365.example.org"
+    - name: LIVEKIT_KEY
+      valueFrom:
+        secretKeyRef:
+          name: livekit-keys
+          key: api-key
+    - name: LIVEKIT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: livekit-keys
+          key: api-secret
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: call.open365.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: element-call-tls
+      hosts:
+        - call.open365.example.org

@@ -1,0 +1,87 @@
+# Brique : Matrix homeserver Synapse — etude 1.2 L.83-96
+# Chart utilise : ananace-chart/matrix-synapse (https://gitlab.com/ananace/charts)
+#   repo Helm : https://ananace.gitlab.io/charts
+#   chart    : matrix-synapse
+# Alternative de chart possible : matrix-org/synapse (helm chart officiel Element, moins
+# complet sur le mode workers) — ananace-chart retenu ici car il expose nativement la
+# decomposition en workers (federation-sender, synchrotron, generic workers) necessaire
+# a la cible d'architecture retenue en 1.2 L.89.
+#
+# Convention de dimensionnement (voir README.md) : ce fichier porte les valeurs COMMUNES
+# (image, OIDC, mode workers activé) ; les valeurs numeriques de dimensionnement
+# (resources, replicas) sont dans les overlays synapse-100.yaml / synapse-2000.yaml,
+# appliques en second sur la ligne de commande helm (-f synapse.yaml -f synapse-100.yaml).
+
+matrix:
+  serverName: matrix.open365.example.org
+
+synapse:
+  # 1.2 L.89 — mode "workers" retenu comme cible d'architecture des le depart (et non
+  # comme evolution ulterieure), pour separer federation / sync / envoi de messages sur
+  # plusieurs processus et absorber la croissance sans repenser l'architecture Matrix.
+  workers:
+    enabled: true
+    federationSender:
+      enabled: true
+      replicaCount: 1
+    federationReader:
+      enabled: true
+      replicaCount: 1
+    synchrotron:
+      enabled: true
+      replicaCount: 2
+    genericWorkers:
+      enabled: true
+      replicaCount: 2
+    mediaRepository:
+      enabled: true
+      replicaCount: 1
+
+  # 1.7 — SSO federe vers Keycloak, brique retenue pour l'ensemble de la stack.
+  oidc:
+    enabled: true
+    providers:
+      - idp_id: keycloak
+        idp_name: "Open365 SSO"
+        issuer: "https://sso.open365.example.org/realms/open365"
+        client_id: "synapse"
+        client_secret:
+          secretName: synapse-oidc-secret
+          secretKey: client-secret
+        scopes: ["openid", "profile", "email"]
+        user_mapping_provider:
+          config:
+            localpart_template: "{{ user.preferred_username }}"
+            display_name_template: "{{ user.name }}"
+
+  federation:
+    enabled: true
+
+  image:
+    tag: v1.114.0
+    repository: matrixdotorg/synapse
+
+postgresql:
+  enabled: true
+  auth:
+    database: synapse
+    existingSecret: synapse-postgres-secret
+
+persistence:
+  mediaStore:
+    enabled: true
+    size: 100Gi
+    storageClass: ""
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: matrix.open365.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: synapse-tls
+      hosts:
+        - matrix.open365.example.org
