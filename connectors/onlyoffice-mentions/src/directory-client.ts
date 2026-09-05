@@ -1,7 +1,7 @@
 import { DirectoryUser } from "./types";
 
 const KEYCLOAK_BASE_URL = process.env.KEYCLOAK_BASE_URL ?? "https://auth.example.org";
-const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM ?? "open365";
+const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM ?? "libre365";
 const KEYCLOAK_ADMIN_TOKEN = process.env.KEYCLOAK_ADMIN_TOKEN ?? "";
 
 /**

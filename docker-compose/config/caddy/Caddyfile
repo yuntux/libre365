@@ -29,7 +29,7 @@
 	#     html_injection {
 	#         selector "body"
 	#         position "prepend"
-	#         html `<div id="open365-banner">...menu, cloche, recherche...</div>`
+	#         html `<div id="libre365-banner">...menu, cloche, recherche...</div>`
 	#     }
 	# }
 
@@ -70,7 +70,7 @@
 	}
 
 	handle {
-		respond "open365 dev portal - see docker-compose/README.md for the per-service ports" 200
+		respond "libre365 dev portal - see docker-compose/README.md for the per-service ports" 200
 	}
 
 	log {

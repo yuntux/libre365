@@ -18,7 +18,7 @@
 resource "proxmox_virtual_environment_vm" "grommunio" {
   name        = "${local.name_prefix}-grommunio"
   description = "Appliance Grommunio (VM dédiée, hors cluster Kubernetes — étude 4.3)"
-  tags        = ["open365", "grommunio", "mail", var.environment]
+  tags        = ["libre365", "grommunio", "mail", var.environment]
 
   node_name = var.proxmox_node_names[0] # priorité de placement sur le 1er nœud physique : service à état, pas de vMotion à chaud automatique voulu ici
 

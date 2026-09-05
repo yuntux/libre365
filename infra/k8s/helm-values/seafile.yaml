@@ -43,7 +43,7 @@ env:
   # 1.5 L.193 — integration OnlyOffice comme office server (edition Community >= 9.4,
   # plafond de connexions leve).
   OFFICE_SERVER_TYPE: "OnlyOffice"
-  ONLYOFFICE_APIJS_URL: "https://office.open365.example.org/web-apps/apps/api/documents/api.js"
+  ONLYOFFICE_APIJS_URL: "https://office.libre365.example.org/web-apps/apps/api/documents/api.js"
   ONLYOFFICE_JWT_SECRET:
     valueFrom:
       secretKeyRef:
@@ -52,10 +52,10 @@ env:
 
   # 1.7 — SSO Keycloak (OIDC natif Seafile)
   ENABLE_OAUTH: "true"
-  OAUTH_PROVIDER_DOMAIN: "sso.open365.example.org"
+  OAUTH_PROVIDER_DOMAIN: "sso.libre365.example.org"
   OAUTH_CLIENT_ID: "seafile"
 
-  SEAFILE_SERVER_HOSTNAME: "files.open365.example.org"
+  SEAFILE_SERVER_HOSTNAME: "files.libre365.example.org"
 
 persistence:
   data:
@@ -77,11 +77,11 @@ ingress:
   enabled: true
   className: ""
   hosts:
-    - host: files.open365.example.org
+    - host: files.libre365.example.org
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: seafile-tls
       hosts:
-        - files.open365.example.org
+        - files.libre365.example.org

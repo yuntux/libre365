@@ -8,7 +8,7 @@ import { NormalizedEvent } from "./types";
 const NOVU_API_URL = process.env.NOVU_API_URL ?? "https://api.novu.co/v1";
 const NOVU_API_KEY = process.env.NOVU_API_KEY ?? "";
 // Workflow trigger identifier configure cote Novu, commun a toutes les sources.
-const NOVU_WORKFLOW_ID = process.env.NOVU_WORKFLOW_ID ?? "open365-unified-notification";
+const NOVU_WORKFLOW_ID = process.env.NOVU_WORKFLOW_ID ?? "libre365-unified-notification";
 
 export interface NovuTriggerResult {
   ok: boolean;

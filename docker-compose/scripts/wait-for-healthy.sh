@@ -27,7 +27,7 @@ declare -A TCP_ONLY_SERVICES=(
   [grommunio-dev]="${GROMMUNIO_DEV_HTTP_PORT:-8443}"
 )
 
-echo "==> Attente de la disponibilite de la stack open365 (dev/test)..."
+echo "==> Attente de la disponibilite de la stack libre365 (dev/test)..."
 
 compose_services() {
   docker compose config --services

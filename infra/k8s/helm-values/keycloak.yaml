@@ -31,7 +31,7 @@ proxy: edge
 
 extraEnvVars:
   - name: KC_HOSTNAME
-    value: "sso.open365.example.org"
+    value: "sso.libre365.example.org"
   # 1.7 — MFA natif : TOTP + WebAuthn/FIDO2 actives dans les flux d'authentification
   # standards de Keycloak (configuration de realm, pas une variable d'environnement) —
   # a positionner via Ansible/import de realm (cf. infra/ansible/, hors perimetre ici).
@@ -47,9 +47,9 @@ postgresql:
 ingress:
   enabled: true
   ingressClassName: ""
-  hostname: sso.open365.example.org
+  hostname: sso.libre365.example.org
   tls: true
   extraTls:
     - hosts:
-        - sso.open365.example.org
+        - sso.libre365.example.org
       secretName: keycloak-tls

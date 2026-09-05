@@ -13,7 +13,7 @@
 # appliques en second sur la ligne de commande helm (-f synapse.yaml -f synapse-100.yaml).
 
 matrix:
-  serverName: matrix.open365.example.org
+  serverName: matrix.libre365.example.org
 
 synapse:
   # 1.2 L.89 — mode "workers" retenu comme cible d'architecture des le depart (et non
@@ -42,8 +42,8 @@ synapse:
     enabled: true
     providers:
       - idp_id: keycloak
-        idp_name: "Open365 SSO"
-        issuer: "https://sso.open365.example.org/realms/open365"
+        idp_name: "Libre365 SSO"
+        issuer: "https://sso.libre365.example.org/realms/libre365"
         client_id: "synapse"
         client_secret:
           secretName: synapse-oidc-secret
@@ -77,11 +77,11 @@ ingress:
   enabled: true
   className: ""
   hosts:
-    - host: matrix.open365.example.org
+    - host: matrix.libre365.example.org
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: synapse-tls
       hosts:
-        - matrix.open365.example.org
+        - matrix.libre365.example.org

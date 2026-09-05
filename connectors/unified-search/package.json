@@ -1,5 +1,5 @@
 {
-  "name": "@open365/unified-search",
+  "name": "@libre365/unified-search",
   "version": "1.0.0",
   "description": "Recherche unifiee - fan-out temps reel Matrix/Seafile/Vikunja/Grommunio avec relais du token utilisateur (etude 2.2)",
   "private": true,

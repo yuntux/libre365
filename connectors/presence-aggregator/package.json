@@ -1,5 +1,5 @@
 {
-  "name": "@open365/presence-aggregator",
+  "name": "@libre365/presence-aggregator",
   "version": "1.0.0",
   "description": "Agregateur de presence Matrix/Grommunio-EWS/LiveKit consolidee pour le bandeau du portail (etude 2.8)",
   "private": true,

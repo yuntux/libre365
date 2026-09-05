@@ -1,20 +1,20 @@
 {
-  "realm": "open365",
+  "realm": "libre365",
   "enabled": true,
-  "displayName": "open365 (dev)",
+  "displayName": "libre365 (dev)",
   "sslRequired": "none",
   "registrationAllowed": false,
   "loginTheme": "keycloak",
   "accessTokenLifespan": 3600,
   "roles": {
     "realm": [
-      { "name": "consultant", "description": "Utilisateur standard open365 (etude 1.7)" },
-      { "name": "admin", "description": "Administration open365" }
+      { "name": "consultant", "description": "Utilisateur standard libre365 (etude 1.7)" },
+      { "name": "admin", "description": "Administration libre365" }
     ]
   },
   "clients": [
     {
-      "clientId": "open365-integration-tests",
+      "clientId": "libre365-integration-tests",
       "name": "Suite de tests d'integration (tests/integration)",
       "description": "Client OIDC utilise par la suite pytest pour obtenir des tokens SSO de bout en bout contre chaque brique (etude 4.5, 5.5).",
       "enabled": true,
@@ -34,7 +34,7 @@
       "username": "testuser",
       "enabled": true,
       "emailVerified": true,
-      "email": "testuser@open365.localhost",
+      "email": "testuser@libre365.localhost",
       "firstName": "Test",
       "lastName": "User",
       "credentials": [

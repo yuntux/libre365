@@ -7,7 +7,7 @@ deployment_scale = "100" # ou "2000" — cf. locals.tf pour le dimensionnement d
 environment       = "production"
 
 proxmox_endpoint      = "https://pve1.example.internal:8006/"
-proxmox_api_token     = "terraform@pve!open365-token=00000000-0000-0000-0000-000000000000"
+proxmox_api_token     = "terraform@pve!libre365-token=00000000-0000-0000-0000-000000000000"
 proxmox_ssh_username  = "root"
 proxmox_tls_insecure  = false
 
@@ -22,7 +22,7 @@ storage_pool     = "local-lvm"
 storage_pool_iso = "local"
 
 ssh_public_keys = [
-  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... exploitation@open365",
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... exploitation@libre365",
 ]
 
 grommunio_iso_file_id          = "local:iso/grommunio-appliance-2026.06.iso"

@@ -134,7 +134,7 @@ def test_start_visio_widget_in_room(base_urls, matrix_headers, test_room):
     qu'Element affiche comme bouton d'appel dans la room.
     """
     visio_url = os.environ.get(
-        "TEST_VISIO_ROOM_URL", "https://visio.open365.test/room/integration-test"
+        "TEST_VISIO_ROOM_URL", "https://visio.libre365.test/room/integration-test"
     )
     widget_id = f"visio-{uuid.uuid4().hex[:8]}"
 

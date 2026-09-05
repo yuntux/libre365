@@ -1,5 +1,5 @@
 {
-  "name": "@open365/onlyoffice-mentions",
+  "name": "@libre365/onlyoffice-mentions",
   "version": "1.0.0",
   "description": "Handler onRequestUsers / onRequestSendNotify OnlyOffice, relais vers notification-hub (etude 2.7)",
   "private": true,

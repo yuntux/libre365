@@ -9,7 +9,7 @@ import { MeetingMetadata } from "./types";
  * Convention de nommage attendue, cote export LiveKit Egress (a documenter/configurer
  * au niveau de la regle d'Egress) :
  *   <ISO-date>_<slug-titre>_<participant1>-<participant2>-....<ext>
- * ex: "2026-09-05_kickoff-projet-open365_alice-bob-carol.mp4"
+ * ex: "2026-09-05_kickoff-projet-libre365_alice-bob-carol.mp4"
  *
  * Si le nom ne suit pas ce format, retombe sur un titre derive du nom de fichier brut,
  * sans date ni participants -- degrade proprement plutot que d'echouer.

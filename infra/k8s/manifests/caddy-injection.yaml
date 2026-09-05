@@ -14,30 +14,30 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: caddy-html-banner
-  namespace: open365
+  namespace: libre365
   labels:
     app.kubernetes.io/name: caddy
     app.kubernetes.io/component: portail-applicatif
 data:
   banner.html: |
-    <!-- Bandeau applicatif transverse open365 — injecte avant </body> -->
-    <div id="open365-banner" data-open365-banner>
-      <nav id="open365-banner-menu">
+    <!-- Bandeau applicatif transverse libre365 — injecte avant </body> -->
+    <div id="libre365-banner" data-libre365-banner>
+      <nav id="libre365-banner-menu">
         <!-- Liens vers chaque brique : Element, Seafile, Vikunja, Visio, Grommunio-web, PeerTube -->
       </nav>
-      <div id="open365-banner-search">
+      <div id="libre365-banner-search">
         <!-- 2.2 L.398-399 — Zone de recherche unifiee : fan-out temps reel vers les APIs
              natives de chaque service (Matrix /search, Seafile, Vikunja, Grommunio IMAP),
              avec le token Keycloak de l'utilisateur relaye a chaque appel. -->
       </div>
-      <div id="open365-banner-notifications">
+      <div id="libre365-banner-notifications">
         <!-- 2.1 L.381-382 — Cloche de notification : centre Novu, alimente par les
              connecteurs webhook par service. -->
       </div>
-      <div id="open365-banner-presence">
+      <div id="libre365-banner-presence">
         <!-- 2.8 L.503-504 — Statut de presence consolide (Matrix m.presence,
              Grommunio GetUserAvailability, etat d'appel LiveKit). -->
       </div>
     </div>
-    <script src="/open365-banner/banner.js" defer></script>
-    <link rel="stylesheet" href="/open365-banner/banner.css">
+    <script src="/libre365-banner/banner.js" defer></script>
+    <link rel="stylesheet" href="/libre365-banner/banner.css">

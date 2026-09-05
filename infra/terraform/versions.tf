@@ -18,7 +18,7 @@ terraform {
   #
   # backend "s3" {
   #   endpoints                  = { s3 = "https://minio.example.internal:9000" }
-  #   bucket                     = "open365-terraform-state"
+  #   bucket                     = "libre365-terraform-state"
   #   key                        = "proxmox/terraform.tfstate"
   #   region                     = "us-east-1" # valeur imposée par le provider S3, sans effet chez MinIO
   #   skip_credentials_validation = true

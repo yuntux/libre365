@@ -131,13 +131,13 @@ def test_user() -> TestUser:
     return TestUser(
         username=os.environ.get("TEST_USER_USERNAME", "test.consultant"),
         password=os.environ.get("TEST_USER_PASSWORD", "ChangeMe123!"),
-        email=os.environ.get("TEST_USER_EMAIL", "test.consultant@open365.test"),
+        email=os.environ.get("TEST_USER_EMAIL", "test.consultant@libre365.test"),
     )
 
 
 @pytest.fixture(scope="session")
 def keycloak_realm() -> str:
-    return os.environ.get("KEYCLOAK_REALM", "open365")
+    return os.environ.get("KEYCLOAK_REALM", "libre365")
 
 
 @pytest.fixture(scope="session")

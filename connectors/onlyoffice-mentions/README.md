@@ -34,7 +34,7 @@ Dans la configuration de l'editeur (Document Server), pointer :
 |---|---|---|
 | `PORT` | `4004` | Port d'ecoute HTTP |
 | `KEYCLOAK_BASE_URL` | `https://auth.example.org` | URL du serveur Keycloak |
-| `KEYCLOAK_REALM` | `open365` | Realm Keycloak |
+| `KEYCLOAK_REALM` | `libre365` | Realm Keycloak |
 | `KEYCLOAK_ADMIN_TOKEN` | (vide) | Token de service (Admin API, role `view-users`) |
 | `NOTIFICATION_HUB_URL` | `http://notification-hub:4001` | URL du centre de notifications |
 

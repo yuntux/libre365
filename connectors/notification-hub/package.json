@@ -1,5 +1,5 @@
 {
-  "name": "@open365/notification-hub",
+  "name": "@libre365/notification-hub",
   "version": "1.0.0",
   "description": "Centre de notifications unifie - ingestion Matrix/Grommunio/Seafile/Vikunja/OnlyOffice vers Novu (etude 2.1, 2.7)",
   "private": true,

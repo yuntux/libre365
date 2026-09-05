@@ -4,10 +4,10 @@ import { extractMeetingMetadataFromKey, mergeWithS3Tags } from "../src/metadata"
 describe("extractMeetingMetadataFromKey", () => {
   it("extrait titre/date/participants du nom conventionnel", () => {
     const result = extractMeetingMetadataFromKey(
-      "recordings/2026-09-05_kickoff-projet-open365_alice-bob-carol.mp4"
+      "recordings/2026-09-05_kickoff-projet-libre365_alice-bob-carol.mp4"
     );
     expect(result.date).toBe("2026-09-05");
-    expect(result.title).toBe("Kickoff Projet Open365");
+    expect(result.title).toBe("Kickoff Projet Libre365");
     expect(result.participants).toEqual(["Alice", "Bob", "Carol"]);
   });
 

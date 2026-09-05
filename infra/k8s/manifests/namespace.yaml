@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: open365
+  name: libre365
   labels:
-    app.kubernetes.io/part-of: open365
+    app.kubernetes.io/part-of: libre365
     # Etude chapitre 4.4 : toutes les briques conteneurisees (hors Grommunio, VM Proxmox,
     # cf. 4.3) sont deployees dans Kubernetes des la cible initiale a 100 utilisateurs.
     environment: production

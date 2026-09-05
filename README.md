@@ -1,4 +1,4 @@
-# open365
+# libre365
 
 Sortie d'Office 365 vers une stack libre — implémentation de l'étude
 [`sortie-office365-etude.md`](./sortie-office365-etude.md).

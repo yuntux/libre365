@@ -2,8 +2,8 @@
 # Defaults du rôle keycloak_realm — étude 1.7 : Keycloak en SSO/IAM central,
 # TOTP + WebAuthn/FIDO2 activés nativement dès le déploiement initial.
 
-keycloak_realm_name: "open365"
-keycloak_realm_display_name: "Open365"
+keycloak_realm_name: "libre365"
+keycloak_realm_display_name: "Libre365"
 
 # MFA — étude 1.7, ligne ~264-265 : TOTP et WebAuthn/FIDO2 "nativement
 # supportés, sans développement". SMS et OTP mail sont volontairement absents
@@ -33,9 +33,9 @@ keycloak_oidc_clients:
 
   - client_id: "vikunja"
     name: "Vikunja"
-    root_url: "https://tasks.{{ open365_domain }}"
+    root_url: "https://tasks.{{ libre365_domain }}"
     redirect_uris:
-      - "https://tasks.{{ open365_domain }}/auth/openid/*"
+      - "https://tasks.{{ libre365_domain }}/auth/openid/*"
     public_client: false
 
   - client_id: "onlyoffice"
@@ -54,23 +54,23 @@ keycloak_oidc_clients:
 
   - client_id: "gokapi"
     name: "Gokapi"
-    root_url: "https://send.{{ open365_domain }}"
+    root_url: "https://send.{{ libre365_domain }}"
     redirect_uris:
-      - "https://send.{{ open365_domain }}/oauth2/callback"
+      - "https://send.{{ libre365_domain }}/oauth2/callback"
     public_client: false
 
   - client_id: "novu"
     name: "Novu (centre de notifications)"
-    root_url: "https://notify.{{ open365_domain }}"
+    root_url: "https://notify.{{ libre365_domain }}"
     redirect_uris:
-      - "https://notify.{{ open365_domain }}/auth/oidc/callback"
+      - "https://notify.{{ libre365_domain }}/auth/oidc/callback"
     public_client: false
 
   - client_id: "peertube"
     name: "PeerTube"
-    root_url: "https://video.{{ open365_domain }}"
+    root_url: "https://video.{{ libre365_domain }}"
     redirect_uris:
-      - "https://video.{{ open365_domain }}/plugins/auth-openid-connect/router/callback"
+      - "https://video.{{ libre365_domain }}/plugins/auth-openid-connect/router/callback"
     public_client: false
 
 keycloak_client_secrets_output_dir: "{{ playbook_dir }}/../secrets/keycloak-clients"

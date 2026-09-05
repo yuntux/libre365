@@ -1,4 +1,4 @@
-# Values Helm — open365
+# Values Helm — libre365
 
 Configuration Kubernetes des briques conteneurisees retenues par l'etude
 (`sortie-office365-etude.md`, chapitre 4.3). Grommunio est **hors perimetre** de ce
@@ -39,7 +39,7 @@ surchargeant les cles de dimensionnement :
 
 ```bash
 helm upgrade --install synapse ananace-charts/matrix-synapse \
-  -n open365 -f synapse.yaml -f synapse-100.yaml
+  -n libre365 -f synapse.yaml -f synapse-100.yaml
 ```
 
 Pour les briques dont le dimensionnement ne depend pas reellement du nombre
@@ -85,17 +85,17 @@ helm repo update
 kubectl apply -f ../manifests/namespace.yaml
 
 # Brique sans overlay d'echelle
-helm upgrade --install vikunja vikunja/vikunja -n open365 -f vikunja.yaml
-helm upgrade --install seafile seafile-charts/seafile-ce -n open365 -f seafile.yaml
-helm upgrade --install minio minio/minio -n open365 -f minio.yaml
-helm upgrade --install peertube peertube-helm/peertube -n open365 -f peertube.yaml
-helm upgrade --install novu novu/novu -n open365 -f novu.yaml
-helm upgrade --install element-web ananace-charts/matrix-element-web -n open365 -f element-web.yaml
+helm upgrade --install vikunja vikunja/vikunja -n libre365 -f vikunja.yaml
+helm upgrade --install seafile seafile-charts/seafile-ce -n libre365 -f seafile.yaml
+helm upgrade --install minio minio/minio -n libre365 -f minio.yaml
+helm upgrade --install peertube peertube-helm/peertube -n libre365 -f peertube.yaml
+helm upgrade --install novu novu/novu -n libre365 -f novu.yaml
+helm upgrade --install element-web ananace-charts/matrix-element-web -n libre365 -f element-web.yaml
 
 # Brique avec overlay d'echelle (exemple : cible 100 utilisateurs)
-helm upgrade --install synapse ananace-charts/matrix-synapse -n open365 -f synapse.yaml -f synapse-100.yaml
-helm upgrade --install onlyoffice onlyoffice/docs-cloud -n open365 -f onlyoffice.yaml -f onlyoffice-100.yaml
-helm upgrade --install keycloak bitnami/keycloak -n open365 -f keycloak.yaml -f keycloak-100.yaml
+helm upgrade --install synapse ananace-charts/matrix-synapse -n libre365 -f synapse.yaml -f synapse-100.yaml
+helm upgrade --install onlyoffice onlyoffice/docs-cloud -n libre365 -f onlyoffice.yaml -f onlyoffice-100.yaml
+helm upgrade --install keycloak bitnami/keycloak -n libre365 -f keycloak.yaml -f keycloak-100.yaml
 
 # Manifests raw (pas de chart)
 kubectl apply -f ../manifests/gokapi.yaml
@@ -121,7 +121,7 @@ par une autre equipe).
   `infra/ansible/`.
 - LiveKit (backend SFU partage par Visio et Element Call, etude 1.3 L.106-107) : les
   fichiers `visio-meet.yaml` et `element-call.yaml` referencent un endpoint LiveKit
-  commun (`livekit.open365.svc.cluster.local`) mais ne definissent pas le deploiement
+  commun (`livekit.libre365.svc.cluster.local`) mais ne definissent pas le deploiement
   LiveKit lui-meme, non liste explicitement dans le perimetre de ce chantier.
 - Les connecteurs applicatifs (centre de notifications, recherche unifiee, agregateur
   de presence, integrations Seafile/OnlyOffice, etc., chapitre 2 de l'etude) : cf.

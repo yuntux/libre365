@@ -45,13 +45,13 @@
     # de passe (passkey), cf. 1.7 : "à la fois comme second facteur et comme
     # facteur principal sans mot de passe".
     web_authn_policy_rp_entity_name: "{{ keycloak_realm_display_name }}"
-    web_authn_policy_rp_id: "{{ open365_domain }}"
+    web_authn_policy_rp_id: "{{ libre365_domain }}"
     web_authn_policy_signature_algorithms:
       - "ES256"
       - "RS256"
     web_authn_policy_user_verification_requirement: "preferred"
     web_authn_policy_passwordless_rp_entity_name: "{{ keycloak_realm_display_name }}"
-    web_authn_policy_passwordless_rp_id: "{{ open365_domain }}"
+    web_authn_policy_passwordless_rp_id: "{{ libre365_domain }}"
     state: present
   no_log: true # évite de journaliser le mot de passe admin transmis en clair dans les paramètres du module
 

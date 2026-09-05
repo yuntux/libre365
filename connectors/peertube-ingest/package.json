@@ -1,5 +1,5 @@
 {
-  "name": "@open365/peertube-ingest",
+  "name": "@libre365/peertube-ingest",
   "version": "1.0.0",
   "description": "Depot des enregistrements de reunion MinIO -> PeerTube, webhook temps reel + batch (etude 2.12)",
   "private": true,

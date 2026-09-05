@@ -1,7 +1,7 @@
 # Configuration Synapse minimale pour l'environnement docker-compose dev/test
 # (etude 1.2 / 4.6). PAS la configuration de production (pas de workers, pas
 # de TLS federation reel - cf. 4.4 pour le mode "workers" cible en Kubernetes).
-server_name: "matrix.open365.localhost"
+server_name: "matrix.libre365.localhost"
 pid_file: /data/homeserver.pid
 public_baseurl: "http://localhost:8008/"
 
@@ -46,7 +46,7 @@ form_secret: "devonly-changeme-synapse-form"
 
 report_stats: false
 
-signing_key_path: "/data/matrix.open365.localhost.signing.key"
+signing_key_path: "/data/matrix.libre365.localhost.signing.key"
 
 trusted_key_servers:
   - server_name: "matrix.org"

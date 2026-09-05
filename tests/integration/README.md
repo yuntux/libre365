@@ -71,7 +71,7 @@ ports de `docker-compose/.env.example` et les tags d'image de
 | Variable                     | Défaut                     | Brique                          |
 |-------------------------------|-----------------------------|----------------------------------|
 | `KEYCLOAK_URL`                 | `http://localhost:8080`     | Keycloak                        |
-| `KEYCLOAK_REALM`               | `open365`                   | Keycloak (realm de test)        |
+| `KEYCLOAK_REALM`               | `libre365`                   | Keycloak (realm de test)        |
 | `KEYCLOAK_CLIENT_ID`           | `integration-tests`         | Keycloak (client public direct access grants) |
 | `KEYCLOAK_CLIENT_SECRET`       | *(vide)*                    | Keycloak (si le client de test n'est pas public) |
 | `GROMMUNIO_IMAP_HOST` / `_PORT`| `localhost` / `993`         | Grommunio (IMAP)                |
@@ -91,7 +91,7 @@ ports de `docker-compose/.env.example` et les tags d'image de
 | `PRESENCE_AGGREGATOR_URL`      | `http://localhost:4003`     | Connecteur presence-aggregator  |
 | `ONLYOFFICE_MENTIONS_URL`      | `http://localhost:4004`     | Connecteur onlyoffice-mentions  |
 | `PEERTUBE_INGEST_URL`          | `http://localhost:4005`     | Connecteur peertube-ingest      |
-| `TEST_USER_USERNAME` / `_PASSWORD` / `_EMAIL` | `test.consultant` / `ChangeMe123!` / `test.consultant@open365.test` | Utilisateur de test partagé (jeu de données représentatif, étude 4.4) |
+| `TEST_USER_USERNAME` / `_PASSWORD` / `_EMAIL` | `test.consultant` / `ChangeMe123!` / `test.consultant@libre365.test` | Utilisateur de test partagé (jeu de données représentatif, étude 4.4) |
 | `SERVICE_WAIT_TIMEOUT`         | `120` (secondes)            | Délai max d'attente de disponibilité de Keycloak |
 
 Des variables spécifiques par test permettent de surcharger des identifiants

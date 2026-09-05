@@ -27,7 +27,7 @@ quelques centaines de lignes"), sans dependance SDK supplementaire a suivre.
 | `PORT` | `4001` | Port d'ecoute HTTP |
 | `NOVU_API_URL` | `https://api.novu.co/v1` | URL de l'API Novu (self-hosted ou cloud) |
 | `NOVU_API_KEY` | (vide) | Cle API Novu |
-| `NOVU_WORKFLOW_ID` | `open365-unified-notification` | Identifiant du workflow Novu declenche |
+| `NOVU_WORKFLOW_ID` | `libre365-unified-notification` | Identifiant du workflow Novu declenche |
 
 ## Structure
 

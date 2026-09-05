@@ -26,7 +26,7 @@ resources:
 
 config:
   webserver:
-    hostname: "videos.open365.example.org"
+    hostname: "videos.libre365.example.org"
   # 2.12 L.583 — federation ActivityPub desactivee : usage interne strict.
   federation:
     videos:
@@ -45,7 +45,7 @@ config:
   plugins:
     openid_connect:
       enabled: true
-      discover_url: "https://sso.open365.example.org/realms/open365/.well-known/openid-configuration"
+      discover_url: "https://sso.libre365.example.org/realms/libre365/.well-known/openid-configuration"
       client_id: "peertube"
 
   signup:
@@ -70,11 +70,11 @@ ingress:
   enabled: true
   className: ""
   hosts:
-    - host: videos.open365.example.org
+    - host: videos.libre365.example.org
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: peertube-tls
       hosts:
-        - videos.open365.example.org
+        - videos.libre365.example.org

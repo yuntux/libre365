@@ -46,7 +46,7 @@ resource "proxmox_virtual_environment_vm" "k8s_control_plane" {
 
   name        = "${local.name_prefix}-k8s-cp-${count.index + 1}"
   description = "Nœud control-plane Kubernetes ${count.index + 1}/${local.sizing.k8s_control_plane_count}"
-  tags        = ["open365", "kubernetes", "control-plane", var.environment]
+  tags        = ["libre365", "kubernetes", "control-plane", var.environment]
 
   node_name = var.proxmox_node_names[count.index % local.proxmox_node_count]
 
@@ -112,7 +112,7 @@ resource "proxmox_virtual_environment_vm" "k8s_worker" {
 
   name        = "${local.name_prefix}-k8s-worker-${count.index + 1}"
   description = "Nœud worker Kubernetes ${count.index + 1}/${local.sizing.k8s_worker_count}"
-  tags        = ["open365", "kubernetes", "worker", var.environment]
+  tags        = ["libre365", "kubernetes", "worker", var.environment]
 
   node_name = var.proxmox_node_names[count.index % local.proxmox_node_count]
 

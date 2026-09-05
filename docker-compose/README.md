@@ -1,4 +1,4 @@
-# open365 - environnement docker-compose (developpement / test)
+# libre365 - environnement docker-compose (developpement / test)
 
 Cet environnement correspond au chapitre 4.6 de l'etude
 (`../sortie-office365-etude.md`) : *"Developpement/test : echelle reduite,
@@ -40,12 +40,12 @@ racine du depot pour le detail.
 
 | Service | Image | Port(s) hote | Identifiants par defaut (dev only) |
 |---|---|---|---|
-| `keycloak` | `quay.io/keycloak/keycloak:25.0.6` | 8080 | admin / `devonly-changeme-admin` (realm `master`) ; realm `open365` importe automatiquement avec le client `open365-integration-tests` / `devonly-changeme-client-secret` et l'utilisateur `testuser` / `devonly-changeme-testuser` |
+| `keycloak` | `quay.io/keycloak/keycloak:25.0.6` | 8080 | admin / `devonly-changeme-admin` (realm `master`) ; realm `libre365` importe automatiquement avec le client `libre365-integration-tests` / `devonly-changeme-client-secret` et l'utilisateur `testuser` / `devonly-changeme-testuser` |
 | `postgres-keycloak` | `postgres:16.4-alpine` | 5433 | `keycloak` / `devonly-changeme-keycloak-db` |
 | `synapse` | `matrixdotorg/synapse:v1.114.0` | 8008 (client), 8448 (federation) | inscription ouverte sans verification (dev uniquement) |
 | `postgres-synapse` | `postgres:16.4-alpine` | 5434 | `synapse` / `devonly-changeme-synapse-db` |
 | `element` | `vectorim/element-web:v1.11.86` | 8081 | pointe vers `synapse` (a saisir a la connexion) |
-| `seafile` | `seafileltd/seafile-mc:11.0.13` | 8082 | `admin@open365.localhost` / `devonly-changeme-seafile-admin` |
+| `seafile` | `seafileltd/seafile-mc:11.0.13` | 8082 | `admin@libre365.localhost` / `devonly-changeme-seafile-admin` |
 | `seafile-mysql` | `mariadb:10.11` | (interne uniquement) | root / `devonly-changeme-seafile-mysql-root` |
 | `onlyoffice-documentserver` | `onlyoffice/documentserver:8.2.2` | 8083 | JWT active (`devonly-changeme-onlyoffice-jwt`) |
 | `postgres-onlyoffice` | `postgres:16.4-alpine` | 5435 | `onlyoffice` / `devonly-changeme-onlyoffice-db` |
@@ -125,7 +125,7 @@ docker-compose/
   .env.example               Variables d'environnement (mots de passe dev only)
   README.md                  Ce fichier
   config/
-    keycloak/realm-export.json   Realm "open365" + client de test importes au demarrage
+    keycloak/realm-export.json   Realm "libre365" + client de test importes au demarrage
     synapse/homeserver.yaml      Configuration Synapse minimale (dev/test)
     synapse/log.config           Configuration de logs Synapse (sortie console)
     caddy/Caddyfile               Reverse-proxy par sous-chemin + reference a l'injection HTML de prod (2.3)

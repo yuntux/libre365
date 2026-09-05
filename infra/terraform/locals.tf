@@ -109,5 +109,5 @@ locals {
   # (étude 4.2 : cluster Proxmox multi-nœuds pour la HA au niveau hyperviseur).
   proxmox_node_count = length(var.proxmox_node_names)
 
-  name_prefix = "${var.environment}-open365"
+  name_prefix = "${var.environment}-libre365"
 }

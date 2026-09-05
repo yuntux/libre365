@@ -25,16 +25,16 @@ backend:
   env:
     DJANGO_SETTINGS_MODULE: "meet.settings.production"
     # 1.7 — SSO Keycloak (OIDC)
-    OIDC_OP_AUTHORIZATION_ENDPOINT: "https://sso.open365.example.org/realms/open365/protocol/openid-connect/auth"
-    OIDC_OP_TOKEN_ENDPOINT: "https://sso.open365.example.org/realms/open365/protocol/openid-connect/token"
-    OIDC_OP_USER_ENDPOINT: "https://sso.open365.example.org/realms/open365/protocol/openid-connect/userinfo"
+    OIDC_OP_AUTHORIZATION_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/auth"
+    OIDC_OP_TOKEN_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/token"
+    OIDC_OP_USER_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/userinfo"
     OIDC_RP_CLIENT_ID: "visio-meet"
     # secret client OIDC : cf. secret oidc-client-secrets, non versionne
-    LIVEKIT_API_URL: "https://livekit.open365.example.org"
+    LIVEKIT_API_URL: "https://livekit.libre365.example.org"
     # 2.12 L.587 — MinIO auto-heberge comme destination S3 de LiveKit Egress, plutot
     # qu'un volume reseau partage (NFS) entre pods pour un fichier ecrit en local par le
     # pod Egress.
-    AWS_S3_ENDPOINT_URL: "http://minio.open365.svc.cluster.local:9000"
+    AWS_S3_ENDPOINT_URL: "http://minio.libre365.svc.cluster.local:9000"
     AWS_STORAGE_BUCKET_NAME: "visio-recordings"
     RECORDING_ENABLE: "true"
 
@@ -66,7 +66,7 @@ redis:
 # bucket / cf. politique de cycle de vie MinIO).
 liveKitEgress:
   s3:
-    endpoint: "http://minio.open365.svc.cluster.local:9000"
+    endpoint: "http://minio.libre365.svc.cluster.local:9000"
     bucket: "visio-recordings"
     accessKeySecretRef: minio-egress-credentials
     forcePathStyle: true
@@ -75,11 +75,11 @@ ingress:
   enabled: true
   className: ""
   hosts:
-    - host: visio.open365.example.org
+    - host: visio.libre365.example.org
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: visio-meet-tls
       hosts:
-        - visio.open365.example.org
+        - visio.libre365.example.org
