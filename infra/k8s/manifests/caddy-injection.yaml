@@ -21,23 +21,23 @@ metadata:
     app.kubernetes.io/component: portail-applicatif
 data:
   banner.html: |
-    <!-- Bandeau applicatif transverse libre365 — injecte avant </body> -->
+    <!-- libre365 cross-cutting application banner — injected before </body> -->
     <div id="libre365-banner" data-libre365-banner>
       <nav id="libre365-banner-menu">
-        <!-- Liens vers chaque brique : Element, Seafile, Vikunja, Visio, Grommunio-web, PeerTube -->
+        <!-- Links to each component: Element, Seafile, Vikunja, Visio, Grommunio-web, PeerTube -->
       </nav>
       <div id="libre365-banner-search">
-        <!-- 2.2 L.398-399 — Zone de recherche unifiee : fan-out temps reel vers les APIs
-             natives de chaque service (Matrix /search, Seafile, Vikunja, Grommunio IMAP),
-             avec le token Keycloak de l'utilisateur relaye a chaque appel. -->
+        <!-- 2.2 L.398-399 — Unified search area: real-time fan-out to each service's
+             native APIs (Matrix /search, Seafile, Vikunja, Grommunio IMAP),
+             with the user's Keycloak token relayed on every call. -->
       </div>
       <div id="libre365-banner-notifications">
-        <!-- 2.1 L.381-382 — Cloche de notification : centre Novu, alimente par les
-             connecteurs webhook par service. -->
+        <!-- 2.1 L.381-382 — Notification bell: Novu center, fed by the
+             per-service webhook connectors. -->
       </div>
       <div id="libre365-banner-presence">
-        <!-- 2.8 L.503-504 — Statut de presence consolide (Matrix m.presence,
-             Grommunio GetUserAvailability, etat d'appel LiveKit). -->
+        <!-- 2.8 L.503-504 — Consolidated presence status (Matrix m.presence,
+             Grommunio GetUserAvailability, LiveKit call state). -->
       </div>
     </div>
     <script src="/libre365-banner/banner.js" defer></script>
