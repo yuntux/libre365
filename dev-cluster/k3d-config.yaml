@@ -60,6 +60,9 @@ ports:
   # CADDY_HTTPS_PORT
   - port: 10443:10443
     nodeFilters: ["loadbalancer"]
+  # NOVU_API_PORT
+  - port: 13000:13000
+    nodeFilters: ["loadbalancer"]
   # NOTIFICATION_HUB_PORT
   - port: 4001:4001
     nodeFilters: ["loadbalancer"]

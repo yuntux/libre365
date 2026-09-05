@@ -35,12 +35,14 @@ spec:
           env:
             - name: PORT
               value: "4001"
-            # novu-mock stays on docker-compose (never deployed to the k3d dev
-            # cluster, see platform.yaml `other_ports`) — reached from inside
-            # the cluster via k3d's built-in host alias, at the port
-            # docker-compose publishes it on (NOVU_MOCK_PORT: 13000).
+            # Novu is a Helm release in this namespace (infra/k8s/helm-values/
+            # novu.yaml + dev/novu.yaml) — in-cluster Service DNS name.
+            # "novu-api" assumes the chart's common <release>-<subchart>
+            # naming for its api component (unverified against a live
+            # template in this sandbox — see dev-cluster/lib-expose.sh).
+            # Port 3000 matches Novu's documented self-hosted API default.
             - name: NOVU_API_URL
-              value: "http://host.k3d.internal:13000"
+              value: "http://novu-api.libre365.svc.cluster.local:3000"
             # Synapse is a Helm release in this namespace — in-cluster Service
             # DNS name, same as used by infra/k8s/manifests/caddy.yaml.
             - name: SYNAPSE_URL

@@ -11,9 +11,9 @@ name: Ephemeral staging (manual)
 # scope of this task - but as of the k3d dev cluster migration (chapter 4.6,
 # dev-cluster/), this workflow now starts the SAME thing a developer runs
 # locally: an ephemeral k3d cluster with the production Helm charts
-# (dev-cluster/deploy.sh), plus grommunio-dev/novu-mock on docker-compose
-# for the two bricks with no Kubernetes counterpart worth reusing (see
-# dev-cluster/README.md). This gets much closer to the study's intent
+# (dev-cluster/deploy.sh, Novu included), plus grommunio-dev on
+# docker-compose for the one brick with no Kubernetes counterpart worth
+# reusing (see dev-cluster/README.md). This gets much closer to the study's intent
 # (chart-level config exercised, not a parallel compose-only definition)
 # than the previous docker-compose-only substitute, while still not being
 # the real Proxmox/Terraform provisioner; pointing this cycle at that real
@@ -63,7 +63,7 @@ jobs:
           fi
           echo "present=true" >> "$GITHUB_OUTPUT"
 
-      - name: Start grommunio-dev + novu-mock (docker-compose)
+      - name: Start grommunio-dev (docker-compose)
         working-directory: docker-compose
         run: |
           # Test dataset represented here by the default configuration of
@@ -77,7 +77,7 @@ jobs:
           fi
           docker compose up -d
 
-      - name: Wait for grommunio-dev/novu-mock to be healthy
+      - name: Wait for grommunio-dev to be healthy
         working-directory: docker-compose
         run: |
           script="scripts/wait-for-healthy.sh"

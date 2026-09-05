@@ -108,15 +108,12 @@ def compute_compose_changes(platform: dict) -> list[Change]:
     text = sub_image_tag(text, "postgres", shared["postgres"])
     text = sub_image_tag(text, "redis", shared["redis"])
     text = sub_image_tag(text, "mariadb", shared["mariadb"])
-    text = sub_image_tag(text, "node", shared["node"])
 
     return [Change(compose_path, text, "docker-compose.yml (image tags)")]
 
 
 def compute_dockerfile_changes(platform: dict) -> list[Change]:
-    # Connector Dockerfiles are Python/FastAPI (`FROM python:<tag>`); `node` is
-    # only used by the dev-tier Novu mock inside docker-compose.yml itself
-    # (handled by compute_compose_changes), not by any connector Dockerfile.
+    # Connector Dockerfiles are Python/FastAPI (`FROM python:<tag>`).
     python_tag = platform["shared"]["python"]
     changes = []
     for dockerfile in sorted((REPO_ROOT / "connectors").glob("*/Dockerfile")):
@@ -218,9 +215,8 @@ def all_ports(platform: dict) -> dict:
 def k3d_ports(platform: dict) -> dict:
     """Ports that must be reachable from the host through the k3d cluster's
     load balancer: every service port except `grommunio_dev` (stays on
-    docker-compose, see platform.yaml's `other_ports` comment), plus every
-    connector port. Excludes `other_ports` entirely (Novu mock, also
-    docker-compose-only)."""
+    docker-compose, see its entry in platform.yaml), plus every connector
+    port."""
     merged: dict[str, int] = {}
     for name, svc in platform["services"].items():
         if name == "grommunio_dev":

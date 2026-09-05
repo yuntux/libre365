@@ -26,7 +26,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 NAMESPACE="libre365"
 CLUSTER_NAME="libre365-dev"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
-HELM_CHARTS=(keycloak synapse element-web seafile onlyoffice vikunja minio peertube)
+HELM_CHARTS=(keycloak synapse element-web seafile onlyoffice vikunja minio peertube novu)
 
 usage() {
   echo "Usage: $0 <connector-name|helm-release-name>"
@@ -61,6 +61,7 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
     vikunja) chart="vikunja/vikunja" ;;
     minio) chart="minio/minio" ;;
     peertube) chart="peertube-helm/peertube" ;;
+    novu) chart="novu/novu" ;;
   esac
   helm upgrade --install "$target" "$chart" -n "$NAMESPACE" -f "$base" -f "$dev_overlay"
   echo "==> Force-deleting its pod(s) so the new values are picked up immediately"

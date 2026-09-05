@@ -3,11 +3,12 @@
 This directory holds the local Kubernetes dev environment for libre365: a
 [k3d](https://k3d.io/) cluster that **reuses the production Helm
 charts/values** (`../infra/k8s/helm-values/`, `../infra/k8s/manifests/`)
-instead of a second, hand-maintained definition of the same 8 application
-bricks in `docker-compose.yml`. Only `grommunio-dev` and `novu-mock` remain
-on plain `docker-compose` (see `../docker-compose/README.md`) — everything
-else now runs the same way it would in production: a Helm release per
-brick, with the same chart, the same `<component>.yaml` base values.
+instead of a second, hand-maintained definition of the same application
+bricks in `docker-compose.yml`. Only `grommunio-dev` remains on plain
+`docker-compose` (see `../docker-compose/README.md`) — everything else,
+Novu included, now runs the same way it would in production: a Helm
+release per brick, with the same chart, the same `<component>.yaml` base
+values.
 
 ## Why k3d instead of docker-compose for most of the stack
 
@@ -22,22 +23,33 @@ first time at the ephemeral-staging or production step (study, chapter
 `docker compose up` — see "Dev-speed hardening" below for how this is
 mitigated.
 
-## Why grommunio-dev and novu-mock stay on docker-compose
+## Why grommunio-dev stays on docker-compose
 
-- `grommunio-dev`: the study (4.3) targets a Proxmox VM appliance for
-  production, never a Kubernetes container — there is no Helm chart to
-  reuse, and the container image used here is explicitly a dev/test-only
-  substitute (see its comment in `../docker-compose/docker-compose.yml`).
-  Deploying it to k3d would test something that doesn't exist in production.
-- `novu-mock`: a lightweight HTTP mock with no chart of its own — the real
-  `novu` chart (`../infra/k8s/helm-values/novu.yaml`) deploys the full
-  api/worker/ws/MongoDB/Redis stack, disproportionate for a mock whose only
-  job is to expose the same `POST /v1/events/trigger` shape the connectors
-  call.
+The study (4.3) targets a Proxmox VM appliance for production, never a
+Kubernetes container — there is no Helm chart to reuse, and the container
+image used here is explicitly a dev/test-only substitute (see its comment
+in `../docker-compose/docker-compose.yml`). Deploying it to k3d would test
+something that doesn't exist in production.
 
-Connectors that need them reach them through `host.k3d.internal` (k3d's
-built-in DNS alias for the Docker host), on the same port docker-compose
-exposes them on locally — see `infra/k8s/manifests/connectors/*.yaml`.
+## Novu runs the real chart here, not a mock
+
+An earlier version of this dev tier used a lightweight HTTP mock for Novu
+instead of the real `novu` chart (the reference stack — api/worker/ws/web +
+MongoDB + Redis — felt disproportionate for a mock whose only job was to
+expose the `POST /v1/events/trigger` shape the connectors call). That mock
+only validated that the connectors call the right endpoint with the right
+payload — it never exercised real Novu behavior (templates, delivery
+retries, the actual notification center UI), which is a real gap given that
+everything else on this cluster runs its actual production chart. Now that
+the k3d cluster already pays the cost of running real Helm charts for every
+other brick, the same trade-off applies to Novu: `helm upgrade --install
+novu novu/novu -f novu.yaml -f dev/novu.yaml` (see `deploy.sh`), hardened
+like every other brick (single replica per component instead of 2, see
+`../infra/k8s/helm-values/dev/novu.yaml`). The connectors that call it
+(`notification-hub`, `onlyoffice-mentions`) reach it through the in-cluster
+Service DNS name like any other brick — see
+`infra/k8s/manifests/connectors/*.yaml`, and the caveat there about that
+Service's exact name not being verifiable from this sandboxed environment.
 
 ## Dev-speed hardening ("durcir en dev pour aller plus vite")
 
@@ -105,10 +117,10 @@ what to check (`kubectl get service <name> -n libre365 -o yaml`).
 Prerequisites: `k3d`, `kubectl`, `helm`, `docker` on `PATH`.
 
 ```bash
-# Start grommunio-dev + novu-mock (not part of the k3d cluster)
+# Start grommunio-dev (not part of the k3d cluster)
 docker compose -f docker-compose/docker-compose.yml up -d
 
-# Bring up the k3d cluster + every other brick + the 5 connectors
+# Bring up the k3d cluster + every other brick (Novu included) + the 5 connectors
 ./dev-cluster/deploy.sh
 
 # Fast inner loop after editing a connector's code

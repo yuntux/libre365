@@ -1,0 +1,58 @@
+# Dev-speed hardening overlay for Novu (study 2.1) - see
+# ../../../../dev-cluster/README.md for the overall rationale. Usage:
+#   helm upgrade --install novu novu/novu -n libre365 \
+#     -f novu.yaml -f dev/novu.yaml
+#
+# Replaces the base file's `api`/`worker`/`ws`/`web` HA replica counts with a
+# single pod each, matching this repo's existing dev-hardening pattern (see
+# e.g. dev/keycloak.yaml) - same keys the base novu.yaml already uses, no new
+# ones invented.
+#
+# `mongodb.enabled`/`redis.enabled` (base file) are left untouched: they
+# already run as single-instance by default on this chart's own defaults
+# (no clustering toggle to turn off, unlike Keycloak's `cache.enabled` or
+# MinIO's `mode: standalone`), and this sandboxed environment has no network
+# access to novuhq.github.io/helm-charts to verify a resource-trimming key
+# for the `mongodb`/`redis` subcharts beyond what's already used elsewhere
+# in this repo for similar subcharts - left at chart defaults rather than
+# guessed, consistent with every other overlay in this directory.
+
+api:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+worker:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+ws:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+web:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"

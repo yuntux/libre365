@@ -27,16 +27,13 @@
 
 # -----------------------------------------------------------------------------
 # Generic images reused by several services in docker-compose (avoids
-# repeating/letting the same Postgres/Redis/MariaDB/Node tag drift apart in
+# repeating/letting the same Postgres/Redis/MariaDB tag drift apart in
 # 3-5 different places in the file).
 # -----------------------------------------------------------------------------
 shared:
   postgres: "16.4-alpine"
   redis: "7.4-alpine"
   mariadb: "10.11"
-  # Base image for the dev-tier Novu mock only (docker-compose/config/novu-mock) -
-  # the connectors themselves are Python/FastAPI (see `python` below), not Node.
-  node: "20.17-alpine"
   # Base image for the in-house connectors (connectors/*/Dockerfile): FastAPI +
   # uvicorn/uvloop, chosen for consistency with the rest of the repo (already
   # Python: tests/integration/, scripts/sync_platform.py) and for async
@@ -200,13 +197,19 @@ services:
       # synchronize).
 
   novu:
-    # study 2.1 - production notification hub (official Helm chart); the
-    # dev/test tier uses a local mock (docker-compose/config/novu-mock), with
-    # no external image to synchronize on the compose side. The official Novu
-    # chart manages the images of its 3 sub-components (api/worker/ws) itself,
+    # study 2.1 - production notification hub (official Helm chart), also
+    # deployed as-is (with the infra/k8s/helm-values/dev/novu.yaml
+    # dev-hardening overlay) on the k3d dev cluster - see
+    # dev-cluster/README.md. No docker-compose service (Novu was never meant
+    # to run outside Kubernetes here; a hand-rolled HTTP mock used to fill
+    # that gap in docker-compose, replaced once the k3d dev cluster made a
+    # real chart deployment available - see the description of the whole
+    # dev tier for the tradeoff this closed). The official Novu chart
+    # manages the images of its sub-components (api/worker/ws/web) itself,
     # with no single usable `image.tag` field here: not synchronized by this
     # script — the chart version (`--version` on `helm upgrade`) remains the
     # reference to pin separately on the day of the actual deployment.
+    ports: { NOVU_API_PORT: 13000 }
     compose: null
     helm: null
 
@@ -233,16 +236,16 @@ connector_ports:
 
 # -----------------------------------------------------------------------------
 # Services kept on plain docker-compose (never deployed to the k3d dev
-# cluster, see dev-cluster/README.md): Grommunio for the reason already
-# documented in the `grommunio_dev` entry above, and the Novu mock because it
-# has no counterpart chart of its own to reuse (novu.yaml is the full
-# production chart's api/worker/ws stack, disproportionate for a mock).
-# Each chart-backed brique's own Postgres/database now lives inside its
-# Helm release in the dev cluster (see infra/k8s/helm-values/dev/), so there
-# is no longer a standalone dev-tier Postgres port to track here.
+# cluster, see dev-cluster/README.md): only Grommunio, for the reason
+# already documented in the `grommunio_dev` entry above - a Proxmox VM
+# appliance in production, no Kubernetes counterpart to reuse. Novu used to
+# be here too (a hand-rolled HTTP mock, before the k3d dev cluster made
+# deploying the real chart practical - see the `novu` entry above); nothing
+# else currently needs this list. Each chart-backed brique's own
+# Postgres/database now lives inside its Helm release in the dev cluster
+# (see infra/k8s/helm-values/dev/), so there is no longer a standalone
+# dev-tier Postgres port to track here either.
 # -----------------------------------------------------------------------------
-other_ports:
-  NOVU_MOCK_PORT: 13000
 
 # -----------------------------------------------------------------------------
 # Local Kubernetes dev cluster (k3d), reusing the production Helm
@@ -253,7 +256,7 @@ other_ports:
 # fixed directly in that file's template in scripts/sync_platform.py).
 #
 # Port mappings cover every `services.*.ports` entry EXCEPT `grommunio_dev`
-# (stays on docker-compose, see `other_ports` above) plus `connector_ports`
+# (stays on docker-compose, see that entry above) plus `connector_ports`
 # (the 5 in-house connectors, deployed via infra/k8s/manifests/connectors/).
 # The node-port range is widened below the Kubernetes default (30000-32767)
 # so these existing port numbers (3456, 4001-4005, 8008-9002, etc.) can be

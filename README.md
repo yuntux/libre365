@@ -22,7 +22,7 @@ infra/
     helm-values/dev/ Dev-speed hardening overlays for the local k3d cluster
     manifests/connectors/, manifests/dev/  In-house connectors + dev-only Caddy for k3d
 dev-cluster/         Local k3d dev cluster (reuses infra/k8s/, "durcir en dev") — chapter 4.6
-docker-compose/      Reduced-scale dev/test environment (grommunio-dev + novu-mock only) — chapter 4.6
+docker-compose/      Reduced-scale dev/test environment (grommunio-dev only) — chapter 4.6
 connectors/          In-house integration modules — chapter 2
 tests/integration/   Durable integration test suite — chapter 5.5
 .github/workflows/   CI/CD: CVE scanning, version monitoring, ephemeral staging — chapter 5
@@ -72,12 +72,11 @@ request) at the next synchronization.
 Most of the stack now runs on a local [k3d](https://k3d.io/) Kubernetes
 cluster that reuses the production Helm charts (chapter 4.4), hardened for
 dev speed — see [`dev-cluster/README.md`](./dev-cluster/README.md) for the
-full rationale. Only `grommunio-dev` and `novu-mock` remain on
-docker-compose (no production Kubernetes counterpart worth reusing for
-either — see that same README):
+full rationale. Only `grommunio-dev` remains on docker-compose (no
+production Kubernetes counterpart worth reusing — see that same README):
 
 ```bash
-# grommunio-dev + novu-mock (docker-compose)
+# grommunio-dev (docker-compose)
 cd docker-compose
 cp .env.example .env
 docker compose up -d

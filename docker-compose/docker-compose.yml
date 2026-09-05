@@ -5,20 +5,20 @@
 # As of the k3d dev cluster migration, this file no longer hosts the whole
 # dev/test tier. Every service that has a production Helm chart worth
 # reusing (Keycloak, Synapse/Element, Seafile, OnlyOffice, Vikunja, Gokapi,
-# MinIO, PeerTube, Caddy, and the 5 in-house connectors) now runs on the
-# local k3d Kubernetes cluster instead, so that dev/test stays as close as
-# possible to the production deployment model (chapter 4.4) - see
+# MinIO, PeerTube, Novu, Caddy, and the 5 in-house connectors) now runs on
+# the local k3d Kubernetes cluster instead, so that dev/test stays as close
+# as possible to the production deployment model (chapter 4.4) - see
 # dev-cluster/README.md for the full rationale and startup instructions.
+# Novu used to be the exception here too (a lightweight HTTP mock, before
+# the k3d dev cluster made deploying the real chart practical) - see
+# dev-cluster/README.md for why the real chart is worth the extra resource
+# footprint for this one.
 #
-# This file is what remains: the two services that could NOT be migrated to
-# the k3d dev cluster.
-#   - grommunio-dev: the study (4.3) targets a Proxmox VM appliance for
-#     production, never a container, so there is no Helm chart to reuse -
-#     kept here purely so integration tests (send/receive mail, study 5.5)
-#     can run in CI without a Proxmox VM.
-#   - novu-mock: a lightweight HTTP mock with no real Helm chart counterpart
-#     worth reusing (the production `novu` chart deploys the full
-#     api/worker/ws/MongoDB/Redis stack, disproportionate for a mock).
+# This file is what remains: grommunio-dev, the only service that could NOT
+# be migrated to the k3d dev cluster - the study (4.3) targets a Proxmox VM
+# appliance for production, never a container, so there is no Helm chart to
+# reuse. Kept here purely so integration tests (send/receive mail, study
+# 5.5) can run in CI without a Proxmox VM.
 #
 # All images are official Docker Hub/Quay images, explicitly tagged (never
 # `latest`), with ports mapped in the clear on localhost rather than the
@@ -35,36 +35,6 @@ volumes:
   grommunio-dev-data:
 
 services:
-
-  # ---------------------------------------------------------------------
-  # Unified notification center (study 2.1)
-  # ---------------------------------------------------------------------
-  # Documented choice: no full assembly of novu/api + novu/worker +
-  # novu/ws + MongoDB + Redis here. The reference Novu stack is heavy for
-  # this quick dev/test tier, and the main goal of this environment is to
-  # test the application connectors (2.1, 2.7, 2.8), not Novu itself. We
-  # therefore use a minimal HTTP mock (official node image) that exposes
-  # the same API shape (POST /v1/events/trigger) that these connectors
-  # consume. For an acceptance test with real Novu, follow
-  # https://docs.novu.co/self-hosting (chapter 4.4/5.5, ephemeral staging
-  # environment, not this dev/test tier).
-  novu-mock:
-    image: node:20.17-alpine
-    restart: unless-stopped
-    working_dir: /app
-    command: ["node", "/app/server.js"]
-    environment:
-      PORT: "3000"
-    volumes:
-      - ./config/novu-mock/server.js:/app/server.js:ro
-    ports:
-      - "${NOVU_MOCK_PORT:-13000}:3000"
-    networks: [libre365]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
 
   # ---------------------------------------------------------------------
   # Mail/calendar: Grommunio - DEV/TEST ONLY (study 1.1 / 4.3)

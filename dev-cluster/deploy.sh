@@ -32,6 +32,7 @@ echo "==> 3/6 Helm repos (see infra/k8s/helm-values/README.md)"
 helm repo add ananace-charts https://ananace.gitlab.io/charts >/dev/null
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null
 helm repo add minio https://charts.min.io/ >/dev/null
+helm repo add novu https://novuhq.github.io/helm-charts >/dev/null
 # seafile-charts/onlyoffice/peertube-helm repos are marked "to be confirmed"
 # in infra/k8s/helm-values/README.md (no single identified official chart at
 # the time of writing) - added best-effort here; if a repo add fails because
@@ -61,8 +62,8 @@ helm upgrade --install minio minio/minio -n "$NAMESPACE" \
   -f infra/k8s/helm-values/minio.yaml -f infra/k8s/helm-values/dev/minio.yaml
 helm upgrade --install peertube peertube-helm/peertube -n "$NAMESPACE" \
   -f infra/k8s/helm-values/peertube.yaml -f infra/k8s/helm-values/dev/peertube.yaml
-# Novu: no dev-tier release (see platform.yaml `other_ports` comment) - the
-# mock stays on docker-compose, reached from k3d via host.k3d.internal.
+helm upgrade --install novu novu/novu -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/novu.yaml -f infra/k8s/helm-values/dev/novu.yaml
 
 echo "==> 5/6 In-house connectors: build + import images, apply manifests"
 for name in "${CONNECTORS[@]}"; do
@@ -86,6 +87,6 @@ Run `kubectl get pods -n libre365` to watch rollout status - some charts
 (Keycloak, Synapse, OnlyOffice) take a minute or two to become ready even in
 the hardened dev configuration.
 
-grommunio-dev and novu-mock are NOT part of this cluster - start them
-separately with `docker compose -f docker-compose/docker-compose.yml up -d`.
+grommunio-dev is NOT part of this cluster - start it separately with
+`docker compose -f docker-compose/docker-compose.yml up -d`.
 EOF

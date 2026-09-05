@@ -38,6 +38,14 @@ declare -A EXPOSE_MAP=(
   [minio:0]=9000
   [minio:1]=9001
   [peertube:0]=9002
+  # The Novu chart's naming convention for its per-component Services
+  # (api/worker/ws/web) is a second unverified assumption on top of the
+  # port-index one described above: "novu-api" follows the common
+  # <release>-<subchart> pattern, not confirmed against a live template of
+  # novuhq/helm-charts from this sandbox. Adjust with
+  # `kubectl get services -n libre365 -l app.kubernetes.io/instance=novu`
+  # if the real name differs.
+  [novu-api:0]=13000
   [gokapi:0]=53842
   [caddy-dev:0]=10080
   [notification-hub:0]=4001

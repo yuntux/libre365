@@ -2,9 +2,9 @@
 # libre365 - tear down the local k3d dev cluster entirely.
 #
 # This deletes the k3d cluster (all nodes, all in-cluster state - Postgres/
-# MariaDB/MinIO data included, since nothing here is backed by a persistent
-# volume outside the cluster). grommunio-dev and novu-mock (docker-compose,
-# not part of this cluster) are untouched - stop them separately with
+# MariaDB/MongoDB/MinIO data included, since nothing here is backed by a
+# persistent volume outside the cluster). grommunio-dev (docker-compose,
+# not part of this cluster) is untouched - stop it separately with
 # `docker compose -f docker-compose/docker-compose.yml down` if needed.
 
 set -euo pipefail
