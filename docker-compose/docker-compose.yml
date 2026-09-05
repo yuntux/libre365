@@ -1,21 +1,21 @@
 # =============================================================================
-# open365 - environnement docker-compose de developpement/test
-# Etude, chapitre 4.6 : "Developpement/test : echelle reduite, donnees
-# synthetiques." Chapitre 4.4 explique pourquoi ceci N'EST PAS la cible de
-# production (pas de scaling horizontal ni de HA ici - Kubernetes assure
-# cela en prod). Objectif de ce fichier : demarrer une version allegee de
-# toute la stack pour le developpement local et pour que
-# tests/integration/ (pytest, contre http://localhost:<port>) tourne en CI.
+# libre365 - development/test docker-compose environment
+# Study, chapter 4.6: "Development/test: reduced scale, synthetic data."
+# Chapter 4.4 explains why this is NOT the production target (no horizontal
+# scaling or HA here - Kubernetes handles that in prod). Goal of this file:
+# start a lightweight version of the whole stack for local development and
+# so that tests/integration/ (pytest, against http://localhost:<port>) can
+# run in CI.
 #
-# Toutes les images sont des images officielles Docker Hub/Quay, taguees
-# explicitement (jamais `latest`), avec des ports mappes en clair sur
-# localhost plutot que le modele d'ingress/TLS de la cible K8s (chapitre 4.4).
+# All images are official Docker Hub/Quay images, explicitly tagged (never
+# `latest`), with ports mapped in the clear on localhost rather than the
+# ingress/TLS model of the K8s target (chapter 4.4).
 # =============================================================================
 
-name: open365-dev
+name: libre365-dev
 
 networks:
-  open365:
+  libre365:
     driver: bridge
 
 volumes:
@@ -36,7 +36,7 @@ volumes:
 services:
 
   # ---------------------------------------------------------------------
-  # Identite / SSO (etude 1.7)
+  # Identity / SSO (study 1.7)
   # ---------------------------------------------------------------------
   postgres-keycloak:
     image: postgres:16.4-alpine
@@ -49,7 +49,7 @@ services:
       - keycloak-db-data:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_KEYCLOAK_PORT:-5433}:5432"
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak}"]
       interval: 5s
@@ -59,8 +59,8 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
     restart: unless-stopped
-    # Mode dev (start-dev) : pas de TLS, H2/Postgres au choix, adapte au
-    # dev/test uniquement - cf. etude 4.4 pour le cluster Keycloak de prod.
+    # Dev mode (start-dev): no TLS, H2/Postgres either way, suited to
+    # dev/test only - see study 4.4 for the production Keycloak cluster.
     command: ["start-dev", "--import-realm"]
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
@@ -79,7 +79,7 @@ services:
     depends_on:
       postgres-keycloak:
         condition: service_healthy
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"]
       interval: 10s
@@ -88,7 +88,7 @@ services:
       start_period: 30s
 
   # ---------------------------------------------------------------------
-  # Tchat / visio-continuite : Matrix Synapse + Element (etude 1.2)
+  # Chat / video-continuity: Matrix Synapse + Element (study 1.2)
   # ---------------------------------------------------------------------
   postgres-synapse:
     image: postgres:16.4-alpine
@@ -97,14 +97,14 @@ services:
       POSTGRES_DB: ${SYNAPSE_DB_NAME:-synapse}
       POSTGRES_USER: ${SYNAPSE_DB_USER:-synapse}
       POSTGRES_PASSWORD: ${SYNAPSE_DB_PASSWORD:-devonly-changeme-synapse-db}
-      # Synapse impose ces deux reglages sur sa base Postgres, y compris en
-      # dev (cf. documentation Synapse "Using Postgres").
+      # Synapse requires these two settings on its Postgres database, even
+      # in dev (see the Synapse "Using Postgres" documentation).
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
       - synapse-db-data:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_SYNAPSE_PORT:-5434}:5432"
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${SYNAPSE_DB_USER:-synapse}"]
       interval: 5s
@@ -126,7 +126,7 @@ services:
     depends_on:
       postgres-synapse:
         condition: service_healthy
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8008/health || exit 1"]
       interval: 10s
@@ -141,7 +141,7 @@ services:
       - "${ELEMENT_PORT:-8081}:80"
     depends_on:
       - synapse
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:80 >/dev/null || exit 1"]
       interval: 10s
@@ -149,7 +149,7 @@ services:
       retries: 20
 
   # ---------------------------------------------------------------------
-  # Fichiers : Seafile (etude 1.4)
+  # Files: Seafile (study 1.4)
   # ---------------------------------------------------------------------
   seafile:
     image: seafileltd/seafile-mc:11.0.13
@@ -158,7 +158,7 @@ services:
       DB_HOST: seafile-mysql
       DB_ROOT_PASSWD: devonly-changeme-seafile-mysql-root
       TIME_ZONE: Europe/Paris
-      SEAFILE_ADMIN_EMAIL: ${SEAFILE_ADMIN_EMAIL:-admin@open365.localhost}
+      SEAFILE_ADMIN_EMAIL: ${SEAFILE_ADMIN_EMAIL:-admin@libre365.localhost}
       SEAFILE_ADMIN_PASSWORD: ${SEAFILE_ADMIN_PASSWORD:-devonly-changeme-seafile-admin}
       SEAFILE_SERVER_LETSENCRYPT: "false"
       SEAFILE_SERVER_HOSTNAME: "localhost"
@@ -168,7 +168,7 @@ services:
       - "${SEAFILE_PORT:-8082}:80"
     depends_on:
       - seafile-mysql
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80/ >/dev/null || exit 1"]
       interval: 15s
@@ -176,10 +176,11 @@ services:
       retries: 30
       start_period: 60s
 
-  # Seafile-mc gere sa propre base MariaDB interne (contrairement a
-  # Keycloak/Synapse/OnlyOffice, ici on suit le modele d'image officielle
-  # "tout-en-un + DB dediee" fourni par l'editeur plutot que de la brancher
-  # sur une base partagee - une base dediee par brique reste respectee).
+  # Seafile-mc manages its own internal MariaDB (unlike
+  # Keycloak/Synapse/OnlyOffice, here we follow the official "all-in-one +
+  # dedicated DB" image model provided by the vendor rather than wiring it
+  # to a shared database - a database dedicated per component is still
+  # respected).
   seafile-mysql:
     image: mariadb:10.11
     restart: unless-stopped
@@ -187,7 +188,7 @@ services:
       MYSQL_ROOT_PASSWORD: devonly-changeme-seafile-mysql-root
     volumes:
       - seafile-data-mysql:/var/lib/mysql
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -pdevonly-changeme-seafile-mysql-root"]
       interval: 10s
@@ -195,7 +196,7 @@ services:
       retries: 20
 
   # ---------------------------------------------------------------------
-  # Edition collaborative : OnlyOffice Document Server (etude 1.5)
+  # Collaborative editing: OnlyOffice Document Server (study 1.5)
   # ---------------------------------------------------------------------
   postgres-onlyoffice:
     image: postgres:16.4-alpine
@@ -208,7 +209,7 @@ services:
       - onlyoffice-db-data:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_ONLYOFFICE_PORT:-5435}:5432"
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${ONLYOFFICE_DB_USER:-onlyoffice}"]
       interval: 5s
@@ -236,7 +237,7 @@ services:
     depends_on:
       postgres-onlyoffice:
         condition: service_healthy
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost/healthcheck | grep -q true || exit 1"]
       interval: 15s
@@ -245,7 +246,7 @@ services:
       start_period: 60s
 
   # ---------------------------------------------------------------------
-  # Taches : Vikunja (etude 1.6)
+  # Tasks: Vikunja (study 1.6)
   # ---------------------------------------------------------------------
   vikunja:
     image: vikunja/vikunja:0.24.3
@@ -261,7 +262,7 @@ services:
       - vikunja-data:/db
     ports:
       - "${VIKUNJA_PORT:-3456}:3456"
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3456/api/v1/info >/dev/null || exit 1"]
       interval: 10s
@@ -269,7 +270,7 @@ services:
       retries: 20
 
   # ---------------------------------------------------------------------
-  # Partage de fichiers volumineux/ephemere : Gokapi (etude 1.8)
+  # Large/ephemeral file sharing: Gokapi (study 1.8)
   # ---------------------------------------------------------------------
   gokapi:
     image: f0rc3/gokapi:v1.9.6
@@ -284,7 +285,7 @@ services:
       - gokapi-data:/app/data
     ports:
       - "${GOKAPI_PORT:-53842}:53842"
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:53842 >/dev/null || exit 1"]
       interval: 10s
@@ -292,7 +293,7 @@ services:
       retries: 20
 
   # ---------------------------------------------------------------------
-  # Stockage objet : MinIO (etude 2.12, backend PeerTube)
+  # Object storage: MinIO (study 2.12, PeerTube backend)
   # ---------------------------------------------------------------------
   minio:
     image: minio/minio:RELEASE.2024-10-13T13-34-11Z
@@ -306,7 +307,7 @@ services:
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -314,7 +315,7 @@ services:
       retries: 20
 
   # ---------------------------------------------------------------------
-  # Plateforme video : PeerTube (etude 2.12)
+  # Video platform: PeerTube (study 2.12)
   # ---------------------------------------------------------------------
   peertube-db:
     image: postgres:16.4-alpine
@@ -325,7 +326,7 @@ services:
       POSTGRES_PASSWORD: ${PEERTUBE_DB_PASSWORD:-devonly-changeme-peertube-db}
     volumes:
       - peertube-db-data:/var/lib/postgresql/data
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PEERTUBE_DB_USER:-peertube}"]
       interval: 5s
@@ -335,7 +336,7 @@ services:
   peertube-redis:
     image: redis:7.4-alpine
     restart: unless-stopped
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -354,7 +355,7 @@ services:
       PEERTUBE_WEBSERVER_HOSTNAME: localhost
       PEERTUBE_WEBSERVER_PORT: ${PEERTUBE_PORT:-9002}
       PEERTUBE_WEBSERVER_HTTPS: "false"
-      PEERTUBE_ADMIN_EMAIL: ${PEERTUBE_ADMIN_EMAIL:-admin@open365.localhost}
+      PEERTUBE_ADMIN_EMAIL: ${PEERTUBE_ADMIN_EMAIL:-admin@libre365.localhost}
       PEERTUBE_SECRET: ${PEERTUBE_SECRET:-devonly-changeme-peertube-secret}
       # cf. etude 2.12 : ingestion webhook -> connectors/peertube-ingest
     volumes:
@@ -366,7 +367,7 @@ services:
         condition: service_healthy
       peertube-redis:
         condition: service_healthy
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/v1/config >/dev/null || exit 1"]
       interval: 15s
@@ -375,7 +376,7 @@ services:
       start_period: 60s
 
   # ---------------------------------------------------------------------
-  # Reverse proxy / portail applicatif (etude 2.3)
+  # Reverse proxy / application portal (study 2.3)
   # ---------------------------------------------------------------------
   caddy:
     image: caddy:2.8.4-alpine
@@ -393,20 +394,20 @@ services:
       - onlyoffice-documentserver
       - vikunja
       - gokapi
-    networks: [open365]
+    networks: [libre365]
 
   # ---------------------------------------------------------------------
-  # Centre de notifications unifie (etude 2.1)
+  # Unified notification center (study 2.1)
   # ---------------------------------------------------------------------
-  # Choix documente : pas d'assemblage complet de novu/api + novu/worker +
-  # novu/ws + MongoDB + Redis ici. La stack Novu de reference est lourde
-  # pour ce tier dev/test rapide, et l'objectif principal de cet
-  # environnement est de tester les connecteurs applicatifs (2.1, 2.7, 2.8),
-  # pas Novu lui-meme. On utilise donc un mock HTTP minimal (image node
-  # officielle) qui expose la meme forme d'API (POST /v1/events/trigger)
-  # que consomment ces connecteurs. Pour un test de recette avec le vrai
-  # Novu, suivre https://docs.novu.co/self-hosting (chapitre 4.4/5.5,
-  # environnement de recette ephemere, pas ce tier dev/test).
+  # Documented choice: no full assembly of novu/api + novu/worker +
+  # novu/ws + MongoDB + Redis here. The reference Novu stack is heavy for
+  # this quick dev/test tier, and the main goal of this environment is to
+  # test the application connectors (2.1, 2.7, 2.8), not Novu itself. We
+  # therefore use a minimal HTTP mock (official node image) that exposes
+  # the same API shape (POST /v1/events/trigger) that these connectors
+  # consume. For an acceptance test with real Novu, follow
+  # https://docs.novu.co/self-hosting (chapter 4.4/5.5, ephemeral staging
+  # environment, not this dev/test tier).
   novu-mock:
     image: node:20.17-alpine
     restart: unless-stopped
@@ -418,7 +419,7 @@ services:
       - ./config/novu-mock/server.js:/app/server.js:ro
     ports:
       - "${NOVU_MOCK_PORT:-13000}:3000"
-    networks: [open365]
+    networks: [libre365]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 10s
@@ -426,16 +427,16 @@ services:
       retries: 20
 
   # ---------------------------------------------------------------------
-  # Messagerie/agenda : Grommunio - DEV/TEST UNIQUEMENT (etude 1.1 / 4.3)
+  # Mail/calendar: Grommunio - DEV/TEST ONLY (study 1.1 / 4.3)
   # ---------------------------------------------------------------------
-  # L'etude (4.3) retient explicitement Grommunio en VM appliance Proxmox
-  # pour la PRODUCTION, pas en conteneur : le packaging conteneur officiel
-  # (grommunio/gromox-container) est presente par l'editeur lui-meme comme
-  # une solution pour des besoins speciaux, pas prete pour la production
-  # (bundle nginx/Postfix/gromox/Redis/PHP-FPM sous un seul supervisord).
-  # Il est inclus ICI uniquement pour permettre aux tests d'integration
-  # (envoi/reception mail, etude 5.5) de s'executer en CI sans VM Proxmox.
-  # NE PAS reproduire ce service tel quel en environnement de recette/prod.
+  # The study (4.3) explicitly selects Grommunio as a Proxmox VM appliance
+  # for PRODUCTION, not as a container: the official container packaging
+  # (grommunio/gromox-container) is presented by the vendor itself as a
+  # solution for special needs, not production-ready (bundles
+  # nginx/Postfix/gromox/Redis/PHP-FPM under a single supervisord).
+  # It is included HERE only so integration tests (send/receive mail,
+  # study 5.5) can run in CI without a Proxmox VM.
+  # DO NOT reproduce this service as-is in a staging/production environment.
   grommunio-dev:
     image: grommunio/gromox-container:core-c9
     restart: unless-stopped
@@ -446,18 +447,18 @@ services:
       - grommunio-dev-data:/etc/gromox
     ports:
       - "${GROMMUNIO_DEV_HTTP_PORT:-8443}:8443"
-    networks: [open365]
-    # Pas de healthcheck standard documente pour cette image (usage non
-    # recommande en prod par l'editeur lui-meme, cf. commentaire ci-dessus) -
-    # wait-for-healthy.sh retombe sur un TCP-check simple pour ce service.
+    networks: [libre365]
+    # No documented standard healthcheck for this image (usage not
+    # recommended in prod by the vendor itself, see comment above) -
+    # wait-for-healthy.sh falls back to a simple TCP check for this service.
 
   # ---------------------------------------------------------------------
-  # Connecteurs d'integration developpes en propre (etude, chapitre 2)
-  # Ces repertoires sont peuples par un autre agent en parallele
-  # (connectors/) - les build.context ci-dessous les referencent par
-  # anticipation ; ils doivent exister (avec un Dockerfile) avant
-  # `docker compose up`. Ports HTTP par defaut arbitraires (pas de valeur
-  # imposee par l'etude) - a aligner avec le Dockerfile de chaque connecteur.
+  # In-house integration connectors (study, chapter 2)
+  # These directories are populated by another agent in parallel
+  # (connectors/) - the build.context entries below reference them ahead of
+  # time; they must exist (with a Dockerfile) before `docker compose up`.
+  # Default HTTP ports are arbitrary (no value imposed by the study) - to
+  # be kept aligned with each connector's Dockerfile.
   # ---------------------------------------------------------------------
   notification-hub:
     build:
@@ -473,7 +474,7 @@ services:
     depends_on:
       - novu-mock
       - synapse
-    networks: [open365]
+    networks: [libre365]
 
   unified-search:
     build:
@@ -491,7 +492,7 @@ services:
       - seafile
       - synapse
       - vikunja
-    networks: [open365]
+    networks: [libre365]
 
   presence-aggregator:
     build:
@@ -505,7 +506,7 @@ services:
       - "${PRESENCE_AGGREGATOR_PORT:-4003}:4003"
     depends_on:
       - synapse
-    networks: [open365]
+    networks: [libre365]
 
   onlyoffice-mentions:
     build:
@@ -521,7 +522,7 @@ services:
     depends_on:
       - novu-mock
       - onlyoffice-documentserver
-    networks: [open365]
+    networks: [libre365]
 
   peertube-ingest:
     build:
@@ -537,4 +538,4 @@ services:
     depends_on:
       - peertube
       - minio
-    networks: [open365]
+    networks: [libre365]

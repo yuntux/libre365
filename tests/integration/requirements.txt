@@ -1,10 +1,10 @@
-# Dépendances de la suite de tests d'intégration (étude section 4.5 "Rejeu des scénarios de test").
-# Installer avec: pip install -r tests/integration/requirements.txt
+# Dependencies for the integration test suite (study section 4.5 "Replaying test scenarios").
+# Install with: pip install -r tests/integration/requirements.txt
 
 pytest>=7.4,<9
-pytest-timeout>=2.2,<3          # timeouts explicites par test (voir contrainte: échec propre si la stack n'est pas démarrée)
-pytest-html>=4.1,<5             # rapport de résultats succès/échec par scénario (étude 4.5, ligne 797)
+pytest-timeout>=2.2,<3          # explicit per-test timeouts (see constraint: fail cleanly if the stack isn't up)
+pytest-html>=4.1,<5             # pass/fail results report per scenario (study 4.5, line 797)
 requests>=2.31,<3
-responses>=0.25,<1              # mock HTTP pour les tests connecteurs en boîte noire (test_connectors.py)
-PyJWT>=2.8,<3                   # génération du JWT de config OnlyOffice Document Server
-python-keycloak>=3.9,<4         # client OIDC pour le grant "password" (fixture keycloak_token)
+responses>=0.25,<1              # HTTP mocking for black-box connector tests (test_connectors.py)
+PyJWT>=2.8,<3                   # generates the OnlyOffice Document Server config JWT
+python-keycloak>=3.9,<4         # OIDC client for the "password" grant (keycloak_token fixture)

@@ -1,117 +1,119 @@
-# CI/CD — chapitre 5 de l'étude ("Exploitation et pilotage transverse")
+# CI/CD — study chapter 5 ("Cross-cutting operations and steering")
 
-Ce document explique comment les workflows sous `.github/workflows/` et la
-configuration `renovate.json` matérialisent le chapitre 5 de
-[`sortie-office365-etude.md`](../sortie-office365-etude.md) (lignes
-769-802), et ce qui resterait à construire pour une automatisation complète
-de bout en bout ciblant Kubernetes.
+This document explains how the workflows under `.github/workflows/` and the
+`renovate.json` configuration materialize chapter 5 of
+[`office365-exit-study.md`](../office365-exit-study.md) (lines
+769-802), and what would remain to be built for a fully automated end-to-end
+pipeline targeting Kubernetes.
 
-## Table de correspondance
+## Correspondence table
 
-| Besoin de l'étude (chapitre 5) | Section | Réalisation dans ce dépôt |
+| Study need (chapter 5) | Section | Implementation in this repository |
 |---|---|---|
-| Suivi transverse de la stack dans la durée (5.1) | 5.1 (L.771-773) | Ensemble des workflows ci-dessous + `docs/mapping.md` |
-| Scan automatisé et régulier des images conteneurisées (Trivy/Grype) | 5.2 (L.777) | `.github/workflows/cve-scan.yml` — Trivy, quotidien + sur push |
-| Abonnement aux flux de sécurité officiels de chaque brique | 5.2 (L.778) | **Non couvert par GitHub Actions** — reste à outiller, voir "Ce qui manque" ci-dessous |
-| Centralisation des alertes (scan + veille éditeurs) | 5.2 (L.779) | Partiellement : `cve-scan.yml` publie en SARIF vers l'onglet **Security** de GitHub (Code Scanning), qui sert de tableau de bord pour le volet scan uniquement — pas de fusion avec la veille éditeurs (non automatisée, cf. ci-dessus) |
-| Suivi automatisé des nouvelles releases (images + dépendances IaC), type Renovate/Dependabot | 5.3 (L.783) | `renovate.json` — images Docker (`docker-compose/`, `infra/k8s/helm-values/`), providers Terraform (`infra/terraform/`), dépendances npm des connecteurs (`connectors/*/`) |
-| Nouvelle version détectée → déclenche le cycle plutôt qu'appliquée directement | 5.3 (L.784) | `renovate.json` : aucune règle `automerge` sur les mises à jour de versions applicatives — chaque détection produit une PR à valider, pas un déploiement direct |
-| Environnement de recette éphémère créé automatiquement depuis l'IaC | 5.4.1 (L.789) | `.github/workflows/ephemeral-staging.yml` — **simplifié** : démarre `docker-compose` plutôt qu'un environnement Kubernetes provisionné par `infra/terraform` + `infra/k8s` (voir justification dans le commentaire en tête du fichier et section "Ce qui manque") |
-| Jeu de données de test représentatif (pas de données de prod) | 5.4.2 (L.790) | Configuration par défaut de `docker-compose/` (`.env.example`), pas de branchement sur des données de production |
-| Pipeline CI/CD orchestrant le cycle sans intervention manuelle jusqu'à la validation | 5.4.3 (L.791) | `ephemeral-staging.yml` enchaîne démarrage → attente de santé → rejeu des tests → publication du rapport sans intervention manuelle ; seul le **déclenchement** du workflow est manuel pour l'instant (`workflow_dispatch`), voir "Ce qui manque" |
-| Bibliothèque de scénarios de test automatisés (mail, fichiers, co-édition, visio/tchat, tâches, SSO) | 5.5 (L.795) | `tests/integration/` (suite `pytest`, marqueur `smoke`) — maintenue par ailleurs, référencée sans être dupliquée par `ephemeral-staging.yml` |
-| Rejeu automatique sur la recette éphémère à chaque nouvelle version détectée | 5.5 (L.796) | `ephemeral-staging.yml` exécute `pytest -m smoke` contre l'environnement démarré ; le déclenchement automatique depuis une PR Renovate n'est pas câblé (cf. "Ce qui manque") |
-| Rapport de résultats conditionnant la décision de promotion | 5.5 (L.797) | `ephemeral-staging.yml` publie `tests/integration/report.html` (pytest-html) en artefact GitHub Actions et fait échouer le workflow si un scénario `smoke` échoue |
-| Tableau de bord unique (CVE, versions, résultats recette, supervision prod) | 5.6 (L.801-802) | **Non couvert** — l'onglet Security de GitHub ne couvre que le volet CVE scan ; pas de tableau consolidé versions/recette/supervision, cf. "Ce qui manque" |
+| Cross-cutting long-term monitoring of the stack (5.1) | 5.1 (L.771-773) | All the workflows below + `docs/mapping.md` |
+| Automated, regular scanning of container images (Trivy/Grype) | 5.2 (L.777) | `.github/workflows/cve-scan.yml` — Trivy, daily + on push |
+| Subscription to each building block's official security feeds | 5.2 (L.778) | **Not covered by GitHub Actions** — still needs tooling, see "What's missing" below |
+| Centralized alerting (scan + vendor monitoring) | 5.2 (L.779) | Partial: `cve-scan.yml` publishes SARIF to GitHub's **Security** tab (Code Scanning), which serves as a dashboard for the scan side only — no merging with vendor monitoring (not automated, see above) |
+| Automated tracking of new releases (images + IaC dependencies), Renovate/Dependabot-style | 5.3 (L.783) | `renovate.json` — Docker images (`docker-compose/`, `infra/k8s/helm-values/`), Terraform providers (`infra/terraform/`), connector npm dependencies (`connectors/*/`) |
+| New version detected → triggers the cycle rather than being applied directly | 5.3 (L.784) | `renovate.json`: no `automerge` rule on application version updates — every detection produces a PR to review, not a direct deployment |
+| Ephemeral staging environment automatically created from IaC | 5.4.1 (L.789) | `.github/workflows/ephemeral-staging.yml` — **simplified**: starts `docker-compose` rather than a Kubernetes environment provisioned by `infra/terraform` + `infra/k8s` (see the justification in the comment at the top of the file and the "What's missing" section) |
+| Representative test dataset (no production data) | 5.4.2 (L.790) | Default `docker-compose/` configuration (`.env.example`), no connection to production data |
+| CI/CD pipeline orchestrating the cycle without manual intervention up to validation | 5.4.3 (L.791) | `ephemeral-staging.yml` chains startup → health wait → test replay → report publication without manual intervention; only the workflow's **trigger** is manual for now (`workflow_dispatch`), see "What's missing" |
+| Library of automated test scenarios (mail, files, co-editing, video/chat, tasks, SSO) | 5.5 (L.795) | `tests/integration/` (`pytest` suite, `smoke` marker) — maintained separately, referenced without being duplicated by `ephemeral-staging.yml` |
+| Automatic replay against ephemeral staging on every new version detected | 5.5 (L.796) | `ephemeral-staging.yml` runs `pytest -m smoke` against the started environment; automatic triggering from a Renovate PR is not wired up (see "What's missing") |
+| Results report driving the promotion decision | 5.5 (L.797) | `ephemeral-staging.yml` publishes `tests/integration/report.html` (pytest-html) as a GitHub Actions artifact and fails the workflow if a `smoke` scenario fails |
+| Single dashboard (CVE, versions, staging results, production monitoring) | 5.6 (L.801-802) | **Not covered** — GitHub's Security tab only covers the CVE scan side; no consolidated dashboard for versions/staging/monitoring, see "What's missing" |
 
-## Fichiers créés
+## Files created
 
-- `.github/workflows/lint-and-test.yml` — socle de qualité continue (Terraform, Ansible, Helm values, connecteurs Node, docker-compose), déclenché sur chaque PR/push. Ce n'est pas directement une exigence numérotée du chapitre 5, mais la fondation qui rend le reste du cycle fiable (une image ou un manifest cassé ne doit pas atteindre la recette éphémère).
-- `.github/workflows/cve-scan.yml` — étude 5.2.
-- `renovate.json` — étude 5.3.
-- `.github/workflows/ephemeral-staging.yml` — étude 5.4 et 5.5.
-- `docs/ci-cd.md` — ce document.
+- `.github/workflows/lint-and-test.yml` — continuous quality baseline (Terraform, Ansible, Helm values, Node connectors, docker-compose), triggered on every PR/push. This isn't directly a numbered requirement of chapter 5, but it's the foundation that makes the rest of the cycle reliable (a broken image or manifest must not reach ephemeral staging).
+- `.github/workflows/cve-scan.yml` — study 5.2.
+- `renovate.json` — study 5.3.
+- `.github/workflows/ephemeral-staging.yml` — study 5.4 and 5.5.
+- `docs/ci-cd.md` — this document.
 
-## Ce qui manque pour une automatisation Kubernetes de bout en bout
+## What's missing for full end-to-end Kubernetes automation
 
-L'étude décrit un cycle entièrement automatisé :
+The study describes a fully automated cycle:
 
 ```
-Renovate détecte une nouvelle version
+Renovate detects a new version
         ↓
-Recette éphémère provisionnée via l'IaC (Terraform + Ansible + Helm sur Kubernetes)
+Ephemeral staging provisioned via IaC (Terraform + Ansible + Helm on Kubernetes)
         ↓
-Rejeu des scénarios de test critiques
+Critical test scenarios replayed
         ↓
-Rapport de résultats → décision de promotion (manuelle ou automatisée selon criticité)
+Results report → promotion decision (manual or automated depending on criticality)
         ↓
-Destruction de l'environnement de recette
+Staging environment destroyed
 ```
 
-Ce qui est livré ici s'arrête à une version simplifiée et testable en CI
-GitHub Actions, sur `docker-compose` plutôt que Kubernetes. Restent à
-construire, dans l'ordre de dépendance :
+What is delivered here stops at a simplified version, testable in GitHub
+Actions CI, on `docker-compose` rather than Kubernetes. Still to be built, in
+dependency order:
 
-1. **Déclenchement automatique depuis Renovate** — aujourd'hui
-   `ephemeral-staging.yml` se lance uniquement via `workflow_dispatch`
-   manuel. Pour boucler 5.3→5.4 automatiquement, il faudrait soit un
-   workflow `pull_request` filtré sur les PR ouvertes par Renovate
-   (`github.actor == 'renovate[bot]'`), soit une action dans la config
-   Renovate elle-même (`postUpgradeTasks` ou un hook externe) qui appelle ce
-   workflow avec la brique et la version concernées en paramètres.
+1. **Automatic triggering from Renovate** — today
+   `ephemeral-staging.yml` only launches via manual `workflow_dispatch`. To
+   close the loop from 5.3 to 5.4 automatically, we'd need either a
+   `pull_request` workflow filtered on PRs opened by Renovate
+   (`github.actor == 'renovate[bot]'`), or an action in the Renovate
+   configuration itself (`postUpgradeTasks` or an external hook) that calls
+   this workflow with the affected building block and version as
+   parameters.
 
-2. **Provisionnement Kubernetes réel de la recette éphémère** — remplacer le
-   démarrage `docker compose up -d` par :
-   - un `terraform apply` (ou OpenTofu) ciblant un espace de noms/cluster de
-     recette dédié, à partir de `infra/terraform/` ;
-   - l'exécution des playbooks Ansible de `infra/ansible/` pour la
-     configuration applicative (realms Keycloak, domaine Matrix...) sur cet
-     environnement ;
-   - un déploiement Helm des values de `infra/k8s/helm-values/` avec l'image
-     de la brique ciblée surchargée à la nouvelle version, les autres briques
-     restant aux versions courantes (exigence explicite de 5.4.1) ;
-   - une étape de destruction (`terraform destroy` / suppression du
-     namespace) garantissant le caractère réellement éphémère de
-     l'environnement, y compris en cas d'échec des étapes précédentes.
+2. **Real Kubernetes provisioning of ephemeral staging** — replacing the
+   `docker compose up -d` startup with:
+   - a `terraform apply` (or OpenTofu) targeting a dedicated
+     staging namespace/cluster, from `infra/terraform/`;
+   - running the Ansible playbooks from `infra/ansible/` for application
+     configuration (Keycloak realms, Matrix domain, etc.) on this
+     environment;
+   - a Helm deployment of the `infra/k8s/helm-values/` values with the
+     targeted building block's image overridden to the new version, the
+     other building blocks staying at their current versions (an explicit
+     requirement of 5.4.1);
+   - a destruction step (`terraform destroy` / namespace deletion) that
+     guarantees the environment is genuinely ephemeral, even if prior steps
+     fail.
 
-   Ceci suppose un accès réseau depuis les runners GitHub Actions vers
-   l'infrastructure cible (self-hosted runners ou VPN/peering vers
-   l'environnement Proxmox/Kubernetes décrit au chapitre 4), hors de portée
-   d'un runner GitHub hébergé standard.
+   This assumes network access from GitHub Actions runners to the target
+   infrastructure (self-hosted runners, or a VPN/peering link to the
+   Proxmox/Kubernetes environment described in chapter 4), which is beyond
+   the reach of a standard hosted GitHub runner.
 
-3. **Jeu de données de test représentatif au niveau Kubernetes** — la
-   version docker-compose s'appuie sur la configuration de dev par défaut ;
-   une vraie recette Kubernetes nécessiterait un jeu de données de test
-   dédié et rejouable (dump anonymisé ou fixtures applicatives), à charger
-   après le déploiement Helm et avant le rejeu des scénarios.
+3. **Representative test dataset at the Kubernetes level** — the
+   docker-compose version relies on the default dev configuration; a real
+   Kubernetes staging setup would need a dedicated, replayable test dataset
+   (anonymized dump or application fixtures), to be loaded after the Helm
+   deployment and before replaying the scenarios.
 
-4. **Décision de promotion** — l'étude prévoit une promotion "manuelle ou
-   automatisée selon la criticité de la brique concernée" (5.5, L.797).
-   Aujourd'hui, un scénario `smoke` en échec fait simplement échouer le
-   workflow (bloquant, sans notion de criticité). Un mécanisme de promotion
-   réel demanderait : (a) une classification de criticité par brique, (b)
-   pour les briques non critiques, un déclenchement automatique du
-   déploiement en production (ou de l'automerge de la PR Renovate
-   correspondante) si le rapport est au vert, (c) pour les briques
-   critiques, une étape d'approbation humaine explicite (environnement
-   GitHub protégé avec reviewers requis, par exemple) avant tout déploiement
-   en production.
+4. **Promotion decision** — the study calls for a promotion that is "manual
+   or automated depending on the criticality of the building block
+   concerned" (5.5, L.797). Today, a failed `smoke` scenario simply fails
+   the workflow (blocking, with no notion of criticality). A real promotion
+   mechanism would require: (a) a per-building-block criticality
+   classification, (b) for non-critical building blocks, an automatic
+   trigger of the production deployment (or the automerge of the
+   corresponding Renovate PR) if the report is green, (c) for critical
+   building blocks, an explicit human approval step (e.g. a protected
+   GitHub environment with required reviewers) before any production
+   deployment.
 
-5. **Tableau de bord transverse unique (5.6)** — consolider dans un même
-   endroit : les alertes CVE (aujourd'hui dans l'onglet Security de GitHub
-   uniquement), les versions courantes vs. disponibles par brique (dispersées
-   entre le dashboard Renovate et les fichiers de values), les résultats des
-   derniers passages en recette (artefacts `rapport-recette-*` de
-   `ephemeral-staging.yml`, non agrégés), et la supervision technique de
-   production (hors périmètre de ce dépôt CI). Ceci nécessite un outil de
-   pilotage dédié (ex. un tableau de bord interne alimenté par l'API GitHub
-   + un outil de supervision comme Prometheus/Grafana), distinct du centre
-   de notifications utilisateur du chapitre 2 (5.6, L.802).
+5. **Single cross-cutting dashboard (5.6)** — consolidating in one place:
+   CVE alerts (today only in GitHub's Security tab), current vs. available
+   versions per building block (scattered between the Renovate dashboard and
+   the values files), the results of the latest staging runs (the
+   `rapport-recette-*` artifacts from `ephemeral-staging.yml`, not
+   aggregated), and production technical monitoring (out of scope for this
+   CI repository). This requires a dedicated steering tool (e.g. an internal
+   dashboard fed by the GitHub API + a monitoring tool such as
+   Prometheus/Grafana), distinct from the chapter 2 user notification center
+   (5.6, L.802).
 
-6. **Veille sur les flux de sécurité éditeurs (5.2, L.778)** — abonnement aux
-   listes de diffusion sécurité / flux RSS / GitHub Security Advisories de
-   chaque brique (Grommunio, Synapse/Element, Seafile, OnlyOffice, Vikunja,
-   Keycloak, Caddy), indépendant du scan Trivy. Non implémenté : une
-   première étape simple serait d'activer les GitHub Security Advisories
-   côté dépôts amont suivis (quand ce sont des dépôts GitHub) et de les
-   agréger vers le même tableau de bord que le point 5 ci-dessus.
+6. **Monitoring vendor security feeds (5.2, L.778)** — subscribing to the
+   security mailing lists / RSS feeds / GitHub Security Advisories of each
+   building block (Grommunio, Synapse/Element, Seafile, OnlyOffice, Vikunja,
+   Keycloak, Caddy), independent of the Trivy scan. Not implemented: a
+   simple first step would be to enable GitHub Security Advisories on the
+   tracked upstream repositories (when they are GitHub repositories) and
+   aggregate them into the same dashboard as point 5 above.

@@ -1,54 +1,54 @@
 # peertube-ingest
 
-Depot des enregistrements de reunion (LiveKit Egress -> MinIO) vers PeerTube (etude 2.12).
-Implemente les deux modes decrits par l'etude : temps reel (webhook MinIO) et batch
-(cron quotidien), partageant la meme logique d'ingestion (`src/ingest.ts`).
+Uploads meeting recordings (LiveKit Egress -> MinIO) to PeerTube (study 2.12).
+Implements the two modes described by the study: real-time (MinIO webhook) and batch
+(daily cron), sharing the same ingestion logic (`src/ingest.ts`).
 
 ## Modes
 
-- **Temps reel** : `POST /webhooks/minio` recoit les notifications `s3:ObjectCreated:*`
-  publiees par MinIO (bucket notification target de type webhook,
+- **Real-time**: `POST /webhooks/minio` receives the `s3:ObjectCreated:*` notifications
+  published by MinIO (webhook-type bucket notification target,
   `mc admin config set myminio notify_webhook:1 endpoint=http://peertube-ingest:4005/webhooks/minio`).
-- **Batch** : `node dist/batch.js [--since=<ISO8601>]`, a executer en cron quotidien
-  (etude 2.12 ligne 589 : "ce depot peut se faire en tache periodique -- batch quotidien --
-  plus simple a operer, sans risque meme en cas de panne temporaire du connecteur"). Sans
-  `--since`, balaie les 25 dernieres heures (marge de securite sur un cron quotidien).
+- **Batch**: `node dist/batch.js [--since=<ISO8601>]`, to run as a daily cron job
+  (study 2.12 line 589: "this upload can be done as a periodic task -- daily batch --
+  simpler to operate, with no risk even if the connector has a temporary outage"). Without
+  `--since`, it scans the last 25 hours (safety margin on a daily cron).
 
-## Metadonnees de reunion
+## Meeting metadata
 
-`src/metadata.ts` extrait titre/date/participants du nom d'objet MinIO, avec une
-convention `<date-ISO>_<titre-slug>_<participants-slugs>.<ext>` (a configurer au niveau
-de la regle d'export LiveKit Egress). Les tags S3 `meeting-title`/`meeting-date`/
-`meeting-participants`, s'ils sont presents sur l'objet, sont prioritaires sur ce qui est
-deduit du nom de fichier.
+`src/metadata.ts` extracts title/date/participants from the MinIO object name, using
+a `<ISO-date>_<title-slug>_<participant-slugs>.<ext>` convention (to be configured at
+the LiveKit Egress export rule level). S3 tags `meeting-title`/`meeting-date`/
+`meeting-participants`, when present on the object, take priority over what is
+inferred from the file name.
 
 ## Endpoints / scripts
 
 | | | |
 |---|---|---|
-| POST | `/webhooks/minio` | Mode temps reel, evenement `ObjectCreated` MinIO |
-| GET | `/healthz` | Sonde de sante |
-| script | `dist/batch.js` | Mode batch, a planifier en cron |
+| POST | `/webhooks/minio` | Real-time mode, MinIO `ObjectCreated` event |
+| GET | `/healthz` | Health probe |
+| script | `dist/batch.js` | Batch mode, to schedule via cron |
 
-## Variables d'environnement
+## Environment variables
 
-| Variable | Defaut | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `4005` | Port d'ecoute HTTP (mode webhook) |
-| `MINIO_ENDPOINT` | `https://minio.example.org` | Endpoint S3-compatible MinIO |
-| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | (vide) | Identifiants MinIO |
-| `MINIO_RECORDINGS_BUCKET` | `visio-recordings` | Bucket cible de LiveKit Egress |
-| `PEERTUBE_BASE_URL` | `https://tube.example.org` | URL de l'instance PeerTube |
-| `PEERTUBE_ACCESS_TOKEN` | (vide) | Token OAuth PeerTube (compte de service) |
-| `PEERTUBE_CHANNEL_ID` | `1` | Chaine PeerTube cible |
-| `PEERTUBE_DEFAULT_PRIVACY` | `2` (interne) | Visibilite par defaut des videos deposees |
+| `PORT` | `4005` | HTTP listen port (webhook mode) |
+| `MINIO_ENDPOINT` | `https://minio.example.org` | MinIO S3-compatible endpoint |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | (empty) | MinIO credentials |
+| `MINIO_RECORDINGS_BUCKET` | `visio-recordings` | LiveKit Egress target bucket |
+| `PEERTUBE_BASE_URL` | `https://tube.example.org` | PeerTube instance URL |
+| `PEERTUBE_ACCESS_TOKEN` | (empty) | PeerTube OAuth token (service account) |
+| `PEERTUBE_CHANNEL_ID` | `1` | Target PeerTube channel |
+| `PEERTUBE_DEFAULT_PRIVACY` | `2` (internal) | Default visibility of uploaded videos |
 
-## Developpement
+## Development
 
 ```bash
 npm install
 npm test
 npm run build
-npm start        # mode webhook
-npm run batch     # mode batch, une execution
+npm start        # webhook mode
+npm run batch     # batch mode, single run
 ```

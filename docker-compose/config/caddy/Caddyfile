@@ -1,35 +1,35 @@
-# Caddyfile de reverse proxy dev/test (etude 4.6).
-# En production (Kubernetes, etude 4.4) le portail applicatif transverse
-# (bandeau menu + cloche notifications + recherche, etude 2.3) est assure par
-# Caddy + un plugin d'injection HTML (ex. caddy2-html-injection-plugin) qui
-# reecrit le HTML de chaque application a la volee pour y inserer ce bandeau,
-# sans toucher au code des applications (etude 2.3, ligne "Injection HTML
-# cote reverse proxy"). Ici, en dev/test, Caddy ne fait qu'un reverse-proxy
-# simple par sous-chemin vers chaque brique, SANS le plugin d'injection
-# (non compile dans l'image caddy:2-alpine officielle - il faudrait une
-# image Caddy custom avec `xcaddy build --with ...`, hors scope d'un
-# environnement de test leger). Le snippet ci-dessous documente a quoi
-# ressemblerait l'injection en production, a titre de reference uniquement.
+# Dev/test reverse proxy Caddyfile (study 4.6).
+# In production (Kubernetes, study 4.4) the cross-cutting application portal
+# (menu bar + notification bell + search, study 2.3) is provided by
+# Caddy + an HTML injection plugin (e.g. caddy2-html-injection-plugin) that
+# rewrites each application's HTML on the fly to insert this bar,
+# without touching the applications' code (study 2.3, line "HTML injection
+# on the reverse proxy side"). Here, in dev/test, Caddy only does a simple
+# reverse proxy by sub-path to each building block, WITHOUT the injection
+# plugin (not compiled into the official caddy:2-alpine image - a custom
+# Caddy image built with `xcaddy build --with ...` would be needed, out of
+# scope for a lightweight test environment). The snippet below documents
+# what the production injection would look like, for reference only.
 
 {
 	admin off
 }
 
 :80 {
-	# --- Portail : redirection racine vers Element (client de reference) ---
+	# --- Portal: root redirect to Element (reference client) ---
 	redir / /chat/ 302
 
-	# --- Bandeau applicatif transverse (etude 2.3) --------------------------
-	# En PRODUCTION uniquement (non actif ici), le snippet d'injection
-	# ressemblerait a ceci (necessite le plugin caddy2-html-injection-plugin,
-	# absent de l'image caddy:2-alpine standard) :
+	# --- Cross-cutting application bar (study 2.3) --------------------------
+	# In PRODUCTION only (not active here), the injection snippet would
+	# look like this (requires the caddy2-html-injection-plugin, absent
+	# from the standard caddy:2-alpine image):
 	#
 	# route /chat/* {
 	#     reverse_proxy element:80
 	#     html_injection {
 	#         selector "body"
 	#         position "prepend"
-	#         html `<div id="open365-banner">...menu, cloche, recherche...</div>`
+	#         html `<div id="libre365-banner">...menu, cloche, recherche...</div>`
 	#     }
 	# }
 
@@ -70,7 +70,7 @@
 	}
 
 	handle {
-		respond "open365 dev portal - see docker-compose/README.md for the per-service ports" 200
+		respond "libre365 dev portal - see docker-compose/README.md for the per-service ports" 200
 	}
 
 	log {

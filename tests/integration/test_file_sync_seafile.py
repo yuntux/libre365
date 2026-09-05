@@ -1,11 +1,10 @@
 """
-Scénario critique (étude 4.5): "création et synchronisation de fichier
-(Seafile)".
+Critical scenario (study 4.5): "creating and syncing a file (Seafile)".
 
-Utilise l'API REST Seafile (Web API v2.1) plutôt que le client de
-synchronisation desktop: c'est l'API que le connecteur unified-search
-consomme également, et elle suffit à valider le cycle
-upload -> présence -> suppression sans dépendance à un client lourd.
+Uses the Seafile REST API (Web API v2.1) rather than the desktop sync
+client: it is the API that the unified-search connector also consumes, and
+it is enough to validate the upload -> presence -> deletion cycle without
+depending on a heavy client.
 """
 
 from __future__ import annotations
@@ -28,8 +27,8 @@ def seafile_ready(base_urls, wait_for_service):
 @pytest.fixture(scope="module")
 def seafile_auth_token(base_urls, test_user, seafile_ready) -> str:
     """
-    Authentification native Seafile (login/mdp) pour obtenir un jeton d'API.
-    Le scénario SSO Seafile via Keycloak est couvert séparément dans
+    Native Seafile authentication (login/password) to obtain an API token.
+    The Seafile SSO scenario via Keycloak is covered separately in
     test_sso_e2e.py.
     """
     response = requests.post(
@@ -42,12 +41,12 @@ def seafile_auth_token(base_urls, test_user, seafile_ready) -> str:
     )
     if response.status_code != 200:
         pytest.fail(
-            f"Échec d'authentification Seafile sur {base_urls.seafile}: "
+            f"Seafile authentication failed on {base_urls.seafile}: "
             f"HTTP {response.status_code} - {response.text[:300]}"
         )
     token = response.json().get("token")
     if not token:
-        pytest.fail(f"Réponse Seafile sans token: {response.text[:300]}")
+        pytest.fail(f"Seafile response without a token: {response.text[:300]}")
     return token
 
 
@@ -59,8 +58,8 @@ def seafile_headers(seafile_auth_token: str) -> dict:
 @pytest.fixture(scope="module")
 def default_library_id(base_urls, seafile_headers) -> str:
     """
-    Récupère l'identifiant de la bibliothèque de test par défaut de
-    l'utilisateur, ou en crée une dédiée aux tests si aucune n'existe.
+    Retrieves the id of the user's default test library, or creates one
+    dedicated to the tests if none exists.
     """
     library_name = os.environ.get("TEST_SEAFILE_LIBRARY", "integration-tests")
 
@@ -75,12 +74,12 @@ def default_library_id(base_urls, seafile_headers) -> str:
     create_response = requests.post(
         f"{base_urls.seafile}/api2/repos/",
         headers=seafile_headers,
-        data={"name": library_name, "desc": "Bibliothèque de la suite de tests d'intégration"},
+        data={"name": library_name, "desc": "Integration test suite library"},
         timeout=15,
     )
     if create_response.status_code not in (200, 201):
         pytest.fail(
-            "Impossible de créer/retrouver la bibliothèque Seafile de test: "
+            "Unable to create/retrieve the Seafile test library: "
             f"HTTP {create_response.status_code} - {create_response.text[:300]}"
         )
     return create_response.json()["repo_id"]
@@ -88,13 +87,13 @@ def default_library_id(base_urls, seafile_headers) -> str:
 
 def test_create_upload_and_sync_file(base_urls, seafile_headers, default_library_id):
     """
-    Cycle complet: obtention d'une URL d'upload, envoi d'un fichier,
-    vérification de sa présence via l'API de listing (= "synchronisation"
-    visible côté serveur), puis suppression pour ne pas polluer
-    l'environnement de recette entre deux passages.
+    Full cycle: obtaining an upload URL, sending a file, checking its
+    presence via the listing API (= "synchronization" visible server-side),
+    then deletion so as not to pollute the staging environment between two
+    runs.
     """
     file_name = f"integration-test-{uuid.uuid4()}.txt"
-    file_content = b"Contenu de test pour la suite d'integration (test_file_sync_seafile.py)."
+    file_content = b"Test content for the integration suite (test_file_sync_seafile.py)."
 
     upload_link_response = requests.get(
         f"{base_urls.seafile}/api2/repos/{default_library_id}/upload-link/",
@@ -104,7 +103,7 @@ def test_create_upload_and_sync_file(base_urls, seafile_headers, default_library
     )
     if upload_link_response.status_code != 200:
         pytest.fail(
-            "Impossible d'obtenir l'URL d'upload Seafile: "
+            "Unable to obtain the Seafile upload URL: "
             f"HTTP {upload_link_response.status_code} - {upload_link_response.text[:300]}"
         )
     upload_url = upload_link_response.json().strip('"')
@@ -117,13 +116,13 @@ def test_create_upload_and_sync_file(base_urls, seafile_headers, default_library
         timeout=30,
     )
     assert upload_response.status_code in (200, 201), (
-        f"Échec de l'upload Seafile: HTTP {upload_response.status_code} - "
+        f"Seafile upload failed: HTTP {upload_response.status_code} - "
         f"{upload_response.text[:300]}"
     )
 
     try:
-        # Vérification de présence: le fichier doit apparaître dans le listing
-        # du dossier racine ("synchronisation" côté serveur).
+        # Presence check: the file must appear in the root folder listing
+        # ("synchronization" server-side).
         listing_response = requests.get(
             f"{base_urls.seafile}/api2/repos/{default_library_id}/dir/",
             headers=seafile_headers,
@@ -133,11 +132,11 @@ def test_create_upload_and_sync_file(base_urls, seafile_headers, default_library
         listing_response.raise_for_status()
         names = [entry["name"] for entry in listing_response.json()]
         assert file_name in names, (
-            f"Le fichier {file_name!r} envoyé n'apparaît pas dans le listing "
-            f"de la bibliothèque {default_library_id} après upload: {names}"
+            f"The uploaded file {file_name!r} does not appear in the listing "
+            f"of library {default_library_id} after upload: {names}"
         )
     finally:
-        # Nettoyage systématique, y compris si l'assertion de présence échoue.
+        # Systematic cleanup, even if the presence assertion fails.
         requests.delete(
             f"{base_urls.seafile}/api2/repos/{default_library_id}/file/",
             headers=seafile_headers,

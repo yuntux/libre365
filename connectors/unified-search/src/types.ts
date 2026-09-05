@@ -22,8 +22,8 @@ export interface AggregatedSearchResponse {
 }
 
 /**
- * Signature d'un connecteur de recherche par service. Le token Bearer de l'utilisateur
- * est relaye tel quel (etude 2.2 ligne 391, 394) : c'est le service source qui filtre
- * selon les permissions natives de l'utilisateur, pas ce connecteur.
+ * Signature of a per-service search connector. The user's Bearer token
+ * is relayed as-is (study 2.2 lines 391, 394): it is the source service that
+ * filters according to the user's native permissions, not this connector.
  */
 export type SourceSearchFn = (query: string, userToken: string) => Promise<SearchResultItem[]>;

@@ -1,5 +1,5 @@
-# Build context attendu : le repertoire connectors/ (pas ce sous-dossier).
-# docker build -f unified-search/Dockerfile -t unified-search .   # depuis connectors/
+# Expected build context: the connectors/ directory (not this subfolder).
+# docker build -f unified-search/Dockerfile -t unified-search .   # from connectors/
 FROM node:20.17-alpine AS build
 WORKDIR /app
 COPY tsconfig.base.json /tsconfig.base.json

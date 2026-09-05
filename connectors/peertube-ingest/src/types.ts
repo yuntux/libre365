@@ -4,7 +4,7 @@ export interface MeetingMetadata {
   participants: string[];
 }
 
-/** Sous-ensemble du format d'evenement S3 `ObjectCreated` publie par MinIO (webhook). */
+/** Subset of the S3 `ObjectCreated` event format published by MinIO (webhook). */
 export interface MinioObjectCreatedEvent {
   EventName?: string;
   Records?: Array<{

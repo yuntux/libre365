@@ -1,9 +1,9 @@
-# Overlay de dimensionnement — 100 utilisateurs
-# Charge de reference etude 1.5 L.195-196 : "100 consultants x 20 documents ouverts en
-# parallele" (2000 connexions potentielles) -> ~8 coeurs / 16 Go RAM minimum avec marge,
-# a valider par test de charge JMeter avant mise en production (1.5 L.196).
-# Usage : helm upgrade --install onlyoffice onlyoffice/docs-cloud -f onlyoffice.yaml -f onlyoffice-100.yaml
-replicaCount: 2 # cluster des la conception initiale (1.5 L.198), meme a 100 utilisateurs
+# Sizing overlay — 100 users
+# Reference load, study 1.5 L.195-196: "100 consultants x 20 documents opened in
+# parallel" (2000 potential connections) -> ~8 cores / 16 GB RAM minimum with margin,
+# to be validated with a JMeter load test before going to production (1.5 L.196).
+# Usage: helm upgrade --install onlyoffice onlyoffice/docs-cloud -f onlyoffice.yaml -f onlyoffice-100.yaml
+replicaCount: 2 # cluster from the initial design (1.5 L.198), even at 100 users
 
 resources:
   requests:
@@ -12,5 +12,5 @@ resources:
   limits:
     cpu: "4"
     memory: "8Gi"
-# soit ~8 coeurs / 16 Go RAM cumules sur les 2 replicas, conforme a l'ordre de grandeur
-# retenu en 1.5 L.196 pour le scenario de charge de reference.
+# i.e. ~8 cores / 16 GB RAM combined across the 2 replicas, consistent with the order
+# of magnitude adopted in 1.5 L.196 for the reference load scenario.

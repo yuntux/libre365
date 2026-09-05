@@ -1,12 +1,12 @@
-# Brique : Vikunja — gestion de taches (etude 1.6 L.228-229)
-# Chart utilise : chart communautaire `vikunja/helm-charts` (https://vikunja.io, depot
-#   GitHub `go-vikunja/helm-charts`)
-#   repo Helm : https://vikunja.github.io/helm-charts
+# Component: Vikunja — task management (study 1.6 L.228-229)
+# Chart used: community chart `vikunja/helm-charts` (https://vikunja.io, GitHub repo
+#   `go-vikunja/helm-charts`)
+#   Helm repo: https://vikunja.github.io/helm-charts
 #
-# 1.6 L.229 — dimensionnement 2-4 coeurs / 4 Go RAM suffisant pour 100 comme 2000
-# utilisateurs (sauf usage massif d'API/automatisations) : pas de variante 100/2000
-# dediee, un seul fichier de values suffit ici, contrairement a Synapse/OnlyOffice/
-# Keycloak dont le dimensionnement croit reellement avec l'echelle.
+# 1.6 L.229 — 2-4 cores / 4 GB RAM sizing sufficient for both 100 and 2000 users
+# (barring massive API/automation usage): no dedicated 100/2000 variant, a single
+# values file suffices here, unlike Synapse/OnlyOffice/Keycloak whose sizing really
+# grows with scale.
 
 replicaCount: 2
 
@@ -23,12 +23,12 @@ resources:
     memory: "4Gi"
 
 env:
-  VIKUNJA_SERVICE_PUBLICURL: "https://taches.open365.example.org"
-  VIKUNJA_SERVICE_ENABLECALDAV: "true" # 1.6 tableau — integration calendrier native
-  # 1.7 — SSO Keycloak (OIDC natif Vikunja)
+  VIKUNJA_SERVICE_PUBLICURL: "https://taches.libre365.example.org"
+  VIKUNJA_SERVICE_ENABLECALDAV: "true" # 1.6 table — native calendar integration
+  # 1.7 — Keycloak SSO (native Vikunja OIDC)
   VIKUNJA_AUTH_OPENID_ENABLED: "true"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_0_NAME: "Open365 SSO"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_0_AUTHURL: "https://sso.open365.example.org/realms/open365"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_0_NAME: "Libre365 SSO"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_0_AUTHURL: "https://sso.libre365.example.org/realms/libre365"
   VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTID: "vikunja"
   VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTSECRET:
     valueFrom:
@@ -52,11 +52,11 @@ ingress:
   enabled: true
   className: ""
   hosts:
-    - host: taches.open365.example.org
+    - host: taches.libre365.example.org
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: vikunja-tls
       hosts:
-        - taches.open365.example.org
+        - taches.libre365.example.org

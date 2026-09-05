@@ -1,4 +1,4 @@
-/** Utilisateur de l'annuaire (Keycloak Admin API), forme minimale utilisee ici. */
+/** Directory user (Keycloak Admin API), minimal shape used here. */
 export interface DirectoryUser {
   id: string;
   username: string;
@@ -7,7 +7,7 @@ export interface DirectoryUser {
   lastName?: string;
 }
 
-/** Forme attendue par OnlyOffice Document Server en reponse a `onRequestUsers`. */
+/** Shape expected by OnlyOffice Document Server in response to `onRequestUsers`. */
 export interface OnlyOfficeUserEntry {
   id: string;
   name: string;
@@ -15,9 +15,9 @@ export interface OnlyOfficeUserEntry {
 }
 
 /**
- * Charge utile envoyee par OnlyOffice a `onRequestSendNotify` (etude 2.7 ligne 484) :
- * message du commentaire, emails mentionnes, lien d'action vers la position exacte
- * du commentaire dans le document.
+ * Payload sent by OnlyOffice to `onRequestSendNotify` (study 2.7 line 484):
+ * comment message, mentioned emails, action link to the exact position
+ * of the comment in the document.
  */
 export interface OnRequestSendNotifyPayload {
   actionLink?: string;

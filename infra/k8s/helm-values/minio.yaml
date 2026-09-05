@@ -1,18 +1,19 @@
-# Brique : MinIO — stockage objet compatible S3 (etude 2.12 L.587)
-# Chart utilise : minio/minio (chart officiel MinIO)
-#   repo Helm : https://charts.min.io/
+# Component: MinIO — S3-compatible object storage (study 2.12 L.587)
+# Chart used: minio/minio (official MinIO chart)
+#   Helm repo: https://charts.min.io/
 #   chart    : minio
 #
-# 2.12 L.587 — MinIO auto-heberge retenu comme destination S3 de LiveKit Egress plutot
-# qu'un partage de filesystem (NFS) entre pods : composant auto-heberge de plus, pas une
-# dependance cloud. La retention sur ce bucket est fixee par le cabinet lui-meme (regle
-# de cycle de vie generique ou son absence), plutot que subie (cf. 2.12 L.587).
+# 2.12 L.587 — self-hosted MinIO chosen as the S3 destination for LiveKit Egress
+# rather than a filesystem share (NFS) between pods: one more self-hosted component,
+# not a cloud dependency. Retention on this bucket is set by the firm itself
+# (generic lifecycle rule or the absence of one), rather than imposed on it
+# (see 2.12 L.587).
 
 image:
   repository: minio/minio
   tag: RELEASE.2024-10-13T13-34-11Z
 
-mode: distributed # HA multi-noeud, coherent avec l'objectif de croissance (chapitre 4.1)
+mode: distributed # multi-node HA, consistent with the growth objective (chapter 4.1)
 replicas: 4
 
 resources:
@@ -28,8 +29,8 @@ persistence:
   size: 500Gi
   storageClass: ""
 
-# 2.12 L.587-592 — bucket dedie aux enregistrements de reunion (destination Egress
-# LiveKit) + bucket dedie au depot intermediaire avant reprise par PeerTube.
+# 2.12 L.587-592 — bucket dedicated to meeting recordings (LiveKit Egress
+# destination) + bucket dedicated to the staging area before pickup by PeerTube.
 buckets:
   - name: visio-recordings
     policy: none
@@ -38,27 +39,27 @@ buckets:
     policy: none
     purge: false
 
-# 2.12 L.589 — notifications ObjectCreated exposees via webhook, consommees par le
-# connecteur de depot vers PeerTube (batch quotidien, cf. peertube.yaml et connectors/,
-# hors perimetre de ce depot k8s).
+# 2.12 L.589 — ObjectCreated notifications exposed via webhook, consumed by the
+# handoff connector to PeerTube (daily batch, see peertube.yaml and connectors/,
+# out of scope for this k8s repository).
 existingSecret: minio-root-credentials
 
 ingress:
   enabled: true
   ingressClassName: ""
   hosts:
-    - s3.open365.example.org
+    - s3.libre365.example.org
   tls:
     - secretName: minio-tls
       hosts:
-        - s3.open365.example.org
+        - s3.libre365.example.org
 
 consoleIngress:
   enabled: true
   ingressClassName: ""
   hosts:
-    - minio-console.open365.example.org
+    - minio-console.libre365.example.org
   tls:
     - secretName: minio-console-tls
       hosts:
-        - minio-console.open365.example.org
+        - minio-console.libre365.example.org

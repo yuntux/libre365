@@ -15,7 +15,7 @@ function getClient(): S3Client {
     client = new S3Client({
       endpoint: MINIO_ENDPOINT,
       region: MINIO_REGION,
-      forcePathStyle: true, // requis pour MinIO (etude 1.3/2.12 : MinIO auto-heberge, pas AWS S3)
+      forcePathStyle: true, // required for MinIO (study 1.3/2.12: self-hosted MinIO, not AWS S3)
       credentials: { accessKeyId: MINIO_ACCESS_KEY, secretAccessKey: MINIO_SECRET_KEY },
     });
   }
@@ -23,9 +23,9 @@ function getClient(): S3Client {
 }
 
 /**
- * Liste les objets recents du bucket MinIO pour le mode batch (etude 2.12 ligne 589 :
- * "ce depot peut se faire en tache periodique -- batch quotidien"). `sinceIso` filtre
- * cote client sur `LastModified` (l'API S3 ne propose pas de filtre serveur par date).
+ * Lists recent objects in the MinIO bucket for batch mode (study 2.12 line 589:
+ * "this upload can be done as a periodic task -- daily batch"). `sinceIso` filters
+ * client-side on `LastModified` (the S3 API does not offer a server-side date filter).
  */
 export async function listRecentObjects(sinceIso: string): Promise<IngestCandidate[]> {
   const since = new Date(sinceIso).getTime();
@@ -62,7 +62,7 @@ export async function getObjectStream(bucket: string, key: string): Promise<Read
   return result.Body as Readable;
 }
 
-/** Recupere les tags S3 de l'objet, utilises en complement du nom de fichier (cf. metadata.ts). */
+/** Retrieves the object's S3 tags, used in addition to the file name (see metadata.ts). */
 export async function getObjectTags(bucket: string, key: string): Promise<Record<string, string>> {
   const s3 = getClient();
   const result = await s3.send(new GetObjectTaggingCommand({ Bucket: bucket, Key: key }));

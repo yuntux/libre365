@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
 """
-Synchronise tous les fichiers consommateurs à partir de `platform.yaml`
-(source unique des versions d'image et des ports, cf. l'en-tête de ce
-fichier pour le pourquoi).
+Synchronizes every consumer file from `platform.yaml` (single source of
+image versions and ports, see that file's header for the rationale).
 
 Usage:
-    python3 scripts/sync_platform.py            # applique les changements
-    python3 scripts/sync_platform.py --check    # échoue (exit 1) si un
-                                                  # fichier généré/patché
-                                                  # divergerait de platform.yaml
+    python3 scripts/sync_platform.py            # applies the changes
+    python3 scripts/sync_platform.py --check    # fails (exit 1) if a
+                                                  # generated/patched file
+                                                  # would diverge from platform.yaml
 
-Fichiers touchés :
-    - docker-compose/docker-compose.yml   (tags d'image, patch en place)
-    - docker-compose/.env.example         (bloc de ports généré)
+Files touched:
+    - docker-compose/docker-compose.yml   (image tags, patched in place)
+    - docker-compose/.env.example         (generated ports block)
     - infra/k8s/helm-values/*.yaml        (image.repository / image.tag)
-    - infra/k8s/manifests/gokapi.yaml     (ligne `image:` brute)
-    - connectors/*/Dockerfile             (tag de base Node, patch en place)
-    - tests/integration/_platform_defaults.py  (fichier généré, ne pas éditer)
+    - infra/k8s/manifests/gokapi.yaml     (raw `image:` line)
+    - connectors/*/Dockerfile             (Node base tag, patched in place)
+    - tests/integration/_platform_defaults.py  (generated file, do not edit)
 
-N'écrit jamais dans platform.yaml lui-même.
+Never writes to platform.yaml itself.
 """
 
 from __future__ import annotations
@@ -35,25 +34,25 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PLATFORM_FILE = REPO_ROOT / "platform.yaml"
 
 GENERATED_HEADER = (
-    "# Ce bloc est généré depuis platform.yaml par scripts/sync_platform.py.\n"
-    "# Ne pas éditer à la main : modifier platform.yaml puis relancer le script.\n"
+    "# This block is generated from platform.yaml by scripts/sync_platform.py.\n"
+    "# Do not edit by hand: change platform.yaml then re-run the script.\n"
 )
 PORTS_BEGIN = "# BEGIN GENERATED PORTS (platform.yaml)"
 PORTS_END = "# END GENERATED PORTS"
 
 ruamel_yaml = YAML()
 ruamel_yaml.preserve_quotes = True
-ruamel_yaml.width = 4096  # évite les retours à la ligne intempestifs sur les commentaires longs
-# Convention utilisée dans tout infra/k8s/helm-values/*.yaml : les items de
-# séquence sont indentés de 2 espaces sous leur clé parente (`env:\n  - name:
-# ...`). Sans ce réglage, ruamel retombe sur son style par défaut (item aligné
-# avec la clé) et regénère un diff massif et non fonctionnel sur tout fichier
-# contenant la moindre liste.
+ruamel_yaml.width = 4096  # avoids unwanted line wraps on long comments
+# Convention used throughout infra/k8s/helm-values/*.yaml: sequence items are
+# indented 2 spaces under their parent key (`env:\n  - name: ...`). Without
+# this setting, ruamel falls back to its default style (item aligned with the
+# key) and regenerates a massive, non-functional diff on any file containing
+# so much as a single list.
 ruamel_yaml.indent(mapping=2, sequence=4, offset=2)
 
 
 class Change:
-    """Une modification en attente sur un fichier : (chemin, contenu désiré)."""
+    """A pending change to a file: (path, desired content)."""
 
     def __init__(self, path: Path, desired: str, description: str) -> None:
         self.path = path
@@ -77,8 +76,8 @@ def load_platform() -> dict:
 
 
 def sub_image_tag(text: str, repository: str, new_tag: str) -> str:
-    """Remplace `image: <repository>:<ancien-tag>` par `<repository>:<new_tag>`,
-    en préservant tout ce qui suit sur la ligne (commentaire éventuel)."""
+    """Replaces `image: <repository>:<old-tag>` with `<repository>:<new_tag>`,
+    preserving everything else on the line (e.g. a trailing comment)."""
     pattern = re.compile(
         r"(image:\s*)" + re.escape(repository) + r":[^\s\"']+"
     )
@@ -86,8 +85,8 @@ def sub_image_tag(text: str, repository: str, new_tag: str) -> str:
 
 
 def sub_from_tag(text: str, repository: str, new_tag: str) -> str:
-    """Remplace `FROM <repository>:<ancien-tag>` (Dockerfile), en préservant
-    un éventuel `AS <stage>` qui suit."""
+    """Replaces `FROM <repository>:<old-tag>` (Dockerfile), preserving a
+    trailing `AS <stage>` if present."""
     pattern = re.compile(
         r"(FROM\s+)" + re.escape(repository) + r":[^\s]+"
     )
@@ -111,7 +110,7 @@ def compute_compose_changes(platform: dict) -> list[Change]:
     text = sub_image_tag(text, "mariadb", shared["mariadb"])
     text = sub_image_tag(text, "node", shared["node"])
 
-    return [Change(compose_path, text, "docker-compose.yml (tags d'image)")]
+    return [Change(compose_path, text, "docker-compose.yml (image tags)")]
 
 
 def compute_dockerfile_changes(platform: dict) -> list[Change]:
@@ -120,15 +119,15 @@ def compute_dockerfile_changes(platform: dict) -> list[Change]:
     for dockerfile in sorted((REPO_ROOT / "connectors").glob("*/Dockerfile")):
         text = dockerfile.read_text()
         new_text = sub_from_tag(text, "node", node_tag)
-        changes.append(Change(dockerfile, new_text, f"{dockerfile.relative_to(REPO_ROOT)} (base Node)"))
+        changes.append(Change(dockerfile, new_text, f"{dockerfile.relative_to(REPO_ROOT)} (Node base image)"))
     return changes
 
 
 def set_nested(data, dot_path: str, value: str) -> None:
-    """`.image.tag` -> data['image']['tag'] = value, en créant les niveaux
-    manquants (ex: minio.yaml n'a aujourd'hui aucun bloc `image:` explicite —
-    on le crée plutôt que de laisser le chart sur son tag par défaut,
-    silencieux et donc source de dérive)."""
+    """`.image.tag` -> data['image']['tag'] = value, creating any missing
+    levels (e.g. minio.yaml currently has no explicit `image:` block — this
+    creates one rather than leaving the chart on its default, silent, and
+    therefore drift-prone tag)."""
     from ruamel.yaml.comments import CommentedMap
 
     keys = [k for k in dot_path.split(".") if k]
@@ -148,9 +147,9 @@ def sibling_path(dot_path: str, new_leaf: str) -> str:
 
 
 def _helm_specs(svc: dict) -> list[dict]:
-    """Normalise `helm` (un seul patch) et/ou `helm_images` (plusieurs images
-    dans le même fichier, ex: visio-meet backend+frontend) en une liste plate
-    de specs {file, image_repository, tag_path, version, raw_image_line?}."""
+    """Normalizes `helm` (a single patch) and/or `helm_images` (several
+    images in the same file, e.g. visio-meet backend+frontend) into a flat
+    list of specs {file, image_repository, tag_path, version, raw_image_line?}."""
     specs = []
     helm = svc.get("helm")
     if helm:
@@ -163,9 +162,9 @@ def _helm_specs(svc: dict) -> list[dict]:
 def compute_helm_changes(platform: dict) -> list[Change]:
     from io import StringIO
 
-    # Regroupées par fichier : plusieurs images (backend/frontend) peuvent
-    # cibler le même fichier de values, il faut les appliquer en une seule
-    # passe de chargement/écriture pour ne pas s'écraser l'une l'autre.
+    # Grouped by file: several images (backend/frontend) can target the same
+    # values file, so they must be applied in a single load/write pass to
+    # avoid overwriting one another.
     specs_by_file: dict[Path, list[dict]] = {}
     for svc in platform["services"].values():
         for spec in _helm_specs(svc):
@@ -181,7 +180,7 @@ def compute_helm_changes(platform: dict) -> list[Change]:
             text = target.read_text()
             for spec in raw_specs:
                 text = sub_image_tag(text, spec["image_repository"], spec["version"])
-            changes.append(Change(target, text, f"{spec['file']} (image brute)"))
+            changes.append(Change(target, text, f"{spec['file']} (raw image line)"))
             continue
 
         with target.open() as f:
@@ -202,9 +201,9 @@ def compute_helm_changes(platform: dict) -> list[Change]:
 
 
 def all_ports(platform: dict) -> dict:
-    """Fusionne toutes les variables de port déclarées dans platform.yaml en un
-    seul dict {NOM_VARIABLE: valeur}, dans l'ordre de lecture (services, puis
-    connecteurs, puis divers) pour un diff stable et lisible."""
+    """Merges every port variable declared in platform.yaml into a single
+    dict {VARIABLE_NAME: value}, in reading order (services, then
+    connectors, then miscellaneous) for a stable, readable diff."""
     merged: dict[str, int] = {}
     for svc in platform["services"].values():
         merged.update(svc.get("ports") or {})
@@ -230,11 +229,11 @@ def compute_env_example_changes(platform: dict) -> list[Change]:
         new_text = pattern.sub(generated_block, text)
     else:
         raise SystemExit(
-            f"'{path}' ne contient pas les marqueurs {PORTS_BEGIN} / {PORTS_END} — "
-            "ajoutez-les une fois manuellement autour du bloc de ports existant."
+            f"'{path}' does not contain the {PORTS_BEGIN} / {PORTS_END} markers — "
+            "add them once by hand around the existing ports block."
         )
 
-    return [Change(path, new_text, ".env.example (bloc de ports)")]
+    return [Change(path, new_text, ".env.example (ports block)")]
 
 
 def compute_test_defaults_changes(platform: dict) -> list[Change]:
@@ -243,11 +242,11 @@ def compute_test_defaults_changes(platform: dict) -> list[Change]:
 
     body = [
         '"""',
-        "Fichier généré par scripts/sync_platform.py à partir de platform.yaml.",
-        "Ne PAS éditer à la main : les valeurs par défaut de tests/integration/conftest.py",
-        "doivent rester alignées avec les ports par défaut de docker-compose (étude 4.6) —",
-        "c'est précisément ce que ce fichier garantit en étant généré depuis la même",
-        "source que docker-compose/.env.example.",
+        "File generated by scripts/sync_platform.py from platform.yaml.",
+        "Do NOT edit by hand: the default values in tests/integration/conftest.py",
+        "must stay aligned with docker-compose's default ports (study 4.6) —",
+        "that is precisely what this file guarantees, by being generated from the",
+        "same source as docker-compose/.env.example.",
         '"""',
         "",
         "DEFAULT_PORTS = {",
@@ -258,7 +257,7 @@ def compute_test_defaults_changes(platform: dict) -> list[Change]:
     body.append("")
 
     content = "\n".join(body)
-    return [Change(path, content, "tests/integration/_platform_defaults.py (généré)")]
+    return [Change(path, content, "tests/integration/_platform_defaults.py (generated)")]
 
 
 def main() -> int:
@@ -266,7 +265,7 @@ def main() -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="n'écrit rien, échoue si des fichiers divergeraient de platform.yaml",
+        help="write nothing, fail if any file would diverge from platform.yaml",
     )
     args = parser.parse_args()
 
@@ -283,22 +282,22 @@ def main() -> int:
 
     if args.check:
         if dirty:
-            print("Dérive détectée entre platform.yaml et les fichiers suivants :", file=sys.stderr)
+            print("Drift detected between platform.yaml and the following files:", file=sys.stderr)
             for c in dirty:
                 print(f"  - {c.description}", file=sys.stderr)
             print(
-                "\nLancez `python3 scripts/sync_platform.py` puis committez le résultat.",
+                "\nRun `python3 scripts/sync_platform.py` then commit the result.",
                 file=sys.stderr,
             )
             return 1
-        print("OK : aucun fichier ne diverge de platform.yaml.")
+        print("OK: no file diverges from platform.yaml.")
         return 0
 
     for c in dirty:
         c.apply()
-        print(f"mis à jour : {c.description}")
+        print(f"updated: {c.description}")
     if not dirty:
-        print("Rien à faire : tous les fichiers sont déjà alignés sur platform.yaml.")
+        print("Nothing to do: all files are already aligned with platform.yaml.")
     return 0
 
 

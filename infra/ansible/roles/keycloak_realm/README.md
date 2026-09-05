@@ -1,38 +1,38 @@
-# Rôle `keycloak_realm`
+# `keycloak_realm` role
 
-Crée le realm Keycloak principal du cabinet, active TOTP et WebAuthn/FIDO2
-nativement (étude 1.7), et crée un client OIDC confidentiel par brique de la
-stack qui supporte nativement OIDC.
+Creates the firm's main Keycloak realm, natively enables TOTP and
+WebAuthn/FIDO2 (study 1.7), and creates one confidential OIDC client per
+stack component that natively supports OIDC.
 
-Sert de **convention de référence** pour la structure des rôles suivants de ce
-dépôt (`tasks/`, `defaults/`, `templates/`, `handlers/`) — les rôles à ajouter
-pour les autres briques (Seafile, Vikunja, OnlyOffice, Matrix, etc., quand ils
-seront extraits des playbooks en rôles dédiés) doivent reprendre cette même
-structure plutôt qu'un patron ad hoc par brique.
+Serves as the **reference convention** for the structure of subsequent roles
+in this repository (`tasks/`, `defaults/`, `templates/`, `handlers/`) — roles
+to be added for the other components (Seafile, Vikunja, OnlyOffice, Matrix,
+etc., once they are extracted from the playbooks into dedicated roles) should
+reuse this same structure rather than an ad hoc pattern per component.
 
-## Variables principales (`defaults/main.yml`)
+## Main variables (`defaults/main.yml`)
 
 - `keycloak_realm_name`, `keycloak_realm_display_name`
-- `keycloak_realm_webauthn_enabled` — active WebAuthn/passwordless dans le
-  browser flow (1.7 : "à la fois comme second facteur et comme facteur
-  principal sans mot de passe")
-- `keycloak_oidc_clients` — liste des clients OIDC à créer (un par brique
-  compatible OIDC ; Grommunio en est volontairement absent, cf. commentaire
-  dans le fichier)
+- `keycloak_realm_webauthn_enabled` — enables WebAuthn/passwordless in the
+  browser flow (1.7: "both as a second factor and as a primary
+  passwordless factor")
+- `keycloak_oidc_clients` — list of OIDC clients to create (one per
+  OIDC-compatible component; Grommunio is deliberately absent from it, see
+  the comment in the file)
 
-## Non couvert par ce rôle
+## Not covered by this role
 
-- **OTP par SMS et par mail** : l'étude (1.7, lignes ~266-268) est explicite —
-  ces deux canaux "ne sont pas couverts nativement par Keycloak" et
-  nécessitent un SPI Keycloak custom, traité comme un chantier de
-  développement à part entière, pas une option de ce rôle.
-- **Haute disponibilité du cluster Keycloak** (nœuds, cache distribué) : objet
-  des manifestes Helm (`infra/k8s/helm-values/keycloak.yaml`, hors périmètre
-  de cette tâche), pas de ce rôle de configuration applicative.
+- **OTP via SMS and email**: the study (1.7, lines ~266-268) is explicit —
+  these two channels "are not natively covered by Keycloak" and require a
+  custom Keycloak SPI, treated as a development project of its own, not an
+  option of this role.
+- **High availability of the Keycloak cluster** (nodes, distributed cache):
+  handled by the Helm manifests (`infra/k8s/helm-values/keycloak.yaml`, out
+  of scope for this task), not by this application configuration role.
 
 ## Secrets
 
-Les secrets clients générés sont écrits sur le contrôleur Ansible dans
-`infra/ansible/secrets/keycloak-clients/<client_id>.env` (répertoire à exclure
-du contrôle de version) — à transférer vers le coffre-fort de secrets retenu
-par le cabinet (étude 4.5), jamais laissés en clair dans le dépôt.
+The generated client secrets are written on the Ansible controller under
+`infra/ansible/secrets/keycloak-clients/<client_id>.env` (a directory to
+exclude from version control) — to be transferred to the secrets vault
+adopted by the firm (study 4.5), never left in plaintext in the repository.

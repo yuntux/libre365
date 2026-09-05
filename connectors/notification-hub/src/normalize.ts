@@ -8,16 +8,16 @@ import {
 } from "./types";
 
 /**
- * Fonctions pures de normalisation, une par source (etude 2.1 ligne 379 :
- * "un connecteur par service est necessaire pour traduire chaque evenement").
- * Volontairement sans effet de bord / sans appel reseau pour rester testables unitairement.
+ * Pure normalization functions, one per source (study 2.1 line 379:
+ * "a connector per service is needed to translate each event").
+ * Deliberately free of side effects / network calls to stay unit-testable.
  */
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
-/** Normalise un evenement Matrix Application Service (message texte ou mention). */
+/** Normalizes a Matrix Application Service event (text message or mention). */
 export function normalizeMatrixEvent(payload: MatrixWebhookPayload): NormalizedEvent | null {
   if (!payload || payload.type !== "m.room.message") {
     return null;
@@ -27,13 +27,13 @@ export function normalizeMatrixEvent(payload: MatrixWebhookPayload): NormalizedE
   if (!targetUser) {
     return null;
   }
-  const body = payload.content?.body ?? "(message sans contenu)";
-  const sender = payload.sender ?? "un utilisateur";
+  const body = payload.content?.body ?? "(empty message)";
+  const sender = payload.sender ?? "a user";
   return {
     source: "matrix",
     eventType: mentioned.length > 0 ? "mention" : "message",
     userId: targetUser,
-    title: `Nouveau message de ${sender}`,
+    title: `New message from ${sender}`,
     body: body.length > 280 ? `${body.slice(0, 277)}...` : body,
     actionUrl: payload.room_id
       ? `https://element.example.org/#/room/${payload.room_id}${payload.event_id ? `/${payload.event_id}` : ""}`
@@ -44,7 +44,7 @@ export function normalizeMatrixEvent(payload: MatrixWebhookPayload): NormalizedE
   };
 }
 
-/** Normalise un evenement Grommunio (nouveau mail recu). */
+/** Normalizes a Grommunio event (new mail received). */
 export function normalizeGrommunioEvent(payload: GrommunioWebhookPayload): NormalizedEvent | null {
   if (!payload || !payload.mailboxUser) {
     return null;
@@ -53,7 +53,7 @@ export function normalizeGrommunioEvent(payload: GrommunioWebhookPayload): Norma
     source: "grommunio",
     eventType: payload.event ?? "new_mail",
     userId: payload.mailboxUser,
-    title: payload.subject ? `Nouveau mail : ${payload.subject}` : "Nouveau mail",
+    title: payload.subject ? `New mail: ${payload.subject}` : "New mail",
     body: payload.preview ?? payload.from ?? "",
     actionUrl:
       payload.webUrl ??
@@ -64,7 +64,7 @@ export function normalizeGrommunioEvent(payload: GrommunioWebhookPayload): Norma
   };
 }
 
-/** Normalise un evenement Seafile (partage de fichier/dossier). */
+/** Normalizes a Seafile event (file/folder share). */
 export function normalizeSeafileEvent(payload: SeafileWebhookPayload): NormalizedEvent | null {
   if (!payload || !payload.to_user) {
     return null;
@@ -74,8 +74,8 @@ export function normalizeSeafileEvent(payload: SeafileWebhookPayload): Normalize
     source: "seafile",
     eventType: payload.event_type ?? "file-shared",
     userId: payload.to_user,
-    title: `Fichier partage : ${fileName ?? "document"}`,
-    body: payload.from_user ? `Partage par ${payload.from_user}` : "",
+    title: `File shared: ${fileName ?? "document"}`,
+    body: payload.from_user ? `Shared by ${payload.from_user}` : "",
     actionUrl:
       payload.url ??
       `https://seafile.example.org/library/${payload.repo_id ?? ""}${payload.path ?? ""}`,
@@ -83,7 +83,7 @@ export function normalizeSeafileEvent(payload: SeafileWebhookPayload): Normalize
   };
 }
 
-/** Normalise un evenement Vikunja (tache assignee). */
+/** Normalizes a Vikunja event (task assigned). */
 export function normalizeVikunjaEvent(payload: VikunjaWebhookPayload): NormalizedEvent | null {
   if (!payload) {
     return null;
@@ -97,8 +97,8 @@ export function normalizeVikunjaEvent(payload: VikunjaWebhookPayload): Normalize
     source: "vikunja",
     eventType: payload.event_name ?? "task.assigned",
     userId: assignee,
-    title: task?.title ? `Tache assignee : ${task.title}` : "Nouvelle tache assignee",
-    body: payload.data?.doer?.username ? `Assignee par ${payload.data.doer.username}` : "",
+    title: task?.title ? `Task assigned: ${task.title}` : "New task assigned",
+    body: payload.data?.doer?.username ? `Assigned by ${payload.data.doer.username}` : "",
     actionUrl: task?.id
       ? `https://vikunja.example.org/tasks/${task.id}`
       : "https://vikunja.example.org",
@@ -107,9 +107,9 @@ export function normalizeVikunjaEvent(payload: VikunjaWebhookPayload): Normalize
 }
 
 /**
- * Normalise une mention OnlyOffice (`onRequestSendNotify`, etude 2.7 ligne 484).
- * Un evenement normalise est emis par email mentionne (0..n), donc cette fonction
- * retourne un tableau plutot qu'un evenement unique.
+ * Normalizes an OnlyOffice mention (`onRequestSendNotify`, study 2.7 line 484).
+ * One normalized event is emitted per mentioned email address (0..n), so this function
+ * returns an array rather than a single event.
  */
 export function normalizeOnlyOfficeMentionEvent(
   payload: OnlyOfficeMentionPayload
@@ -117,12 +117,12 @@ export function normalizeOnlyOfficeMentionEvent(
   if (!payload || !payload.emails || payload.emails.length === 0) {
     return [];
   }
-  const documentTitle = payload.document?.title ?? "un document";
+  const documentTitle = payload.document?.title ?? "a document";
   return payload.emails.map((email) => ({
     source: "onlyoffice" as const,
     eventType: "mention",
     userId: email,
-    title: `Vous avez ete mentionne dans ${documentTitle}`,
+    title: `You were mentioned in ${documentTitle}`,
     body: payload.comment ?? "",
     actionUrl: payload.actionLink ?? "https://office.example.org",
     timestamp: payload.timestamp ?? nowIso(),

@@ -1,8 +1,8 @@
 import { LiveKitPresence } from "../types";
 
-// Utilisation differee (require) pour ne pas imposer `livekit-server-sdk` comme
-// dependance de build obligatoire si ce module n'est pas encore installe en
-// developpement local -- charge au premier appel seulement.
+// Deferred use (require) so `livekit-server-sdk` is not an unconditional build
+// dependency if this module is not yet installed in local development -- it is
+// loaded only on first call.
 let cachedRoomServiceClient: unknown | null = null;
 
 const LIVEKIT_URL = process.env.LIVEKIT_URL ?? "https://visio.example.org";
@@ -10,12 +10,12 @@ const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY ?? "";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET ?? "";
 
 /**
- * Determine si l'utilisateur est actuellement participant d'une room LiveKit active
- * (etude 2.8 ligne 499 : "Visio (LiveKit) n'a de notion de presence que pendant un
- * appel actif -- liste des participants connectes a une room").
+ * Determines whether the user is currently a participant in an active LiveKit room
+ * (study 2.8 line 499: "Video (LiveKit) only has a notion of presence during an
+ * active call -- list of participants connected to a room").
  *
- * Utilise `livekit-server-sdk` (RoomServiceClient.listRooms / listParticipants), qui
- * necessite l'API key/secret du serveur LiveKit (pas le token de l'utilisateur final).
+ * Uses `livekit-server-sdk` (RoomServiceClient.listRooms / listParticipants), which
+ * requires the LiveKit server's API key/secret (not the end user's token).
  */
 export async function getLiveKitPresence(
   userIdentity: string,

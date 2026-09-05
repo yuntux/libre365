@@ -10,8 +10,8 @@ const NOTIFICATION_HUB_URL =
   process.env.NOTIFICATION_HUB_URL ?? "http://notification-hub:4001";
 
 /**
- * Endpoint appele par OnlyOffice Document Server pour lister les utilisateurs proposes
- * a la frappe de `@`/`+` dans un commentaire (etude 2.7 ligne 484).
+ * Endpoint called by OnlyOffice Document Server to list the users suggested
+ * when typing `@`/`+` in a comment (study 2.7 line 484).
  */
 app.get("/onlyoffice/request-users", async (_req: Request, res: Response) => {
   try {
@@ -23,9 +23,9 @@ app.get("/onlyoffice/request-users", async (_req: Request, res: Response) => {
 });
 
 /**
- * Endpoint appele par OnlyOffice quand un commentaire mentionnant quelqu'un est soumis
- * (etude 2.7 ligne 484 : `onRequestSendNotify`). Transmet chaque mention au centre de
- * notifications unifie (notification-hub, etude 2.1/2.7 ligne 487).
+ * Endpoint called by OnlyOffice when a comment mentioning someone is submitted
+ * (study 2.7 line 484: `onRequestSendNotify`). Forwards each mention to the
+ * unified notification center (notification-hub, study 2.1/2.7 line 487).
  */
 app.post("/onlyoffice/request-send-notify", async (req: Request, res: Response) => {
   const forwarded = toNotificationHubPayload(req.body);

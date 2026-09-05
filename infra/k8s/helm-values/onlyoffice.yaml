@@ -1,22 +1,22 @@
-# Brique : OnlyOffice Document Server Community Edition >= 9.4 — etude 1.5 L.192-199
-# Chart utilise : chart communautaire `onlyoffice/docs-cloud` (ArtifactHub) ou a defaut
-#   manifest raw derive de l'image officielle `onlyoffice/documentserver`.
-#   repo Helm : https://onlyoffice.github.io/docs-cloud-chart (a valider au deploiement)
+# Component: OnlyOffice Document Server Community Edition >= 9.4 — study 1.5 L.192-199
+# Chart used: community chart `onlyoffice/docs-cloud` (ArtifactHub) or, failing that,
+#   a raw manifest derived from the official `onlyoffice/documentserver` image.
+#   Helm repo: https://onlyoffice.github.io/docs-cloud-chart (to be confirmed at deployment)
 #
-# 1.5 L.198 — architecture cible retenue DES LA CONCEPTION INITIALE : cluster Document
-# Server + load balancer + Redis (stockage de session), plutot qu'une instance unique a
-# faire evoluer plus tard — plus simple a anticiper en infra qu'a retrofitter.
+# 1.5 L.198 — target architecture chosen FROM THE INITIAL DESIGN: Document Server
+# cluster + load balancer + Redis (session storage), rather than a single instance to
+# be evolved later — simpler to plan for in infra than to retrofit.
 #
-# Convention : ce fichier porte les valeurs communes (image, Redis, integration Seafile
-# WOPI/connecteur officiel) ; le dimensionnement chiffre (replicas/resources) est dans
-# les overlays onlyoffice-100.yaml / onlyoffice-2000.yaml.
+# Convention: this file carries the common values (image, Redis, Seafile WOPI
+# integration/official connector); the numeric sizing (replicas/resources) is in the
+# onlyoffice-100.yaml / onlyoffice-2000.yaml overlays.
 
 image:
   repository: onlyoffice/documentserver
   tag: "9.4"
 
-# 1.5 L.198 — cluster explicite : plusieurs replicas Document Server derriere un load
-# balancer (Service ClusterIP + Ingress), avec Redis partage pour la session.
+# 1.5 L.198 — explicit cluster: several Document Server replicas behind a load
+# balancer (ClusterIP Service + Ingress), with shared Redis for the session.
 redis:
   enabled: true
   architecture: standalone
@@ -31,13 +31,14 @@ env:
       secretKeyRef:
         name: onlyoffice-jwt-secret
         key: secret
-  # 2.6 L.469 — `document.permissions.chat: false` : ce parametre se positionne au niveau
-  # de la CONFIG DE CHAQUE DOCUMENT ouvert (config JS transmise a l'ouverture depuis
-  # l'integrateur), pas au niveau serveur global de Document Server — Document Server
-  # n'expose pas de flag global equivalent. Il est donc positionne cote connecteur
-  # Seafile<->OnlyOffice (voir connectors/, hors perimetre de ce depot), qui doit inclure
-  # `"permissions": {"chat": false}` dans le JSON de config de chaque document ouvert
-  # depuis Seafile. Documente ici pour memoire (2.6 L.469-473).
+  # 2.6 L.469 — `document.permissions.chat: false`: this parameter is set at the
+  # level of the CONFIG OF EACH DOCUMENT opened (JS config passed at opening time by
+  # the integrator), not at the global Document Server level — Document Server does
+  # not expose an equivalent global flag. It is therefore set on the
+  # Seafile<->OnlyOffice connector side (see connectors/, out of scope for this
+  # repository), which must include `"permissions": {"chat": false}` in the config
+  # JSON of every document opened from Seafile. Documented here for reference
+  # (2.6 L.469-473).
 
 persistence:
   data:
@@ -53,11 +54,11 @@ ingress:
   enabled: true
   className: ""
   hosts:
-    - host: office.open365.example.org
+    - host: office.libre365.example.org
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: onlyoffice-tls
       hosts:
-        - office.open365.example.org
+        - office.libre365.example.org

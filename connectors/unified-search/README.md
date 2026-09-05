@@ -1,53 +1,53 @@
 # unified-search
 
-Recherche unifiee par fan-out temps reel (etude 2.2). `GET /search?q=...` interroge en
-parallele Matrix (`/search`), Seafile (recherche API), Vikunja (`tasks/all?s=`) et
-Grommunio (IMAP SEARCH, stub structure), avec un timeout par service (2s par defaut)
-qui isole un service lent sans bloquer les autres reponses.
+Unified search via real-time fan-out (study 2.2). `GET /search?q=...` queries Matrix
+(`/search`), Seafile (search API), Vikunja (`tasks/all?s=`) and Grommunio (IMAP SEARCH,
+structured stub) in parallel, with a per-service timeout (2s by default) that isolates a
+slow service without blocking the other responses.
 
-## Point cle : relais de token, pas de re-authentification
+## Key point: token relay, no re-authentication
 
-Le token Bearer Keycloak de l'utilisateur (en-tete `Authorization` de la requete entrante)
-est **relaye tel quel** a chaque service source (etude 2.2 lignes 391 et 394). Ce connecteur
-ne s'authentifie jamais lui-meme a la place de l'utilisateur : chaque service source
-applique ses propres permissions nativement, evitant tout risque de fuite d'ACL propre a
-un index central pre-calcule (cf. discussion 2.2 dans l'etude).
+The user's Keycloak Bearer token (the `Authorization` header of the incoming request)
+is **relayed as-is** to each source service (study 2.2, lines 391 and 394). This connector
+never authenticates itself in place of the user: each source service applies its own
+permissions natively, avoiding any risk of ACL leakage inherent to a pre-computed
+central index (see the discussion in study 2.2).
 
 ## Grommunio / IMAP
 
-Grommunio n'expose pas d'API REST de recherche generique. `src/sources/grommunio.ts`
-pose la structure d'un appel IMAP SEARCH via `imapflow` (en commentaire, pret a etre
-active) et documente le mecanisme d'authentification XOAUTH2 permettant de relayer le
-meme token utilisateur a IMAP. L'implementation active est un stub simplifie qui simule
-une latence reseau, pour exercer correctement le fan-out/timeout de bout en bout.
+Grommunio does not expose a generic REST search API. `src/sources/grommunio.ts`
+lays out the structure of an IMAP SEARCH call via `imapflow` (commented out, ready to
+be enabled) and documents the XOAUTH2 authentication mechanism that lets the same
+user token be relayed to IMAP. The active implementation is a simplified stub that
+simulates network latency, so the fan-out/timeout logic can be exercised end to end.
 
 ## Endpoints
 
-| Methode | Route | Description |
+| Method | Route | Description |
 |---|---|---|
-| GET | `/search?q=...` | Fan-out vers les 4 sources, agregation + timeout par source |
-| GET | `/healthz` | Sonde de sante |
+| GET | `/search?q=...` | Fan-out to the 4 sources, aggregation + per-source timeout |
+| GET | `/healthz` | Health probe |
 
-## Variables d'environnement
+## Environment variables
 
-| Variable | Defaut | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `4002` | Port d'ecoute HTTP |
-| `SEARCH_TIMEOUT_MS` | `2000` | Timeout par service source |
-| `MATRIX_BASE_URL` | `https://matrix.example.org` | URL du serveur Matrix |
-| `SEAFILE_BASE_URL` | `https://seafile.example.org` | URL de Seafile |
-| `VIKUNJA_BASE_URL` | `https://vikunja.example.org` | URL de Vikunja |
-| `GROMMUNIO_IMAP_HOST` | `mail.example.org` | Hote IMAP Grommunio |
-| `GROMMUNIO_IMAP_PORT` | `993` | Port IMAP |
+| `PORT` | `4002` | HTTP listen port |
+| `SEARCH_TIMEOUT_MS` | `2000` | Per-source-service timeout |
+| `MATRIX_BASE_URL` | `https://matrix.example.org` | Matrix server URL |
+| `SEAFILE_BASE_URL` | `https://seafile.example.org` | Seafile URL |
+| `VIKUNJA_BASE_URL` | `https://vikunja.example.org` | Vikunja URL |
+| `GROMMUNIO_IMAP_HOST` | `mail.example.org` | Grommunio IMAP host |
+| `GROMMUNIO_IMAP_PORT` | `993` | IMAP port |
 
 ## Structure
 
-- `src/fanout.ts` — coeur pur du fan-out/timeout/agregation, injecte les sources en
-  parametre pour rester testable sans reseau (`test/fanout.test.ts`).
-- `src/sources/*.ts` — un connecteur HTTP/IMAP par service, relayant le token utilisateur.
-- `src/server.ts` — route Express `/search`, extraction du token depuis `Authorization`.
+- `src/fanout.ts` — pure fan-out/timeout/aggregation core, sources are injected as a
+  parameter to stay testable without network access (`test/fanout.test.ts`).
+- `src/sources/*.ts` — one HTTP/IMAP connector per service, relaying the user token.
+- `src/server.ts` — Express `/search` route, extracting the token from `Authorization`.
 
-## Developpement
+## Development
 
 ```bash
 npm install

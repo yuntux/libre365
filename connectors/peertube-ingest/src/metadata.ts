@@ -1,18 +1,18 @@
 import { MeetingMetadata } from "./types";
 
 /**
- * Extrait les metadonnees de reunion (titre, date, participants) depuis le nom d'objet
- * MinIO (etude 2.12 ligne 589 : "association des metadonnees de reunion -- titre, date,
- * participants -- extraites du nom d'objet ou de tags S3"). Fonction pure, testable
- * sans reseau ni SDK S3.
+ * Extracts meeting metadata (title, date, participants) from the MinIO object name
+ * (study 2.12 line 589: "meeting metadata association -- title, date,
+ * participants -- extracted from the object name or S3 tags"). Pure function,
+ * testable without network access or the S3 SDK.
  *
- * Convention de nommage attendue, cote export LiveKit Egress (a documenter/configurer
- * au niveau de la regle d'Egress) :
- *   <ISO-date>_<slug-titre>_<participant1>-<participant2>-....<ext>
- * ex: "2026-09-05_kickoff-projet-open365_alice-bob-carol.mp4"
+ * Expected naming convention, on the LiveKit Egress export side (to be documented/
+ * configured at the Egress rule level):
+ *   <ISO-date>_<title-slug>_<participant1>-<participant2>-....<ext>
+ * e.g.: "2026-09-05_kickoff-projet-libre365_alice-bob-carol.mp4"
  *
- * Si le nom ne suit pas ce format, retombe sur un titre derive du nom de fichier brut,
- * sans date ni participants -- degrade proprement plutot que d'echouer.
+ * If the name does not follow this format, falls back to a title derived from the
+ * raw file name, with no date or participants -- degrades gracefully rather than failing.
  */
 export function extractMeetingMetadataFromKey(objectKey: string): MeetingMetadata {
   const fileName = objectKey.split("/").pop() ?? objectKey;
@@ -24,7 +24,7 @@ export function extractMeetingMetadataFromKey(objectKey: string): MeetingMetadat
 
   if (!match) {
     return {
-      title: withoutExt.replace(/[-_]/g, " ").trim() || "Enregistrement de reunion",
+      title: withoutExt.replace(/[-_]/g, " ").trim() || "Meeting recording",
       date: null,
       participants: [],
     };
@@ -38,8 +38,8 @@ export function extractMeetingMetadataFromKey(objectKey: string): MeetingMetadat
   };
 }
 
-/** Applique en complement les tags S3 (`meeting-title`, `meeting-participants`) s'ils existent,
- * prioritaires sur ce qui est deduit du nom de fichier. */
+/** Additionally applies S3 tags (`meeting-title`, `meeting-participants`) when present,
+ * taking priority over what is inferred from the file name. */
 export function mergeWithS3Tags(
   base: MeetingMetadata,
   tags: Record<string, string>

@@ -1,7 +1,7 @@
 /**
- * Page de configuration du compte Filelink Gokapi. Thunderbird ouvre cette page
- * (`cloud_file.management_url`) avec un parametre `accountId` dans l'URL pour chaque
- * compte Filelink de ce provider ajoute par l'utilisateur.
+ * Configuration page for the Gokapi Filelink account. Thunderbird opens this page
+ * (`cloud_file.management_url`) with an `accountId` parameter in the URL for each
+ * Filelink account of this provider added by the user.
  */
 function getAccountId() {
   const params = new URLSearchParams(window.location.search);
@@ -32,7 +32,7 @@ async function save() {
   };
 
   await browser.storage.local.set({ [key]: config });
-  document.getElementById("status").textContent = "Enregistre.";
+  document.getElementById("status").textContent = "Saved.";
 }
 
 document.getElementById("save").addEventListener("click", save);

@@ -1,12 +1,12 @@
 /**
- * Script batch, execute en cron (etude 2.12 ligne 589 : "ce depot peut se faire en tache
- * periodique -- batch quotidien -- plus simple a operer, sans risque meme en cas de
- * panne temporaire du connecteur"). Liste les objets deposes depuis la derniere execution
- * et les depose vers PeerTube.
+ * Batch script, run via cron (study 2.12 line 589: "this upload can be done as a
+ * periodic task -- daily batch -- simpler to operate, with no risk even if the
+ * connector has a temporary outage"). Lists objects uploaded since the last run
+ * and uploads them to PeerTube.
  *
- * Usage : `node dist/batch.js [--since=2026-09-04T00:00:00Z]`
- * Sans `--since`, retombe sur "les dernieres 25 heures" (marge d'1h pour couvrir un
- * decalage d'execution du cron quotidien sans trou de couverture).
+ * Usage: `node dist/batch.js [--since=2026-09-04T00:00:00Z]`
+ * Without `--since`, falls back to "the last 25 hours" (1h margin to cover a
+ * scheduling drift of the daily cron without a coverage gap).
  */
 import { filterVideoObjects, ingestAll } from "./ingest";
 import { getObjectStream, getObjectTags, listRecentObjects } from "./minio-client";

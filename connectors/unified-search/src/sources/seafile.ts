@@ -3,9 +3,9 @@ import { SearchResultItem } from "../types";
 const SEAFILE_BASE_URL = process.env.SEAFILE_BASE_URL ?? "https://seafile.example.org";
 
 /**
- * Interroge l'API de recherche Seafile avec le token de l'utilisateur relaye tel quel
- * (etude 2.2 ligne 391) plutot qu'un compte de service, pour que Seafile applique
- * lui-meme ses permissions sur les bibliotheques/dossiers.
+ * Queries the Seafile search API with the user's token relayed as-is
+ * (study 2.2 line 391) rather than a service account, so that Seafile applies
+ * its own permissions on libraries/folders itself.
  */
 export async function searchSeafile(
   query: string,
@@ -36,7 +36,7 @@ export async function searchSeafile(
   return (data.results ?? []).map((r) => ({
     source: "seafile" as const,
     id: `${r.repo_id ?? ""}${r.fullpath ?? ""}`,
-    title: r.name ?? r.fullpath ?? "(fichier)",
+    title: r.name ?? r.fullpath ?? "(file)",
     snippet: r.content_highlight,
     url: `${SEAFILE_BASE_URL}/lib/${r.repo_id ?? ""}/file${r.fullpath ?? ""}`,
     timestamp: r.last_modified ? new Date(r.last_modified * 1000).toISOString() : undefined,

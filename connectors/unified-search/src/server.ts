@@ -16,9 +16,9 @@ app.get("/search", async (req: Request, res: Response) => {
     return;
   }
 
-  // Le token Bearer Keycloak de l'utilisateur est relaye tel quel a chaque service
-  // source (etude 2.2 ligne 391, 394) : ce connecteur ne s'authentifie jamais lui-meme
-  // aupres de Matrix/Seafile/Vikunja/Grommunio a la place de l'utilisateur.
+  // The user's Keycloak Bearer token is relayed as-is to each source service
+  // (study 2.2 lines 391, 394): this connector never authenticates itself
+  // with Matrix/Seafile/Vikunja/Grommunio in place of the user.
   const authHeader = req.header("authorization") ?? "";
   const userToken = authHeader.replace(/^Bearer\s+/i, "");
   if (!userToken) {

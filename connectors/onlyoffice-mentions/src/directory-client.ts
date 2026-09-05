@@ -1,15 +1,15 @@
 import { DirectoryUser } from "./types";
 
 const KEYCLOAK_BASE_URL = process.env.KEYCLOAK_BASE_URL ?? "https://auth.example.org";
-const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM ?? "open365";
+const KEYCLOAK_REALM = process.env.KEYCLOAK_REALM ?? "libre365";
 const KEYCLOAK_ADMIN_TOKEN = process.env.KEYCLOAK_ADMIN_TOKEN ?? "";
 
 /**
- * Stub simple d'annuaire via l'API Admin Keycloak (etude 2.7 : "onRequestUsers doit
- * interroger l'annuaire -- stub simple : Keycloak Admin API pour lister les
- * utilisateurs du realm"). Un service-account Keycloak avec le role `view-users`
- * fournit `KEYCLOAK_ADMIN_TOKEN` (client_credentials, non implemente ici pour rester
- * un stub simple -- a completer avec le flux OAuth2 client-credentials en production).
+ * Simple directory stub via the Keycloak Admin API (study 2.7: "onRequestUsers must
+ * query the directory -- simple stub: Keycloak Admin API to list the
+ * realm's users"). A Keycloak service account with the `view-users` role
+ * supplies `KEYCLOAK_ADMIN_TOKEN` (client_credentials, not implemented here to stay
+ * a simple stub -- to be completed with the OAuth2 client-credentials flow in production).
  */
 export async function listRealmUsers(fetchImpl: typeof fetch = fetch): Promise<DirectoryUser[]> {
   const response = await fetchImpl(

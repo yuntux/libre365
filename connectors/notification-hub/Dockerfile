@@ -1,5 +1,5 @@
-# Build context attendu : le repertoire connectors/ (pas ce sous-dossier), pour que
-# tsconfig.base.json partage soit accessible : `docker build -f notification-hub/Dockerfile .`
+# Expected build context: the connectors/ directory (not this subfolder), so the
+# shared tsconfig.base.json is accessible: `docker build -f notification-hub/Dockerfile .`
 FROM node:20.17-alpine AS build
 WORKDIR /app
 COPY tsconfig.base.json /tsconfig.base.json

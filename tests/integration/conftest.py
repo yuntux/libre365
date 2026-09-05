@@ -1,26 +1,25 @@
 """
-Fixtures partagées pour la suite de tests d'intégration (étude, section 4.5
-"Rejeu des scénarios de test").
+Shared fixtures for the integration test suite (study, section 4.5
+"Replaying the test scenarios").
 
-Cette suite est destinée à être rejouée à la fois:
-- en local, contre la stack docker-compose (docker-compose/docker-compose.yml),
-- automatiquement contre l'environnement de recette éphémère (section 4.4/4.6),
-  via le pipeline CI/CD, sans intervention manuelle jusqu'à la validation des
-  résultats.
+This suite is meant to be replayed both:
+- locally, against the docker-compose stack (docker-compose/docker-compose.yml),
+- automatically against the ephemeral staging environment (section 4.4/4.6),
+  via the CI/CD pipeline, without manual intervention until the results are
+  validated.
 
-Toutes les URLs/ports sont donc lus depuis des variables d'environnement, avec
-des valeurs par défaut alignées sur les ports par défaut du docker-compose
-local. Ne jamais coder en dur une URL dans un fichier de test: passer par la
-fixture `base_urls`.
+All URLs/ports are therefore read from environment variables, with defaults
+aligned on the default ports of the local docker-compose. Never hard-code a
+URL in a test file: go through the `base_urls` fixture instead.
 
-Les ports par défaut eux-mêmes ne sont PAS recopiés ici en dur : ils viennent
-de `_platform_defaults.py`, généré depuis `platform.yaml` (racine du dépôt)
-par `scripts/sync_platform.py` — la même source que celle qui pilote
-`docker-compose/.env.example`. Objectif explicite : éliminer le risque de
-dérive entre les ports réellement exposés par docker-compose et ceux que
-cette suite utilise par défaut (une dérive silencieuse s'était déjà produite
-ici avant l'introduction de platform.yaml : Gokapi, PeerTube et Caddy avaient
-des ports par défaut obsolètes).
+The default ports themselves are NOT hard-coded here: they come from
+`_platform_defaults.py`, generated from `platform.yaml` (repo root) by
+`scripts/sync_platform.py` — the same source that drives
+`docker-compose/.env.example`. Explicit goal: eliminate the risk of drift
+between the ports actually exposed by docker-compose and the ones this suite
+uses by default (a silent drift had already happened here before
+platform.yaml was introduced: Gokapi, PeerTube and Caddy had stale default
+ports).
 """
 
 from __future__ import annotations
@@ -37,23 +36,23 @@ from _platform_defaults import DEFAULT_PORTS
 
 
 # ---------------------------------------------------------------------------
-# Résolution des URLs de service
+# Service URL resolution
 # ---------------------------------------------------------------------------
 
 def _env_url(var_name: str, default: str) -> str:
-    """Lit une URL de base dans l'environnement, sans slash de fin."""
+    """Reads a base URL from the environment, without a trailing slash."""
     return os.environ.get(var_name, default).rstrip("/")
 
 
 def _default_url(port_var: str, path: str = "") -> str:
-    """URL localhost par défaut construite à partir d'un port de
-    `_platform_defaults.DEFAULT_PORTS` (donc de `platform.yaml`)."""
+    """Default localhost URL built from a port in
+    `_platform_defaults.DEFAULT_PORTS` (i.e. from `platform.yaml`)."""
     return f"http://localhost:{DEFAULT_PORTS[port_var]}{path}"
 
 
 @dataclasses.dataclass(frozen=True)
 class BaseUrls:
-    """URLs de base de chaque brique, résolues une fois par session de test."""
+    """Base URLs of each component, resolved once per test session."""
 
     keycloak: str
     grommunio_imap_host: str
@@ -62,7 +61,7 @@ class BaseUrls:
     grommunio_smtp_port: int
     seafile: str
     onlyoffice: str
-    matrix: str  # Synapse (serveur homeserver Matrix)
+    matrix: str  # Synapse (Matrix homeserver)
     element: str
     vikunja: str
     gokapi: str
@@ -79,12 +78,13 @@ class BaseUrls:
 @pytest.fixture(scope="session")
 def base_urls() -> BaseUrls:
     """
-    URLs/hôtes des briques, par défaut cohérentes avec docker-compose/docker-compose.yml
-    (section 4.6 de l'étude: environnement docker-compose local).
+    URLs/hosts of the components, defaulting to values consistent with
+    docker-compose/docker-compose.yml (study section 4.6: local docker-compose
+    environment).
 
-    Pour pointer la suite vers l'environnement de recette éphémère (section 5.4/4.4),
-    surcharger les variables d'environnement correspondantes dans le pipeline CI/CD
-    (voir tests/integration/README.md).
+    To point the suite at the ephemeral staging environment (section 5.4/4.4),
+    override the corresponding environment variables in the CI/CD pipeline
+    (see tests/integration/README.md).
     """
     return BaseUrls(
         keycloak=_env_url("KEYCLOAK_URL", _default_url("KEYCLOAK_PORT")),
@@ -110,7 +110,7 @@ def base_urls() -> BaseUrls:
 
 
 # ---------------------------------------------------------------------------
-# Identifiants de test (jeu de données représentatif, section 4.4 point 2)
+# Test credentials (representative dataset, section 4.4 point 2)
 # ---------------------------------------------------------------------------
 
 @dataclasses.dataclass(frozen=True)
@@ -123,59 +123,57 @@ class TestUser:
 @pytest.fixture(scope="session")
 def test_user() -> TestUser:
     """
-    Utilisateur de test provisionné dans le jeu de données représentatif de
-    l'environnement de recette (section 4.4, point 2) ou dans le realm de
-    test du docker-compose local. Ne JAMAIS pointer ceci vers un compte réel
-    de production.
+    Test user provisioned in the representative dataset of the staging
+    environment (section 4.4, point 2) or in the test realm of the local
+    docker-compose. NEVER point this at a real production account.
     """
     return TestUser(
         username=os.environ.get("TEST_USER_USERNAME", "test.consultant"),
         password=os.environ.get("TEST_USER_PASSWORD", "ChangeMe123!"),
-        email=os.environ.get("TEST_USER_EMAIL", "test.consultant@open365.test"),
+        email=os.environ.get("TEST_USER_EMAIL", "test.consultant@libre365.test"),
     )
 
 
 @pytest.fixture(scope="session")
 def keycloak_realm() -> str:
-    return os.environ.get("KEYCLOAK_REALM", "open365")
+    return os.environ.get("KEYCLOAK_REALM", "libre365")
 
 
 @pytest.fixture(scope="session")
 def keycloak_client_id() -> str:
-    # Client public "direct access grants" dédié aux tests d'intégration
-    # (ne jamais réutiliser un client de production ici).
+    # Public "direct access grants" client dedicated to integration tests
+    # (never reuse a production client here).
     return os.environ.get("KEYCLOAK_CLIENT_ID", "integration-tests")
 
 
 @pytest.fixture(scope="session")
 def keycloak_client_secret() -> Optional[str]:
-    # Vide si le client Keycloak de test est public (pas de secret).
+    # Empty if the test Keycloak client is public (no secret).
     return os.environ.get("KEYCLOAK_CLIENT_SECRET") or None
 
 
 # ---------------------------------------------------------------------------
-# Attente de disponibilité des services (démarrage lent de la stack)
+# Waiting for service availability (slow stack startup)
 # ---------------------------------------------------------------------------
 
 class ServiceNotReadyError(RuntimeError):
     """
-    Levée quand un service n'est pas prêt après épuisement des tentatives.
-    Volontairement distincte des exceptions requests/urllib pour que les tests
-    échouent avec un message clair ("stack non démarrée") plutôt qu'une trace
-    opaque de connexion refusée.
+    Raised when a service is not ready after all retries are exhausted.
+    Deliberately distinct from requests/urllib exceptions so tests fail with
+    a clear message ("stack not started") rather than an opaque connection-
+    refused traceback.
     """
 
 
 @pytest.fixture(scope="session")
 def wait_for_service() -> Callable[..., None]:
     """
-    Fixture-fonction: `wait_for_service(url, expected_statuses=(200,), timeout=60, interval=2)`.
+    Fixture-function: `wait_for_service(url, expected_statuses=(200,), timeout=60, interval=2)`.
 
-    Poll une URL de healthcheck HTTP avec un backoff, pour absorber le
-    démarrage lent de la stack docker-compose avant de lancer les assertions
-    métier. En cas d'échec, lève ServiceNotReadyError avec un message
-    explicite plutôt que de laisser le premier test planter avec une
-    ConnectionError brute.
+    Polls an HTTP healthcheck URL with backoff, to absorb the slow startup of
+    the docker-compose stack before running business assertions. On failure,
+    raises ServiceNotReadyError with an explicit message instead of letting
+    the first test crash with a raw ConnectionError.
     """
 
     def _wait(
@@ -195,7 +193,7 @@ def wait_for_service() -> Callable[..., None]:
                 response = requests.get(url, timeout=request_timeout)
                 if response.status_code in expected_statuses:
                     return
-                last_error = f"HTTP {response.status_code} depuis {url}"
+                last_error = f"HTTP {response.status_code} from {url}"
             except requests.exceptions.RequestException as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
 
@@ -203,17 +201,17 @@ def wait_for_service() -> Callable[..., None]:
             current_interval = min(current_interval * 1.5, max_interval)
 
         raise ServiceNotReadyError(
-            f"Service indisponible après {timeout}s d'attente sur {url} "
-            f"(dernière erreur: {last_error}). "
-            "Vérifier que la stack docker-compose (ou l'environnement de "
-            "recette éphémère) est bien démarrée avant de lancer les tests."
+            f"Service unavailable after waiting {timeout}s on {url} "
+            f"(last error: {last_error}). "
+            "Check that the docker-compose stack (or the ephemeral staging "
+            "environment) is properly started before running the tests."
         )
 
     return _wait
 
 
 # ---------------------------------------------------------------------------
-# Authentification SSO Keycloak (grant "password" pour un utilisateur de test)
+# Keycloak SSO authentication ("password" grant for a test user)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
@@ -226,17 +224,17 @@ def keycloak_token(
     wait_for_service: Callable[..., None],
 ) -> str:
     """
-    Obtient un access_token OIDC via le grant "password" (Resource Owner
-    Password Credentials) contre Keycloak, pour un utilisateur de test.
+    Obtains an OIDC access_token via the "password" grant (Resource Owner
+    Password Credentials) against Keycloak, for a test user.
 
-    C'est le point d'entrée du scénario "authentification SSO bout en bout"
-    (étude 4.5, dernier scénario listé): ce token est ensuite présenté aux
-    autres briques (Grommunio, Seafile, Vikunja, OnlyOffice, Matrix) dans
-    test_sso_e2e.py pour vérifier qu'il est accepté partout.
+    This is the entry point of the "end-to-end SSO authentication" scenario
+    (study 4.5, last scenario listed): this token is then presented to the
+    other components (Grommunio, Seafile, Vikunja, OnlyOffice, Matrix) in
+    test_sso_e2e.py to verify it is accepted everywhere.
 
-    Le grant "password" n'est utilisé qu'en test d'intégration avec un
-    utilisateur de test dédié: il ne doit jamais être activé sur un client
-    Keycloak de production.
+    The "password" grant is only used for integration testing with a
+    dedicated test user: it must never be enabled on a production Keycloak
+    client.
     """
     token_url = (
         f"{base_urls.keycloak}/realms/{keycloak_realm}"
@@ -260,23 +258,23 @@ def keycloak_token(
     response = requests.post(token_url, data=payload, timeout=10)
     if response.status_code != 200:
         pytest.fail(
-            "Échec de l'obtention du token Keycloak (grant password) sur "
+            "Failed to obtain the Keycloak token (password grant) on "
             f"{token_url}: HTTP {response.status_code} - {response.text[:500]}"
         )
 
     access_token = response.json().get("access_token")
     if not access_token:
-        pytest.fail(f"Réponse Keycloak sans access_token: {response.text[:500]}")
+        pytest.fail(f"Keycloak response without access_token: {response.text[:500]}")
 
     return access_token
 
 
 # ---------------------------------------------------------------------------
-# Marqueurs personnalisés (déclarés aussi dans pytest.ini, doublon volontaire
-# pour tolérer un lancement sans -c explicite)
+# Custom markers (also declared in pytest.ini, deliberate duplication to
+# tolerate running without an explicit -c)
 # ---------------------------------------------------------------------------
 
 def pytest_configure(config: pytest.Config) -> None:
-    config.addinivalue_line("markers", "smoke: scénario critique minimal (rejouable rapidement)")
-    config.addinivalue_line("markers", "slow: scénario plus long (ex: attente convergence async)")
-    config.addinivalue_line("markers", "sso: scénario d'authentification SSO bout en bout (Keycloak)")
+    config.addinivalue_line("markers", "smoke: minimal critical scenario (quick to replay)")
+    config.addinivalue_line("markers", "slow: longer scenario (e.g. waiting for async convergence)")
+    config.addinivalue_line("markers", "sso: end-to-end SSO authentication scenario (Keycloak)")

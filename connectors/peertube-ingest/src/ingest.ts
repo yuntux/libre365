@@ -14,9 +14,9 @@ export interface IngestDeps {
 }
 
 /**
- * Depose un objet MinIO vers PeerTube. Isole des SDK reseau (injectes via `deps`) pour
- * rester testable unitairement -- utilise a la fois par le webhook temps reel et le
- * batch (etude 2.12 ligne 589 : les deux modes partagent cette meme logique).
+ * Uploads a MinIO object to PeerTube. Isolated from network SDKs (injected via `deps`)
+ * to stay unit-testable -- used by both the real-time webhook and the
+ * batch (study 2.12 line 589: both modes share this same logic).
  */
 export async function ingestObject(
   candidate: IngestCandidate,
@@ -38,8 +38,8 @@ export async function ingestObject(
   }
 }
 
-/** Ingeste une liste de candidats sequentiellement (evite de saturer la bande passante
- * MinIO->PeerTube en uploadant N videos volumineuses en parallele). */
+/** Ingests a list of candidates sequentially (avoids saturating the
+ * MinIO->PeerTube bandwidth by uploading N large videos in parallel). */
 export async function ingestAll(candidates: IngestCandidate[], deps: IngestDeps): Promise<IngestResult[]> {
   const results: IngestResult[] = [];
   for (const candidate of candidates) {
@@ -48,7 +48,7 @@ export async function ingestAll(candidates: IngestCandidate[], deps: IngestDeps)
   return results;
 }
 
-/** Ne conserve que les objets susceptibles d'etre des enregistrements video exploitables. */
+/** Keeps only objects likely to be usable video recordings. */
 export function filterVideoObjects(candidates: IngestCandidate[]): IngestCandidate[] {
   return candidates.filter((c) => /\.(mp4|webm|mkv|mov)$/i.test(c.key));
 }
