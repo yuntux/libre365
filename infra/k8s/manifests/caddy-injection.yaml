@@ -1,15 +1,16 @@
-# 2.3 L.407-417 — Bandeau applicatif transverse (menu, cloche de notification, zone de
-# recherche) injecte via reverse proxy plutot qu'un portail iframe (ecarte pour raisons
-# de securite : clickjacking, cookies tiers, API navigateur degradees en iframe).
+# 2.3 L.407-417 — Cross-cutting application top bar (menu, notification bell, search
+# area) injected via reverse proxy rather than an iframe portal (ruled out for
+# security reasons: clickjacking, third-party cookies, degraded browser APIs in an
+# iframe).
 #
-# Ce ConfigMap contient uniquement le SNIPPET HTML injecte (le "bandeau"). La logique
-# d'injection elle-meme (plugin `caddy2-html-injection-plugin` ou equivalent `replace`/
-# `sub_filter` de Caddy) est configuree dans le Caddyfile, cf.
-# infra/k8s/helm-values/caddy-deployment.yaml (Caddyfile ConfigMap principal).
+# This ConfigMap only contains the injected HTML SNIPPET (the "banner"). The
+# injection logic itself (plugin `caddy2-html-injection-plugin` or Caddy's
+# equivalent `replace`/`sub_filter`) is configured in the Caddyfile, see
+# infra/k8s/helm-values/caddy-deployment.yaml (main Caddyfile ConfigMap).
 #
-# Le point d'ancrage DOM (ici la balise </body>) est fragile aux montees de version de
-# chaque application cible (2.3 L.413) : a revalider a chaque mise a jour majeure d'une
-# brique (Element Web, Seafile, Vikunja...).
+# The DOM anchor point (here the </body> tag) is fragile to version upgrades of
+# each target application (2.3 L.413): to be revalidated on every major update of a
+# component (Element Web, Seafile, Vikunja...).
 apiVersion: v1
 kind: ConfigMap
 metadata:
