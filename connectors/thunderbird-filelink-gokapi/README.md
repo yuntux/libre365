@@ -1,52 +1,52 @@
 # thunderbird-filelink-gokapi
 
-WebExtension Thunderbird (pas un service serveur) implementant un provider Filelink pour
-Gokapi (etude 2.11 ligne 559-563).
+Thunderbird WebExtension (not a backend service) implementing a Filelink provider for
+Gokapi (study 2.11, lines 559-563).
 
-## Contexte (etude 2.11)
+## Context (study 2.11)
 
-Au-dela d'un seuil de taille configurable (5 Mo par defaut), Thunderbird propose
-automatiquement d'envoyer une piece jointe via un fournisseur **Filelink** plutot qu'en
-piece jointe classique -- mecanisme deja utilise par des fournisseurs tiers existants
-(Dropbox, Box, WebDAV, instances de Send). Ce module suit ce patron deja eprouve par la
-communaute Thunderbird pour l'appliquer a **Gokapi** (etude 1.8), via l'API REST de
-Gokapi (memes points d'entree que ceux utilises par `gokapi-cli`).
+Beyond a configurable size threshold (5 MB by default), Thunderbird automatically
+offers to send an attachment via a **Filelink** provider rather than as a classic
+attachment -- a mechanism already used by existing third-party providers
+(Dropbox, Box, WebDAV, Send instances). This module follows that pattern, already
+proven by the Thunderbird community, to apply it to **Gokapi** (study 1.8), via
+Gokapi's REST API (the same endpoints used by `gokapi-cli`).
 
-## Ce que ce n'est pas
+## What this is not
 
-Ce n'est **pas** un service Node/Express comme les 5 autres connecteurs de ce depot :
-c'est une extension installee dans Thunderbird cote client. Aucun serveur a deployer ni
-Dockerfile associe.
+This is **not** a Node/Express service like the other 5 connectors in this repo:
+it is an extension installed client-side in Thunderbird. No server to deploy and
+no associated Dockerfile.
 
-## Fichiers
+## Files
 
-- `manifest.json` — manifest WebExtension minimal, `permissions: ["cloudFile", "storage"]`,
-  declaration `cloud_file` (nom du provider, page de gestion de compte).
-- `background.js` — implemente les callbacks requis par l'API `cloudFile` :
-  - `onFileUpload` : upload la piece jointe vers `POST /api/files/upload` (Gokapi),
-    retourne le lien de telechargement genere a inserer dans le corps du mail.
-  - `onFileDeleted` : purge le fichier cote Gokapi (`DELETE /api/files/delete/:id`) si
-    l'utilisateur retire la piece jointe avant l'envoi.
-  - `onAccountDeleted` : nettoyage de la configuration locale du compte.
-- `management.html` / `management.js` — page de configuration par compte (URL de
-  l'instance Gokapi, cle API, duree de conservation, nombre max de telechargements),
-  stockee via `browser.storage.local`.
+- `manifest.json` — minimal WebExtension manifest, `permissions: ["cloudFile", "storage"]`,
+  `cloud_file` declaration (provider name, account management page).
+- `background.js` — implements the callbacks required by the `cloudFile` API:
+  - `onFileUpload`: uploads the attachment to `POST /api/files/upload` (Gokapi),
+    returns the generated download link to insert into the mail body.
+  - `onFileDeleted`: purges the file on the Gokapi side (`DELETE /api/files/delete/:id`)
+    if the user removes the attachment before sending.
+  - `onAccountDeleted`: cleans up the local account configuration.
+- `management.html` / `management.js` — per-account configuration page (Gokapi
+  instance URL, API key, retention duration, max number of downloads),
+  stored via `browser.storage.local`.
 
-## Installation / test manuel
+## Installation / manual testing
 
-1. Dans Thunderbird : `Outils -> Modules complementaires et themes -> engrenage ->
-   Installer un module depuis un fichier`, en pointant vers un zip de ce dossier
-   (ou charger temporairement via `about:debugging` en mode developpeur).
-2. Dans les parametres du compte mail, section Pieces jointes / Filelink, ajouter un
-   compte "Gokapi" : la page `management.html` s'ouvre pour saisir l'URL de l'instance
-   et la cle API (associee au compte OIDC de l'expediteur, cf. etude 2.11).
-3. Joindre un fichier au-dela du seuil Filelink configure : Thunderbird propose de
-   l'envoyer via Gokapi plutot qu'en piece jointe classique.
+1. In Thunderbird: `Tools -> Add-ons and Themes -> gear icon ->
+   Install Add-on From File`, pointing to a zip of this folder
+   (or load it temporarily via `about:debugging` in developer mode).
+2. In the mail account settings, Attachments / Filelink section, add a
+   "Gokapi" account: the `management.html` page opens to enter the instance URL
+   and the API key (associated with the sender's OIDC account, see study 2.11).
+3. Attach a file above the configured Filelink threshold: Thunderbird offers to
+   send it via Gokapi rather than as a classic attachment.
 
-## Limitations assumees (stub volontaire)
+## Accepted limitations (deliberate stub)
 
-- Le format exact de la reponse `POST /api/files/upload` de Gokapi est simplifie
-  (`result?.FilesInfo?.UrlDownload ?? result?.Url ?? result?.url`) -- a ajuster a la
-  version precise de l'API Gokapi deployee en production.
-- Pas de gestion de la progression d'upload (`onFileUploadProgress`) dans cette version
-  minimale -- a ajouter si l'UX de progression devient un besoin exprime.
+- The exact format of Gokapi's `POST /api/files/upload` response is simplified
+  (`result?.FilesInfo?.UrlDownload ?? result?.Url ?? result?.url`) -- to be adjusted
+  to the exact Gokapi API version deployed in production.
+- No upload progress handling (`onFileUploadProgress`) in this minimal version --
+  to be added if progress UX becomes a stated requirement.
