@@ -27,11 +27,16 @@ source .venv/bin/activate
 pip install -r tests/integration/requirements.txt
 ```
 
-## Running locally (against docker-compose)
+## Running locally (against the dev environment)
 
-First start the stack (`docker-compose/docker-compose.yml`, maintained
-elsewhere in this repo), then run the tests from `tests/integration/` so
-that `pytest.ini` (markers, timeouts) is picked up automatically:
+First start the dev stack — `../../dev-cluster/deploy.sh` (k3d, reusing the
+production Helm charts) plus `docker compose up -d` in `docker-compose/`
+for `grommunio-dev`/`novu-mock`, see `../../dev-cluster/README.md` — then
+run the tests from `tests/integration/` so that `pytest.ini` (markers,
+timeouts) is picked up automatically. **No change is needed here** whether
+the stack is running on k3d or (previously) fully on docker-compose: the
+k3d cluster's NodePort exposure reuses the exact same `localhost:<port>`
+addresses already used by `_platform_defaults.py`/`platform.yaml`:
 
 ```bash
 cd tests/integration

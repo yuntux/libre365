@@ -196,6 +196,47 @@ jobs:
           fi
           docker compose -f "$compose_file" config
 
+  k8s-manifests-dry-run:
+    name: k8s manifests client-side validation
+    runs-on: ubuntu-latest
+    # Client-side only (`--dry-run=client`): validates YAML/schema syntax
+    # without needing a live cluster - complements helm-values-yamllint
+    # above (which only checks generic YAML syntax, not that a manifest is a
+    # structurally valid Kubernetes object) for the raw manifests
+    # introduced by the k3d dev cluster (infra/k8s/manifests/connectors/,
+    # infra/k8s/manifests/dev/) plus the pre-existing ones. Helm charts
+    # themselves (infra/k8s/helm-values/) aren't `helm template`-able here:
+    # several are third-party charts hosted on repos this environment has
+    # no guaranteed access to in a locked-down CI runner - out of scope for
+    # this fast syntax-only job, see dev-cluster/README.md for the caveats
+    # already documented around those charts.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for infra/k8s/manifests
+        id: check
+        run: |
+          if [ -d "infra/k8s/manifests" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::infra/k8s/manifests not present yet - job skipped."
+          fi
+
+      - name: Set up kubectl
+        if: steps.check.outputs.present == 'true'
+        uses: azure/setup-kubectl@v4
+
+      - name: kubectl apply --dry-run=client for every raw manifest
+        if: steps.check.outputs.present == 'true'
+        run: |
+          set -e
+          for f in $(find infra/k8s/manifests -name '*.yaml'); do
+            echo "::group::$f"
+            kubectl apply --dry-run=client --validate=true -f "$f"
+            echo "::endgroup::"
+          done
+
   platform-drift-check:
     name: Version/port drift (platform.yaml)
     runs-on: ubuntu-latest
