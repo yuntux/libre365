@@ -10,7 +10,7 @@
     {
       "description": "Study 5.3 (lines 781-784): automatic tracking of container image versions for each component. Grouped by component (one PR per application service) so each version bump can be validated independently in ephemeral staging (see ephemeral-staging.yml).",
       "matchManagers": ["dockerfile", "docker-compose", "kubernetes", "helm-values"],
-      "matchFileNames": ["docker-compose/**", "infra/k8s/helm-values/**"],
+      "matchFileNames": ["dev-cluster/**", "infra/k8s/helm-values/**"],
       "groupName": "images {{packageName}}",
       "groupSlug": "image-{{packageName}}",
       "commitMessagePrefix": "chore(images):",

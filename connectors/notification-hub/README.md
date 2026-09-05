@@ -61,8 +61,8 @@ uvicorn app.main:app --reload --port 4001
 ## Docker
 
 Self-contained build: the build context is this directory itself (no shared file
-outside it), consistent with `docker-compose/docker-compose.yml`'s
-`context: ../connectors/notification-hub`.
+outside it), consistent with how `dev-cluster/deploy.sh` builds and imports
+this image into the local k3d cluster.
 
 ```bash
 docker build -t notification-hub .   # from connectors/notification-hub/

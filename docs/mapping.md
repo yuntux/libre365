@@ -31,6 +31,6 @@ block/connector.
 | Room booking | 2.14 | No code — native Grommunio behavior, documented (`docs/room-booking.md`) |
 | Proxmox / Kubernetes infrastructure | 4.1–4.7 | `infra/terraform/`, `infra/k8s/` |
 | Single source of versions/ports (docker-compose ↔ Helm ↔ tests) | 4.1 (rebuildable IaC, without drift) | `platform.yaml`, `scripts/sync_platform.py` |
-| Dev/staging/prod environments | 4.6 | `dev-cluster/` (k3d, reuses `infra/k8s/helm-values/` + `infra/k8s/helm-values/dev/` hardening overlays), `docker-compose/` (grommunio-dev only) |
+| Dev/staging/prod environments | 4.6 | `dev-cluster/` (k3d, reuses `infra/k8s/helm-values/` + `infra/k8s/helm-values/dev/` hardening overlays, plus `dev-cluster/grommunio-dev/` docker-compose for the one brick k3d can't host) |
 | CVE monitoring / version monitoring / ephemeral staging | 5.2–5.5 | `.github/workflows/` |
 | Durable integration tests | 5.5 | `tests/integration/` |

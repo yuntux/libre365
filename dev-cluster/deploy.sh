@@ -3,8 +3,8 @@
 # charts/values (infra/k8s/helm-values/) and raw manifests
 # (infra/k8s/manifests/), with the dev-speed hardening overlays
 # (infra/k8s/helm-values/dev/) layered on top. See dev-cluster/README.md for
-# the full rationale (why k3d over docker-compose here, why some bricks
-# stay on docker-compose, what "durcir en dev" means concretely).
+# the full rationale (why k3d over docker-compose here, why grommunio-dev
+# stays on docker-compose, what "durcir en dev" means concretely).
 #
 # Requires: k3d, kubectl, helm, docker (to build the connector images), all
 # on PATH. Idempotent: safe to re-run (helm upgrade --install, kubectl apply,
@@ -88,5 +88,5 @@ Run `kubectl get pods -n libre365` to watch rollout status - some charts
 the hardened dev configuration.
 
 grommunio-dev is NOT part of this cluster - start it separately with
-`docker compose -f docker-compose/docker-compose.yml up -d`.
+`docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d`.
 EOF

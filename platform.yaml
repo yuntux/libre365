@@ -4,7 +4,7 @@
 #
 # This file is the ONLY authorized source for:
 #   - the image tags/versions used by both the development environment
-#     (docker-compose/, study 4.6) and the production target
+#     (dev-cluster/, study 4.6) and the production target
 #     (infra/k8s/helm-values, study 4.4);
 #   - the default ports exposed by docker-compose and consumed by the
 #     integration test suite (tests/integration/).
@@ -224,7 +224,7 @@ services:
 # -----------------------------------------------------------------------------
 # In-house connectors (chapter 2): no third-party version tag (built from this
 # repo), only the default port is centralized to avoid the drift already
-# observed between docker-compose/.env.example and
+# observed between the dev environment's .env.example and
 # tests/integration/conftest.py.
 # -----------------------------------------------------------------------------
 connector_ports:

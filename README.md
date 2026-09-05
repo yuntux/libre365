@@ -21,8 +21,9 @@ infra/
     manifests/       Raw manifests for building blocks without a suitable official chart
     helm-values/dev/ Dev-speed hardening overlays for the local k3d cluster
     manifests/connectors/, manifests/dev/  In-house connectors + dev-only Caddy for k3d
-dev-cluster/         Local k3d dev cluster (reuses infra/k8s/, "durcir en dev") — chapter 4.6
-docker-compose/      Reduced-scale dev/test environment (grommunio-dev only) — chapter 4.6
+dev-cluster/         Local dev environment — chapter 4.6
+  deploy.sh, redeploy.sh, destroy.sh  k3d cluster reusing infra/k8s/, "durcir en dev"
+  grommunio-dev/     docker-compose recipe for the one brick k3d can't host
 connectors/          In-house integration modules — chapter 2
 tests/integration/   Durable integration test suite — chapter 5.5
 .github/workflows/   CI/CD: CVE scanning, version monitoring, ephemeral staging — chapter 5
@@ -38,20 +39,22 @@ hard-coded.
 
 ## A single source for versions and ports: `platform.yaml`
 
-The development environment (`docker-compose/`) and the production target
+The development environment (`dev-cluster/`) and the production target
 (`infra/k8s/`) describe the same building blocks through two different
-mechanisms (Docker Hub image vs. Helm chart): without precaution, their
-version tags and their ports silently drift apart from one another — this has
-actually already happened once in this repository (the default ports in
-`tests/integration/` had diverged from those in `docker-compose/`).
+mechanisms (Docker Hub image vs. Helm chart) for the one brick that stays
+on docker-compose: without precaution, their version tags and their ports
+silently drift apart from one another — this has actually already happened
+once in this repository (the default ports in `tests/integration/` had
+diverged from those in the dev environment).
 
 [`platform.yaml`](./platform.yaml) is now the only authorized source for
 these values. It feeds:
-- the image tags in `docker-compose/docker-compose.yml` and the
+- the image tag in `dev-cluster/grommunio-dev/docker-compose.yml` and the
   `FROM python:...` lines of `connectors/*/Dockerfile`;
 - `image.repository`/`image.tag` in `infra/k8s/helm-values/*.yaml` (and the
   raw `image:` line of `infra/k8s/manifests/gokapi.yaml`);
-- the generated ports block in `docker-compose/.env.example`;
+- the generated ports block in `dev-cluster/grommunio-dev/.env.example` and
+  `dev-cluster/k3d-config.yaml`;
 - the default ports in `tests/integration/conftest.py`, via the generated
   file `tests/integration/_platform_defaults.py`.
 
@@ -77,17 +80,17 @@ production Kubernetes counterpart worth reusing — see that same README):
 
 ```bash
 # grommunio-dev (docker-compose)
-cd docker-compose
+cd dev-cluster/grommunio-dev
 cp .env.example .env
 docker compose up -d
-cd ..
+cd ../..
 
 # everything else (k3d, reusing infra/k8s/)
 ./dev-cluster/deploy.sh
 ```
 
-See [`docker-compose/README.md`](./docker-compose/README.md) and
-[`dev-cluster/README.md`](./dev-cluster/README.md) for details on the
+See [`dev-cluster/grommunio-dev/README.md`](./dev-cluster/grommunio-dev/README.md)
+and [`dev-cluster/README.md`](./dev-cluster/README.md) for details on the
 services started, their default credentials, and the fast
 edit/rebuild/observe loop (`dev-cluster/redeploy.sh`).
 

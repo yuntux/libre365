@@ -3,11 +3,13 @@
 # NOT a reuse of infra/k8s/manifests/caddy.yaml: that manifest requires a
 # custom image built with xcaddy (HTML injection plugin, internal registry -
 # see its header comment), which cannot be built or pulled from this local
-# dev cluster. This is the same simplification already applied on the
-# docker-compose side (docker-compose/config/caddy/Caddyfile): a plain
-# `caddy:2.8.4-alpine` image with a sub-path reverse proxy, WITHOUT the HTML
-# injection plugin — enough to reach every brick through one entry point
-# while developing, without reproducing the production portal behavior.
+# dev cluster. This is the same simplification the dev/test tier already
+# used before this cluster existed (a plain docker-compose Caddy service,
+# since removed along with the rest of the dev/test docker-compose bricks
+# it fronted): a plain `caddy:2.8.4-alpine` image with a sub-path reverse
+# proxy, WITHOUT the HTML injection plugin — enough to reach every brick
+# through one entry point while developing, without reproducing the
+# production portal behavior.
 #
 # Backend hostnames below are the in-cluster Service DNS names created by
 # each brick's own Helm release / raw manifest (see

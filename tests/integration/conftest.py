@@ -3,23 +3,26 @@ Shared fixtures for the integration test suite (study, section 4.5
 "Replaying the test scenarios").
 
 This suite is meant to be replayed both:
-- locally, against the docker-compose stack (docker-compose/docker-compose.yml),
+- locally, against the local dev stack (the k3d dev cluster,
+  `../../dev-cluster/deploy.sh`, plus `grommunio-dev` on docker-compose,
+  `dev-cluster/grommunio-dev/docker-compose.yml` — see
+  `../../dev-cluster/README.md`),
 - automatically against the ephemeral staging environment (section 4.4/4.6),
   via the CI/CD pipeline, without manual intervention until the results are
   validated.
 
 All URLs/ports are therefore read from environment variables, with defaults
-aligned on the default ports of the local docker-compose. Never hard-code a
-URL in a test file: go through the `base_urls` fixture instead.
+aligned on the default ports of the local dev stack. Never hard-code a URL
+in a test file: go through the `base_urls` fixture instead.
 
 The default ports themselves are NOT hard-coded here: they come from
 `_platform_defaults.py`, generated from `platform.yaml` (repo root) by
 `scripts/sync_platform.py` — the same source that drives
-`docker-compose/.env.example`. Explicit goal: eliminate the risk of drift
-between the ports actually exposed by docker-compose and the ones this suite
-uses by default (a silent drift had already happened here before
-platform.yaml was introduced: Gokapi, PeerTube and Caddy had stale default
-ports).
+`dev-cluster/grommunio-dev/.env.example` and `dev-cluster/k3d-config.yaml`.
+Explicit goal: eliminate the risk of drift between the ports actually
+exposed by the dev stack and the ones this suite uses by default (a silent
+drift had already happened here before platform.yaml was introduced:
+Gokapi, PeerTube and Caddy had stale default ports).
 """
 
 from __future__ import annotations
@@ -78,9 +81,9 @@ class BaseUrls:
 @pytest.fixture(scope="session")
 def base_urls() -> BaseUrls:
     """
-    URLs/hosts of the components, defaulting to values consistent with
-    docker-compose/docker-compose.yml (study section 4.6: local docker-compose
-    environment).
+    URLs/hosts of the components, defaulting to values consistent with the
+    local dev stack (study section 4.6: k3d dev cluster + grommunio-dev on
+    docker-compose, see ../../dev-cluster/README.md).
 
     To point the suite at the ephemeral staging environment (section 5.4/4.4),
     override the corresponding environment variables in the CI/CD pipeline

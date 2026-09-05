@@ -5,7 +5,7 @@
 # MariaDB/MongoDB/MinIO data included, since nothing here is backed by a
 # persistent volume outside the cluster). grommunio-dev (docker-compose,
 # not part of this cluster) is untouched - stop it separately with
-# `docker compose -f docker-compose/docker-compose.yml down` if needed.
+# `docker compose -f dev-cluster/grommunio-dev/docker-compose.yml down` if needed.
 
 set -euo pipefail
 

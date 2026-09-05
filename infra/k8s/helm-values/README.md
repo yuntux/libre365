@@ -10,7 +10,7 @@ directory: deployed as a Proxmox appliance VM, see chapter 4.3 and
 The `image.repository`/`image.tag` fields in this directory (and the raw
 `image:` line of `../manifests/gokapi.yaml`) are generated from
 `../../../platform.yaml` by `../../../scripts/sync_platform.py` — the same
-source as the tags used by `docker-compose/`. **Do not edit an image tag or
+source as the tag used by `../../../dev-cluster/grommunio-dev/`. **Do not edit an image tag or
 repository directly in a file in this folder**: the next `sync_platform.py`
 run would overwrite it, and CI (`platform-drift-check`) detects any manual
 edit that hasn't been resynchronized. To change a version, edit

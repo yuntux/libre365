@@ -57,14 +57,14 @@ jobs:
       - name: Check for the dev environment definitions
         id: check
         run: |
-          if [ ! -f "docker-compose/docker-compose.yml" ] || [ ! -x "dev-cluster/deploy.sh" ]; then
-            echo "::error::docker-compose/docker-compose.yml or dev-cluster/deploy.sh missing - cannot start the ephemeral staging environment."
+          if [ ! -f "dev-cluster/grommunio-dev/docker-compose.yml" ] || [ ! -x "dev-cluster/deploy.sh" ]; then
+            echo "::error::dev-cluster/grommunio-dev/docker-compose.yml or dev-cluster/deploy.sh missing - cannot start the ephemeral staging environment."
             exit 1
           fi
           echo "present=true" >> "$GITHUB_OUTPUT"
 
       - name: Start grommunio-dev (docker-compose)
-        working-directory: docker-compose
+        working-directory: dev-cluster/grommunio-dev
         run: |
           # Test dataset represented here by the default configuration of
           # the dev docker-compose (5.4, point 2: "not real production
@@ -78,7 +78,7 @@ jobs:
           docker compose up -d
 
       - name: Wait for grommunio-dev to be healthy
-        working-directory: docker-compose
+        working-directory: dev-cluster/grommunio-dev
         run: |
           script="scripts/wait-for-healthy.sh"
           if [ ! -x "$script" ] && [ ! -f "$script" ]; then
@@ -106,7 +106,7 @@ jobs:
       - name: Show the state of the services on failure
         if: failure()
         run: |
-          docker compose -f docker-compose/docker-compose.yml ps && docker compose -f docker-compose/docker-compose.yml logs --tail=200
+          docker compose -f dev-cluster/grommunio-dev/docker-compose.yml ps && docker compose -f dev-cluster/grommunio-dev/docker-compose.yml logs --tail=200
           kubectl get pods -n libre365 -o wide || true
           kubectl describe pods -n libre365 || true
 
@@ -154,4 +154,4 @@ jobs:
         if: always()
         run: |
           ./dev-cluster/destroy.sh || true
-          docker compose -f docker-compose/docker-compose.yml down -v
+          docker compose -f dev-cluster/grommunio-dev/docker-compose.yml down -v

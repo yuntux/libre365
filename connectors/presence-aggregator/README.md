@@ -61,7 +61,8 @@ uvicorn app.main:app --reload --port 4003 # or: python -m app.main
 ## Docker
 
 Build context is this directory (`connectors/presence-aggregator`), matching
-`docker-compose/docker-compose.yml`:
+how `dev-cluster/deploy.sh` builds and imports this image into the local
+k3d cluster:
 
 ```bash
 cd connectors/presence-aggregator

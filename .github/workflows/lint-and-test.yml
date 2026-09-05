@@ -189,7 +189,7 @@ jobs:
       - name: docker compose config
         run: |
           set -e
-          compose_file="docker-compose/docker-compose.yml"
+          compose_file="dev-cluster/grommunio-dev/docker-compose.yml"
           if [ ! -f "$compose_file" ]; then
             echo "::notice::$compose_file not present yet - job skipped."
             exit 0
@@ -249,7 +249,7 @@ jobs:
     name: Version/port drift (platform.yaml)
     runs-on: ubuntu-latest
     # platform.yaml (repo root) is the single source of truth for the image
-    # tags and ports shared by docker-compose/ AND infra/k8s/helm-values/
+    # tags and ports shared by dev-cluster/grommunio-dev/ AND infra/k8s/helm-values/
     # (see its header). This job guarantees that none of these consuming
     # files was hand-edited without going back through
     # `scripts/sync_platform.py` — otherwise the dev/test tier and the

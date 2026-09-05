@@ -10,8 +10,8 @@ Usage:
                                                   # would diverge from platform.yaml
 
 Files touched:
-    - docker-compose/docker-compose.yml   (image tags, patched in place)
-    - docker-compose/.env.example         (generated ports block)
+    - dev-cluster/grommunio-dev/docker-compose.yml (image tag, patched in place)
+    - dev-cluster/grommunio-dev/.env.example       (generated ports block)
     - infra/k8s/helm-values/*.yaml        (image.repository / image.tag)
     - infra/k8s/manifests/gokapi.yaml     (raw `image:` line)
     - connectors/*/Dockerfile             (Node base tag, patched in place)
@@ -94,7 +94,7 @@ def sub_from_tag(text: str, repository: str, new_tag: str) -> str:
 
 
 def compute_compose_changes(platform: dict) -> list[Change]:
-    compose_path = REPO_ROOT / "docker-compose" / "docker-compose.yml"
+    compose_path = REPO_ROOT / "dev-cluster" / "grommunio-dev" / "docker-compose.yml"
     text = compose_path.read_text()
 
     for _name, svc in platform["services"].items():
@@ -265,7 +265,7 @@ def compute_k3d_config_change(platform: dict) -> list[Change]:
 
 
 def compute_env_example_changes(platform: dict) -> list[Change]:
-    path = REPO_ROOT / "docker-compose" / ".env.example"
+    path = REPO_ROOT / "dev-cluster" / "grommunio-dev" / ".env.example"
     text = path.read_text()
 
     lines = [PORTS_BEGIN, GENERATED_HEADER.rstrip("\n")]
@@ -298,7 +298,7 @@ def compute_test_defaults_changes(platform: dict) -> list[Change]:
         "Do NOT edit by hand: the default values in tests/integration/conftest.py",
         "must stay aligned with docker-compose's default ports (study 4.6) —",
         "that is precisely what this file guarantees, by being generated from the",
-        "same source as docker-compose/.env.example.",
+        "same source as dev-cluster/grommunio-dev/.env.example.",
         '"""',
         "",
         "DEFAULT_PORTS = {",

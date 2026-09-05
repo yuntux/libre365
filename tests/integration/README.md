@@ -30,8 +30,9 @@ pip install -r tests/integration/requirements.txt
 ## Running locally (against the dev environment)
 
 First start the dev stack — `../../dev-cluster/deploy.sh` (k3d, reusing the
-production Helm charts) plus `docker compose up -d` in `docker-compose/`
-for `grommunio-dev`, see `../../dev-cluster/README.md` — then
+production Helm charts) plus `docker compose up -d` in
+`dev-cluster/grommunio-dev/` for `grommunio-dev`, see
+`../../dev-cluster/README.md` — then
 run the tests from `tests/integration/` so that `pytest.ini` (markers,
 timeouts) is picked up automatically. **No change is needed here** whether
 the stack is running on k3d or (previously) fully on docker-compose: the
@@ -61,17 +62,18 @@ running the business assertions.
 
 ## Environment variables
 
-Every service URL has a default consistent with
-`docker-compose/docker-compose.yml`, but can be overridden to point the
-suite at another environment (local dev with remapped ports, or the
-ephemeral staging environment - study 4.4/5.4).
+Every service URL has a default consistent with the local dev stack (k3d +
+`dev-cluster/grommunio-dev/docker-compose.yml`), but can be overridden to
+point the suite at another environment (local dev with remapped ports, or
+the ephemeral staging environment - study 4.4/5.4).
 
 These defaults are **not** hand-copied: they come from
 `_platform_defaults.py`, generated from `../../platform.yaml` (repo root)
 by `../../scripts/sync_platform.py` — the same source that drives the
-ports in `docker-compose/.env.example` and the image tags in
-`infra/k8s/helm-values/`. To change a default port, edit `platform.yaml`,
-never `_platform_defaults.py` or `conftest.py` directly.
+ports in `dev-cluster/grommunio-dev/.env.example`, `dev-cluster/k3d-config.yaml`,
+and the image tags in `infra/k8s/helm-values/`. To change a default port,
+edit `platform.yaml`, never `_platform_defaults.py` or `conftest.py`
+directly.
 
 | Variable                     | Default                     | Component                          |
 |-------------------------------|-----------------------------|----------------------------------|
