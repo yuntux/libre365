@@ -1,6 +1,6 @@
-# Provider Proxmox retenu explicitement par l'étude (chapitre 4.2) : bpg/proxmox,
-# provider Terraform/OpenTofu mature permettant de décrire les VM Proxmox de façon
-# déclarative (nœuds Kubernetes + VM appliance Grommunio, cf. 4.3).
+# Proxmox provider explicitly chosen by the study (chapter 4.2): bpg/proxmox,
+# a mature Terraform/OpenTofu provider allowing Proxmox VMs to be described
+# declaratively (Kubernetes nodes + Grommunio appliance VM, see 4.3).
 terraform {
   required_version = ">= 1.7.0"
 
@@ -11,16 +11,16 @@ terraform {
     }
   }
 
-  # Backend local par défaut (adapté au dépôt seul, sans dépendance externe).
-  # Pour un usage en équipe/CI, préférer un backend distant partagé afin d'éviter
-  # les conflits d'état entre exploitants (cohérent avec l'exigence de
-  # reconstruction depuis le dépôt seul, chapitre 4.1) :
+  # Local backend by default (suitable for a single repository, no external
+  # dependency). For team/CI use, prefer a shared remote backend to avoid
+  # state conflicts between operators (consistent with the requirement to be
+  # rebuildable from the repository alone, chapter 4.1):
   #
   # backend "s3" {
   #   endpoints                  = { s3 = "https://minio.example.internal:9000" }
   #   bucket                     = "libre365-terraform-state"
   #   key                        = "proxmox/terraform.tfstate"
-  #   region                     = "us-east-1" # valeur imposée par le provider S3, sans effet chez MinIO
+  #   region                     = "us-east-1" # value imposed by the S3 provider, has no effect with MinIO
   #   skip_credentials_validation = true
   #   skip_region_validation      = true
   #   skip_metadata_api_check     = true

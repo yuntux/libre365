@@ -1,87 +1,86 @@
-# Terraform/OpenTofu — infrastructure Proxmox
+# Terraform/OpenTofu — Proxmox infrastructure
 
-Matérialise l'infrastructure décrite au chapitre 4 de l'étude
-(`sortie-office365-etude.md`) : hyperviseur **Proxmox VE**, provider
-**`bpg/proxmox`** (4.2), VM appliance **Grommunio** hors cluster Kubernetes
-(4.3, "Exception assumée"), nœuds du cluster **Kubernetes** cible de
-production (4.4).
+Materializes the infrastructure described in chapter 4 of the study
+(`office365-exit-study.md`): **Proxmox VE** hypervisor, **`bpg/proxmox`**
+provider (4.2), **Grommunio** appliance VM outside the Kubernetes cluster
+(4.3, "Assumed exception"), production-target **Kubernetes** cluster nodes
+(4.4).
 
-Ce code n'est **pas appliqué** dans ce dépôt : aucune infrastructure Proxmox
-réelle n'y est associée, et **aucune credential n'y est committée**.
+This code is **not applied** in this repository: no real Proxmox
+infrastructure is associated with it, and **no credentials are committed**.
 
-## Fichiers
+## Files
 
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `versions.tf` | Provider `bpg/proxmox`, backend (local par défaut, exemple S3/MinIO en commentaire) |
-| `variables.tf` | Toutes les variables d'entrée, dont `deployment_scale` (`"100"` / `"2000"`) |
-| `locals.tf` | Table de dimensionnement par échelle (`sizing_by_scale`), reprenant les chiffres de l'étude (1.1, 1.2, 1.7) |
-| `grommunio.tf` | VM appliance Grommunio (ISO), dimensionnée par `local.sizing.grommunio` |
-| `kubernetes_nodes.tf` | Nœuds control-plane + workers du cluster Kubernetes, nombre de workers dérivé de `deployment_scale` |
-| `network.tf` | Modèle d'interface réseau (bridge/VLAN) partagé par les VM |
-| `outputs.tf` | IPs et noms de VM à consommer par l'inventaire Ansible |
-| `terraform.tfvars.example` | Valeurs d'exemple à copier en `terraform.tfvars` (jamais committé) |
+| `versions.tf` | `bpg/proxmox` provider, backend (local by default, S3/MinIO example in a comment) |
+| `variables.tf` | All input variables, including `deployment_scale` (`"100"` / `"2000"`) |
+| `locals.tf` | Sizing table by scale (`sizing_by_scale`), reusing the study's figures (1.1, 1.2, 1.7) |
+| `grommunio.tf` | Grommunio appliance VM (ISO), sized via `local.sizing.grommunio` |
+| `kubernetes_nodes.tf` | Kubernetes cluster control-plane + worker nodes, worker count derived from `deployment_scale` |
+| `network.tf` | Network interface model (bridge/VLAN) shared by the VMs |
+| `outputs.tf` | VM IPs and names to be consumed by the Ansible inventory |
+| `terraform.tfvars.example` | Example values to copy to `terraform.tfvars` (never committed) |
 
-## Prérequis avant un `terraform apply` réel
+## Prerequisites before a real `terraform apply`
 
-1. Un cluster Proxmox VE joignable (`proxmox_endpoint`), avec un jeton d'API
-   dédié (`user@realm!tokenid=uuid`, permissions `VM.Allocate`,
-   `Datastore.AllocateSpace`, `Sys.Modify` a minima).
-2. Une image ISO d'appliance Grommunio déjà téléversée sur le storage ISO du
-   nœud Proxmox, référencée par `grommunio_iso_file_id`.
-3. Une cloud image (Debian/Ubuntu) téléversée ou importable, référencée par
+1. A reachable Proxmox VE cluster (`proxmox_endpoint`), with a dedicated API
+   token (`user@realm!tokenid=uuid`, `VM.Allocate`, `Datastore.AllocateSpace`,
+   `Sys.Modify` permissions at a minimum).
+2. A Grommunio appliance ISO image already uploaded to the ISO storage of the
+   Proxmox node, referenced by `grommunio_iso_file_id`.
+3. A cloud image (Debian/Ubuntu) uploaded or importable, referenced by
    `kubernetes_cloud_image_file_id`.
-4. Un VLAN/bridge réseau existant côté hyperviseur (`network_bridge`,
-   `network_vlan_id`) — ce dépôt ne configure pas la couche réseau physique
-   du nœud Proxmox lui-même, seulement les interfaces des VM.
+4. An existing network VLAN/bridge on the hypervisor side (`network_bridge`,
+   `network_vlan_id`) — this repository does not configure the physical
+   network layer of the Proxmox node itself, only the VM interfaces.
 
-## Utilisation
+## Usage
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
-# éditer terraform.tfvars avec les vraies valeurs de l'environnement cible —
-# ne jamais committer ce fichier (déjà exclu via .gitignore à la racine du dépôt)
+# edit terraform.tfvars with the real values of the target environment —
+# never commit this file (already excluded via .gitignore at the repo root)
 
 tofu init
 tofu plan -var-file=terraform.tfvars
-tofu apply -var-file=terraform.tfvars   # non exécuté dans le cadre de ce dépôt
+tofu apply -var-file=terraform.tfvars   # not run as part of this repository
 ```
 
-Le provider retenu (`bpg/proxmox`) fonctionne indifféremment avec Terraform
-ou OpenTofu ; les exemples ci-dessus utilisent `tofu`, substituer `terraform`
-si préféré.
+The chosen provider (`bpg/proxmox`) works equally well with Terraform or
+OpenTofu; the examples above use `tofu`, substitute `terraform` if preferred.
 
 ## Secrets
 
-`proxmox_api_token` est marquée `sensitive` mais **reste en clair dans l'état
-Terraform** comme toute variable sensible native — cohérent avec l'étude
-4.5 ("gestion des secrets externalisée dans un coffre-fort dédié, jamais en
-clair dans le dépôt de code") : en production, ce jeton doit être injecté via
-une variable d'environnement (`TF_VAR_proxmox_api_token`) alimentée par le
-coffre-fort (Vault ou équivalent), jamais écrit dans `terraform.tfvars` sur un
-poste ou un runner CI.
+`proxmox_api_token` is marked `sensitive` but **remains in plaintext in the
+Terraform state** like any native sensitive variable — consistent with study
+section 4.5 ("secrets management externalized to a dedicated vault, never in
+plaintext in the code repository"): in production, this token must be
+injected via an environment variable (`TF_VAR_proxmox_api_token`) fed by the
+vault (Vault or equivalent), never written to `terraform.tfvars` on a
+workstation or a CI runner.
 
-## Trajectoire de croissance (100 → 2000 → au-delà)
+## Growth trajectory (100 → 2000 → beyond)
 
-- `deployment_scale = "100"` ou `"2000"` pilote entièrement le dimensionnement
-  des VM (`locals.tf`) et le nombre de workers Kubernetes — aucune autre
-  variable à modifier pour ce palier.
-- **Au-delà de 2000 utilisateurs**, l'étude documente des changements de
-  *topologie*, pas une simple extrapolation de ces chiffres :
-  - Grommunio : bascule vers l'architecture multi-serveurs "share-nothing"
-    documentée par l'éditeur (cluster Corosync/Pacemaker) plutôt qu'une VM
-    appliance unique surdimensionnée (1.1) — nécessiterait un nouveau fichier
-    `grommunio-cluster.tf` distinct de `grommunio.tf`.
-  - Matrix/Synapse : bascule en mode "workers" (déjà retenu comme cible dès la
-    conception, 1.2) — le pod Synapse unique devient plusieurs déploiements
-    Kubernetes spécialisés, sans changement côté Terraform (le cluster
-    Kubernetes absorbe la charge par ajout de workers).
+- `deployment_scale = "100"` or `"2000"` fully drives the VM sizing
+  (`locals.tf`) and the number of Kubernetes workers — no other variable
+  needs to be changed for this tier.
+- **Beyond 2000 users**, the study documents *topology* changes, not a
+  simple extrapolation of these figures:
+  - Grommunio: switches to the multi-server "share-nothing" architecture
+    documented by the vendor (Corosync/Pacemaker cluster) rather than a
+    single oversized appliance VM (1.1) — would require a new
+    `grommunio-cluster.tf` file distinct from `grommunio.tf`.
+  - Matrix/Synapse: switches to "workers" mode (already chosen as the target
+    from the design stage, 1.2) — the single Synapse pod becomes several
+    specialized Kubernetes deployments, with no change on the Terraform side
+    (the Kubernetes cluster absorbs the load by adding workers).
 
-## Backend d'état distant
+## Remote state backend
 
-Le backend local (par défaut, `versions.tf`) convient à un usage
-mono-exploitant. Pour une équipe ou un pipeline CI/CD (chapitre 5), activer le
-backend S3 commenté dans `versions.tf`, pointé vers une instance **MinIO**
-auto-hébergée — cohérent avec le choix déjà fait pour la plateforme vidéo
-d'entreprise (étude 2.12) plutôt que d'introduire un service cloud tiers
-supplémentaire pour le seul état Terraform.
+The local backend (default, `versions.tf`) is suitable for a single-operator
+use case. For a team or a CI/CD pipeline (chapter 5), enable the S3 backend
+commented out in `versions.tf`, pointing to a self-hosted **MinIO**
+instance — consistent with the choice already made for the enterprise video
+platform (study 2.12) rather than introducing an additional third-party
+cloud service for Terraform state alone.

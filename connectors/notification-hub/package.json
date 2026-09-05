@@ -1,7 +1,7 @@
 {
   "name": "@libre365/notification-hub",
   "version": "1.0.0",
-  "description": "Centre de notifications unifie - ingestion Matrix/Grommunio/Seafile/Vikunja/OnlyOffice vers Novu (etude 2.1, 2.7)",
+  "description": "Unified notification center - Matrix/Grommunio/Seafile/Vikunja/OnlyOffice ingestion to Novu (study 2.1, 2.7)",
   "private": true,
   "main": "dist/server.js",
   "scripts": {

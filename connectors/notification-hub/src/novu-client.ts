@@ -1,13 +1,13 @@
 import { NormalizedEvent } from "./types";
 
 /**
- * Relais vers l'API Novu via appel REST direct plutot que le SDK @novu/node,
- * pour eviter une dependance lourde dans ce connecteur mince (etude 2.1 ligne 382 :
- * "Novu pour l'UI de centre de notif ... alimente par des connecteurs custom").
+ * Relay to the Novu API via a direct REST call rather than the @novu/node SDK,
+ * to avoid a heavy dependency in this thin connector (study 2.1 line 382:
+ * "Novu for the notification center UI ... fed by custom connectors").
  */
 const NOVU_API_URL = process.env.NOVU_API_URL ?? "https://api.novu.co/v1";
 const NOVU_API_KEY = process.env.NOVU_API_KEY ?? "";
-// Workflow trigger identifier configure cote Novu, commun a toutes les sources.
+// Workflow trigger identifier configured on the Novu side, shared by all sources.
 const NOVU_WORKFLOW_ID = process.env.NOVU_WORKFLOW_ID ?? "libre365-unified-notification";
 
 export interface NovuTriggerResult {

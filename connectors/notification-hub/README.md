@@ -1,55 +1,55 @@
 # notification-hub
 
-Centre de notifications unifie (etude 2.1 et 2.7). Recoit les webhooks de Matrix
-(Application Service), Grommunio, Seafile, Vikunja et OnlyOffice (mentions), normalise
-chaque evenement au format commun `{source, eventType, userId, title, body, actionUrl, timestamp}`,
-puis declenche une notification Novu via l'API REST (`events/trigger`).
+Unified notification center (study 2.1 and 2.7). Receives webhooks from Matrix
+(Application Service), Grommunio, Seafile, Vikunja and OnlyOffice (mentions), normalizes
+each event to the common format `{source, eventType, userId, title, body, actionUrl, timestamp}`,
+then triggers a Novu notification via the REST API (`events/trigger`).
 
-## Pourquoi pas `@novu/node` ?
-Appel REST direct pour rester un connecteur mince (etude 2.1 ligne 374 : "reproductible en
-quelques centaines de lignes"), sans dependance SDK supplementaire a suivre.
+## Why not `@novu/node`?
+Direct REST call to keep the connector thin (study 2.1, line 374: "reproducible in
+a few hundred lines"), with no extra SDK dependency to maintain.
 
 ## Endpoints
 
-| Methode | Route | Source |
+| Method | Route | Source |
 |---|---|---|
 | POST | `/webhooks/matrix` | Matrix Application Service (message/mention) |
-| POST | `/webhooks/grommunio` | Grommunio (nouveau mail) |
-| POST | `/webhooks/seafile` | Seafile (partage de fichier) |
-| POST | `/webhooks/vikunja` | Vikunja (tache assignee) |
-| POST | `/webhooks/onlyoffice-mention` | OnlyOffice `onRequestSendNotify` relaye par `connectors/onlyoffice-mentions` |
-| GET | `/healthz` | Sonde de sante |
+| POST | `/webhooks/grommunio` | Grommunio (new mail) |
+| POST | `/webhooks/seafile` | Seafile (file share) |
+| POST | `/webhooks/vikunja` | Vikunja (task assigned) |
+| POST | `/webhooks/onlyoffice-mention` | OnlyOffice `onRequestSendNotify` relayed by `connectors/onlyoffice-mentions` |
+| GET | `/healthz` | Health probe |
 
-## Variables d'environnement
+## Environment variables
 
-| Variable | Defaut | Description |
+| Variable | Default | Description |
 |---|---|---|
-| `PORT` | `4001` | Port d'ecoute HTTP |
-| `NOVU_API_URL` | `https://api.novu.co/v1` | URL de l'API Novu (self-hosted ou cloud) |
-| `NOVU_API_KEY` | (vide) | Cle API Novu |
-| `NOVU_WORKFLOW_ID` | `libre365-unified-notification` | Identifiant du workflow Novu declenche |
+| `PORT` | `4001` | HTTP listen port |
+| `NOVU_API_URL` | `https://api.novu.co/v1` | Novu API URL (self-hosted or cloud) |
+| `NOVU_API_KEY` | (empty) | Novu API key |
+| `NOVU_WORKFLOW_ID` | `libre365-unified-notification` | Identifier of the triggered Novu workflow |
 
 ## Structure
 
-- `src/normalize.ts` — fonctions pures de normalisation, une par source. Aucun effet de
-  bord, testables sans reseau.
-- `src/novu-client.ts` — relais REST vers Novu.
-- `src/server.ts` — routes Express, cablage normalisation -> Novu.
+- `src/normalize.ts` — pure normalization functions, one per source. No side
+  effects, testable without network access.
+- `src/novu-client.ts` — REST relay to Novu.
+- `src/server.ts` — Express routes, wiring normalization -> Novu.
 
-## Developpement
+## Development
 
 ```bash
 npm install
-npm test        # vitest sur src/normalize.ts
+npm test        # vitest on src/normalize.ts
 npm run build
 npm start
 ```
 
 ## Docker
 
-Le build necessite le fichier partage `../tsconfig.base.json` : construire avec le
-repertoire `connectors/` comme contexte.
+The build requires the shared `../tsconfig.base.json` file: build with the
+`connectors/` directory as the context.
 
 ```bash
-docker build -f notification-hub/Dockerfile -t notification-hub .   # depuis connectors/
+docker build -f notification-hub/Dockerfile -t notification-hub .   # from connectors/
 ```

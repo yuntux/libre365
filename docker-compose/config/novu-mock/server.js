@@ -1,21 +1,23 @@
 /*
- * Mock leger de l'API Novu pour l'environnement docker-compose dev/test.
+ * Lightweight mock of the Novu API for the docker-compose dev/test
+ * environment.
  *
- * Pourquoi un mock plutot que la vraie stack Novu (etude 2.1) :
- * l'infrastructure Novu de reference assemble novu/api + novu/worker +
- * novu/ws + novu/web + MongoDB + Redis (et optionnellement un service de
- * mail) - lourd pour un environnement de test rapide en CI et redondant
- * avec le vrai objectif ici, qui est de tester les CONNECTEURS
- * (notification-hub, onlyoffice-mentions, presence-aggregator...) plutot
- * que Novu lui-meme. Ce mock expose donc uniquement la surface minimale que
- * ces connecteurs appellent en pratique : un endpoint de sante et un
- * endpoint d'ingestion d'evenement (equivalent simplifie de
- * POST /v1/events/trigger de l'API Novu), qui journalise et acquitte.
+ * Why a mock rather than the real Novu stack (study 2.1):
+ * the reference Novu infrastructure assembles novu/api + novu/worker +
+ * novu/ws + novu/web + MongoDB + Redis (and optionally a mail service) -
+ * heavy for a fast test environment in CI, and redundant with the real
+ * goal here, which is to test the CONNECTORS (notification-hub,
+ * onlyoffice-mentions, presence-aggregator...) rather than Novu itself.
+ * This mock therefore only exposes the minimal surface that these
+ * connectors actually call: a health endpoint and an event ingestion
+ * endpoint (a simplified equivalent of Novu's API
+ * POST /v1/events/trigger), which logs and acknowledges.
  *
- * Pour un test d'integration bout-en-bout AVEC le vrai Novu (recette,
- * etude 4.4/5.5), remplacer ce service par le docker-compose officiel Novu
- * documente sur https://docs.novu.co/self-hosting - non duplique ici pour
- * eviter la derive de configuration entre deux definitions de la stack.
+ * For an end-to-end integration test WITH the real Novu (staging,
+ * study 4.4/5.5), replace this service with the official Novu
+ * docker-compose documented at https://docs.novu.co/self-hosting - not
+ * duplicated here to avoid configuration drift between two definitions of
+ * the stack.
  */
 const http = require("http");
 

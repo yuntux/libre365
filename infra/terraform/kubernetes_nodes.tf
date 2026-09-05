@@ -1,18 +1,17 @@
-# Cluster Kubernetes — étude 4.4 : orchestrateur retenu dès la conception
-# initiale (100 utilisateurs) pour que la montée en charge vers 2000+ se
-# traduise par un ajout de nœuds/réplicas plutôt qu'une migration
-# d'orchestrateur en cours de croissance. Les nœuds sont des VM Proxmox (4.2),
-# pas de déploiement bare-metal.
+# Kubernetes cluster — study 4.4: orchestrator chosen from the initial design
+# stage (100 users) so that scaling up to 2000+ translates into adding
+# nodes/replicas rather than an orchestrator migration mid-growth. The nodes
+# are Proxmox VMs (4.2), not a bare-metal deployment.
 #
-# Le nombre de workers est dérivé de deployment_scale (locals.sizing) : 3 pour
-# 100 utilisateurs, 6 pour 2000 — cf. locals.tf pour la table complète.
-# Le control-plane reste à 3 nœuds sur les deux paliers (quorum etcd standard).
+# The worker count is derived from deployment_scale (locals.sizing): 3 for
+# 100 users, 6 for 2000 — see locals.tf for the full table. The control plane
+# stays at 3 nodes across both tiers (standard etcd quorum).
 #
-# Bootstrap : cloud-init installe les prérequis (containerd, kubeadm) ; le
-# bootstrap effectif du cluster (kubeadm init/join, CNI) est ensuite piloté par
-# Ansible (infra/ansible/playbooks/kubernetes.yml, hors périmètre de ce dépôt à
-# ce stade — cf. README) pour rester cohérent avec le partage Terraform
-# (infrastructure) / Ansible (configuration) de l'étude 4.5.
+# Bootstrap: cloud-init installs the prerequisites (containerd, kubeadm); the
+# actual cluster bootstrap (kubeadm init/join, CNI) is then driven by Ansible
+# (infra/ansible/playbooks/kubernetes.yml, out of scope for this repository
+# at this stage — see README) to stay consistent with the study's Terraform
+# (infrastructure) / Ansible (configuration) split (4.5).
 
 locals {
   k8s_cloud_init_common = <<-EOT
@@ -45,7 +44,7 @@ resource "proxmox_virtual_environment_vm" "k8s_control_plane" {
   count = local.sizing.k8s_control_plane_count
 
   name        = "${local.name_prefix}-k8s-cp-${count.index + 1}"
-  description = "Nœud control-plane Kubernetes ${count.index + 1}/${local.sizing.k8s_control_plane_count}"
+  description = "Kubernetes control-plane node ${count.index + 1}/${local.sizing.k8s_control_plane_count}"
   tags        = ["libre365", "kubernetes", "control-plane", var.environment]
 
   node_name = var.proxmox_node_names[count.index % local.proxmox_node_count]
@@ -67,9 +66,9 @@ resource "proxmox_virtual_environment_vm" "k8s_control_plane" {
     discard      = "on"
   }
 
-  # Import de la cloud image comme disque de base, plutôt qu'une installation
-  # ISO complète — cohérent avec des nœuds sans état à recréer facilement
-  # (contrairement à Grommunio, cf. grommunio.tf).
+  # Importing the cloud image as the base disk, rather than a full ISO
+  # installation — consistent with stateless nodes that are easy to
+  # recreate (unlike Grommunio, see grommunio.tf).
   disk {
     datastore_id = var.storage_pool
     interface    = "scsi1"
@@ -111,7 +110,7 @@ resource "proxmox_virtual_environment_vm" "k8s_worker" {
   count = local.sizing.k8s_worker_count
 
   name        = "${local.name_prefix}-k8s-worker-${count.index + 1}"
-  description = "Nœud worker Kubernetes ${count.index + 1}/${local.sizing.k8s_worker_count}"
+  description = "Kubernetes worker node ${count.index + 1}/${local.sizing.k8s_worker_count}"
   tags        = ["libre365", "kubernetes", "worker", var.environment]
 
   node_name = var.proxmox_node_names[count.index % local.proxmox_node_count]
@@ -146,10 +145,10 @@ resource "proxmox_virtual_environment_vm" "k8s_worker" {
     firewall = local.network_interface_template.firewall
   }
 
-  # Les workers restent en DHCP par défaut (pas de dépendance externe critique
-  # sur leur adresse — contrairement au control-plane, qui expose l'API server
-  # à une IP connue de kubeadm join) ; adapter si le DHCP n'est pas disponible
-  # sur le VLAN cible.
+  # Workers stay on DHCP by default (no critical external dependency on
+  # their address — unlike the control plane, which exposes the API server
+  # at an address known to kubeadm join); adapt if DHCP is not available on
+  # the target VLAN.
   initialization {
     ip_config {
       ipv4 {

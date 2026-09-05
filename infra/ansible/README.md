@@ -1,39 +1,39 @@
-# Ansible — configuration applicative
+# Ansible — application configuration
 
-Porte la configuration applicative des briques provisionnées par Terraform
-(`infra/terraform/`), conformément au partage retenu au chapitre 4.5 de
-l'étude : *"Provisionnement de l'infrastructure [...] Terraform ; configuration
-applicative [...] automatisée via des playbooks (Ansible)"*.
+Carries the application configuration of the components provisioned by
+Terraform (`infra/terraform/`), in line with the split adopted in chapter 4.5
+of the study: *"Infrastructure provisioning [...] Terraform; application
+configuration [...] automated via playbooks (Ansible)"*.
 
-## Prérequis
+## Prerequisites
 
 ```bash
 pip install ansible
 ansible-galaxy collection install community.general
 ```
 
-Les playbooks `keycloak-realm.yml`, `matrix.yml`, `seafile.yml` et
-`onlyoffice.yml` s'exécutent en local (`connection: local`) car ils pilotent
-des API HTTP (Keycloak Admin API, `kubectl`) plutôt que des hôtes distants en
-SSH — `kubectl` doit donc être configuré avec un contexte pointant vers le
-cluster Kubernetes cible avant de les lancer. Seul `grommunio.yml` se connecte
-en SSH à une VM réelle (la VM appliance provisionnée par Terraform).
+The `keycloak-realm.yml`, `matrix.yml`, `seafile.yml` and `onlyoffice.yml`
+playbooks run locally (`connection: local`) because they drive HTTP APIs
+(Keycloak Admin API, `kubectl`) rather than remote hosts over SSH —
+`kubectl` must therefore be configured with a context pointing to the target
+Kubernetes cluster before running them. Only `grommunio.yml` connects over
+SSH to a real VM (the appliance VM provisioned by Terraform).
 
-## Inventaire
+## Inventory
 
 ```bash
 cp inventory/hosts.ini.example inventory/hosts.ini
-# ou, une fois l'infrastructure Terraform appliquée :
+# or, once the Terraform infrastructure has been applied:
 ./scripts/render-inventory-from-terraform.sh
 ```
 
-## Lancer la configuration complète
+## Running the full configuration
 
 ```bash
 ansible-playbook -i inventory/hosts.ini site.yml
 ```
 
-Ou brique par brique :
+Or component by component:
 
 ```bash
 ansible-playbook -i inventory/hosts.ini playbooks/keycloak-realm.yml
@@ -45,32 +45,31 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 
 ## Playbooks
 
-| Playbook | Contenu | Référence étude |
+| Playbook | Content | Study reference |
 |---|---|---|
-| `playbooks/keycloak-realm.yml` | Realm principal, TOTP + WebAuthn/FIDO2, clients OIDC par brique (via le rôle `keycloak_realm`) | 1.7 |
-| `playbooks/grommunio.yml` | `GAL_ENABLED`/`GAL_CACHE_TTL`, désactivation admin web, EWS/EAS/MAPI actifs | 1.1, 2.13 |
-| `playbooks/matrix.yml` | `server_name`, provider OIDC Synapse vers Keycloak | 1.2, 1.7 |
-| `playbooks/seafile.yml` | `SHARE_LINK_LOGIN_REQUIRED`, permission de génération de lien par rôle, connecteur OnlyOffice | 2.11, 1.5 |
-| `playbooks/onlyoffice.yml` | `document.permissions.chat: false` par défaut | 2.6 |
+| `playbooks/keycloak-realm.yml` | Main realm, TOTP + WebAuthn/FIDO2, per-component OIDC clients (via the `keycloak_realm` role) | 1.7 |
+| `playbooks/grommunio.yml` | `GAL_ENABLED`/`GAL_CACHE_TTL`, disabling the web admin, EWS/EAS/MAPI enabled | 1.1, 2.13 |
+| `playbooks/matrix.yml` | `server_name`, Synapse OIDC provider pointing to Keycloak | 1.2, 1.7 |
+| `playbooks/seafile.yml` | `SHARE_LINK_LOGIN_REQUIRED`, per-role share link generation permission, OnlyOffice connector | 2.11, 1.5 |
+| `playbooks/onlyoffice.yml` | `document.permissions.chat: false` by default | 2.6 |
 
-## Rôles
+## Roles
 
-`roles/keycloak_realm/` est le rôle de référence : structure
-`tasks/`/`defaults/`/`templates/`/`handlers/` à reprendre pour tout futur
-rôle extrait de ces playbooks (voir son propre `README.md`).
+`roles/keycloak_realm/` is the reference role: the
+`tasks/`/`defaults/`/`templates/`/`handlers/` structure to reuse for any
+future role extracted from these playbooks (see its own `README.md`).
 
 ## Secrets
 
-Aucun secret n'est committé dans ce dépôt. Les mots de passe/jetons
-nécessaires (`vault_keycloak_admin_password`, etc.) sont à fournir via
-Ansible Vault ou `--extra-vars`, alimentés depuis le coffre-fort de secrets du
-cabinet (étude 4.5) :
+No secret is committed to this repository. Required passwords/tokens
+(`vault_keycloak_admin_password`, etc.) must be supplied via Ansible Vault or
+`--extra-vars`, fed from the firm's secrets vault (study 4.5):
 
 ```bash
 ansible-playbook -i inventory/hosts.ini site.yml \
   --extra-vars "@secrets/vault.yml" --ask-vault-pass
 ```
 
-Le répertoire `secrets/` (créé à l'exécution par le rôle `keycloak_realm`) et
-`rendered/` (fichiers de configuration générés depuis les templates) sont
-exclus du contrôle de version (`.gitignore`).
+The `secrets/` directory (created at runtime by the `keycloak_realm` role)
+and `rendered/` (configuration files generated from templates) are excluded
+from version control (`.gitignore`).

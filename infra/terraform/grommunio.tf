@@ -1,31 +1,32 @@
-# Grommunio — étude 4.3, "Exception assumée : Grommunio en VM appliance".
+# Grommunio — study 4.3, "Assumed exception: Grommunio as an appliance VM".
 #
-# Grommunio propose un packaging conteneur officiel (grommunio/gromox-container),
-# mais sa propre documentation le présente comme réservé à des besoins spéciaux,
-# pas prêt pour la production par défaut, et bundlant de nombreux services sous
-# un seul processus supervisord — sans la décomposition en microservices qui
-# s'orchestre naturellement dans Kubernetes. L'appliance (VM complète, ISO) reste
-# le mode de déploiement le plus mature documenté par l'éditeur. Grommunio est
-# donc déployé ici comme VM Proxmox dédiée, à part du cluster Kubernetes
-# (kubernetes_nodes.tf), et bénéficie au passage de la HA au niveau hyperviseur
-# (cluster Proxmox, migration à chaud — 4.2) plutôt que d'une HA applicative.
+# Grommunio offers an official container package (grommunio/gromox-container),
+# but its own documentation presents it as reserved for special needs, not
+# production-ready by default, and bundling many services under a single
+# supervisord process — without the microservices decomposition that
+# naturally orchestrates in Kubernetes. The appliance (full VM, ISO) remains
+# the most mature deployment mode documented by the vendor. Grommunio is
+# therefore deployed here as a dedicated Proxmox VM, separate from the
+# Kubernetes cluster (kubernetes_nodes.tf), and in turn benefits from HA at
+# the hypervisor level (Proxmox cluster, live migration — 4.2) rather than
+# application-level HA.
 #
-# La configuration post-déploiement (GAL_ENABLED/GAL_CACHE_TTL, désactivation de
-# l'admin web, EWS/EAS/MAPI) est portée par Ansible, pas par Terraform — voir
-# infra/ansible/playbooks/grommunio.yml (étude 4.5 : provisionnement Terraform,
-# configuration applicative Ansible).
+# Post-deployment configuration (GAL_ENABLED/GAL_CACHE_TTL, disabling the web
+# admin, EWS/EAS/MAPI) is carried by Ansible, not Terraform — see
+# infra/ansible/playbooks/grommunio.yml (study 4.5: Terraform provisioning,
+# Ansible application configuration).
 
 resource "proxmox_virtual_environment_vm" "grommunio" {
   name        = "${local.name_prefix}-grommunio"
-  description = "Appliance Grommunio (VM dédiée, hors cluster Kubernetes — étude 4.3)"
+  description = "Grommunio appliance (dedicated VM, outside the Kubernetes cluster — study 4.3)"
   tags        = ["libre365", "grommunio", "mail", var.environment]
 
-  node_name = var.proxmox_node_names[0] # priorité de placement sur le 1er nœud physique : service à état, pas de vMotion à chaud automatique voulu ici
+  node_name = var.proxmox_node_names[0] # placement priority on the 1st physical node: a stateful service, no automatic live vMotion wanted here
 
-  # Grommunio publie une ISO d'appliance complète (Debian pré-configuré +
-  # installeur Grommunio) : on démarre sur cette ISO plutôt que sur une cloud
-  # image générique + provisioning applicatif, conformément au mode de
-  # déploiement le plus mature documenté par l'éditeur (4.3).
+  # Grommunio publishes a full appliance ISO (pre-configured Debian +
+  # Grommunio installer): we boot from this ISO rather than a generic cloud
+  # image + application provisioning, in line with the most mature
+  # deployment mode documented by the vendor (4.3).
   cdrom {
     file_id = var.grommunio_iso_file_id
   }
@@ -53,9 +54,9 @@ resource "proxmox_virtual_environment_vm" "grommunio" {
     firewall = local.network_interface_template.firewall
   }
 
-  # IP statique : Grommunio est un service critique et à état (mailbox, GAL
-  # CardDAV — 2.13), son adresse doit rester stable pour l'inventaire Ansible
-  # et les enregistrements DNS/MX pointant vers lui.
+  # Static IP: Grommunio is a critical, stateful service (mailbox, CardDAV
+  # GAL — 2.13), its address must stay stable for the Ansible inventory and
+  # the DNS/MX records pointing to it.
   initialization {
     ip_config {
       ipv4 {
@@ -77,18 +78,18 @@ resource "proxmox_virtual_environment_vm" "grommunio" {
     enabled = true
   }
 
-  # L'appliance Grommunio embarque son propre installeur post-boot (Ansible
-  # ne peut piloter la VM qu'une fois l'appliance installée et son SSH exposé) :
-  # la première installation reste semi-interactive côté ISO, documentée dans
-  # infra/terraform/README.md.
+  # The Grommunio appliance embeds its own post-boot installer (Ansible can
+  # only drive the VM once the appliance is installed and its SSH exposed):
+  # the initial installation remains semi-interactive on the ISO side,
+  # documented in infra/terraform/README.md.
   lifecycle {
     ignore_changes = [
-      cdrom, # ne pas remonter l'ISO d'installation après le premier provisioning
+      cdrom, # do not remount the installation ISO after the initial provisioning
     ]
   }
 }
 
 output "grommunio_vm_id" {
-  description = "ID Proxmox de la VM Grommunio"
+  description = "Proxmox ID of the Grommunio VM"
   value       = proxmox_virtual_environment_vm.grommunio.vm_id
 }

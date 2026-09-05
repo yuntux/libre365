@@ -8,14 +8,14 @@ import {
 } from "../src/normalize";
 
 describe("normalizeMatrixEvent", () => {
-  it("normalise un message avec mention", () => {
+  it("normalizes a message with a mention", () => {
     const result = normalizeMatrixEvent({
       type: "m.room.message",
       room_id: "!abc:matrix.example.org",
       event_id: "$xyz",
       sender: "@alice:matrix.example.org",
       content: {
-        body: "@bob salut !",
+        body: "@bob hi!",
         "m.mentions": { user_ids: ["@bob:matrix.example.org"] },
       },
     });
@@ -25,11 +25,11 @@ describe("normalizeMatrixEvent", () => {
     expect(result?.actionUrl).toContain("!abc:matrix.example.org");
   });
 
-  it("ignore les evenements non-message", () => {
+  it("ignores non-message events", () => {
     expect(normalizeMatrixEvent({ type: "m.room.member" })).toBeNull();
   });
 
-  it("ignore un message sans utilisateur cible", () => {
+  it("ignores a message with no target user", () => {
     expect(
       normalizeMatrixEvent({ type: "m.room.message", content: { body: "hello" } })
     ).toBeNull();
@@ -37,58 +37,58 @@ describe("normalizeMatrixEvent", () => {
 });
 
 describe("normalizeGrommunioEvent", () => {
-  it("normalise un nouveau mail", () => {
+  it("normalizes a new mail", () => {
     const result = normalizeGrommunioEvent({
       mailboxUser: "alice@example.org",
-      subject: "Reunion demain",
+      subject: "Meeting tomorrow",
       from: "bob@example.org",
-      preview: "Bonjour, ...",
+      preview: "Hello, ...",
     });
     expect(result?.userId).toBe("alice@example.org");
-    expect(result?.title).toContain("Reunion demain");
+    expect(result?.title).toContain("Meeting tomorrow");
   });
 
-  it("retourne null sans mailboxUser", () => {
+  it("returns null without mailboxUser", () => {
     expect(normalizeGrommunioEvent({ subject: "x" })).toBeNull();
   });
 });
 
 describe("normalizeSeafileEvent", () => {
-  it("normalise un partage de fichier", () => {
+  it("normalizes a file share", () => {
     const result = normalizeSeafileEvent({
       event_type: "repo-share",
       repo_id: "abc123",
-      path: "/dossier/rapport.docx",
+      path: "/folder/report.docx",
       to_user: "alice@example.org",
       from_user: "bob@example.org",
     });
     expect(result?.userId).toBe("alice@example.org");
-    expect(result?.title).toContain("rapport.docx");
+    expect(result?.title).toContain("report.docx");
   });
 });
 
 describe("normalizeVikunjaEvent", () => {
-  it("normalise une assignation de tache", () => {
+  it("normalizes a task assignment", () => {
     const result = normalizeVikunjaEvent({
       event_name: "task.assignee.created",
-      data: { task: { id: 42, title: "Preparer le kickoff" }, doer: { username: "bob" } },
+      data: { task: { id: 42, title: "Prepare the kickoff" }, doer: { username: "bob" } },
       assignee: { username: "alice" },
     });
     expect(result?.userId).toBe("alice");
     expect(result?.actionUrl).toContain("42");
   });
 
-  it("retourne null sans assignee", () => {
+  it("returns null without an assignee", () => {
     expect(normalizeVikunjaEvent({ event_name: "task.created" })).toBeNull();
   });
 });
 
 describe("normalizeOnlyOfficeMentionEvent", () => {
-  it("genere un evenement par utilisateur mentionne", () => {
+  it("generates one event per mentioned user", () => {
     const results = normalizeOnlyOfficeMentionEvent({
       actionLink: "https://office.example.org/doc/1#comment-5",
-      comment: "@alice peux-tu relire ?",
-      document: { title: "Rapport annuel.docx" },
+      comment: "@alice can you review this?",
+      document: { title: "Annual report.docx" },
       emails: ["alice@example.org", "carol@example.org"],
     });
     expect(results).toHaveLength(2);
@@ -96,7 +96,7 @@ describe("normalizeOnlyOfficeMentionEvent", () => {
     expect(results[0].actionUrl).toBe("https://office.example.org/doc/1#comment-5");
   });
 
-  it("retourne un tableau vide sans email mentionne", () => {
+  it("returns an empty array without a mentioned email", () => {
     expect(normalizeOnlyOfficeMentionEvent({ comment: "hello" })).toEqual([]);
   });
 });

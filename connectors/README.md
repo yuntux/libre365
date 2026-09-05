@@ -1,10 +1,10 @@
-# Connecteurs d'integration (chapitre 2 de l'etude)
+# Integration connectors (chapter 2 of the study)
 
-Modules d'integration developpes pour combler l'absence d'integration native entre les
-briques "best of breed" de la stack (cf. `sortie-office365-etude.md`, chapitre 2). Cinq
-services Node.js/TypeScript et une extension navigateur (Thunderbird).
+Integration modules developed to bridge the lack of native integration between the
+"best of breed" bricks of the stack (see `sortie-office365-etude.md`, chapter 2). Five
+Node.js/TypeScript services and one browser extension (Thunderbird).
 
-| Connecteur | Etude | Port par defaut | Variable d'environnement cle |
+| Connector | Study | Default port | Key environment variable |
 |---|---|---|---|
 | [`notification-hub`](./notification-hub) | 2.1, 2.7 | `4001` | `NOVU_API_URL` |
 | [`unified-search`](./unified-search) | 2.2 | `4002` | `SEARCH_TIMEOUT_MS` |
@@ -13,36 +13,36 @@ services Node.js/TypeScript et une extension navigateur (Thunderbird).
 | [`peertube-ingest`](./peertube-ingest) | 2.12 | `4005` | `MINIO_ENDPOINT` |
 | [`thunderbird-filelink-gokapi`](./thunderbird-filelink-gokapi) | 2.11 | n/a (WebExtension) | n/a |
 
-## Description rapide
+## Quick description
 
-- **notification-hub** — recoit les webhooks Matrix/Grommunio/Seafile/Vikunja/OnlyOffice,
-  normalise chaque evenement au format commun, relaie vers Novu (centre de notif in-app).
-- **unified-search** — `GET /search?q=` en fan-out temps reel vers Matrix/Seafile/Vikunja/
-  Grommunio(IMAP), avec relais du token Keycloak de l'utilisateur (pas de re-authentification
-  cote connecteur) et timeout par service.
-- **presence-aggregator** — consolide la presence Matrix (`m.presence`), Grommunio/EWS
-  (`GetUserAvailability`) et LiveKit (participants d'une room) en un statut unique
-  (`in-meeting` > `online` > `unavailable` > `offline`), expose en REST et en SSE pour le
-  bandeau du portail applicatif (2.3).
-- **onlyoffice-mentions** — implemente `onRequestUsers` (annuaire via Keycloak Admin API)
-  et relaie `onRequestSendNotify` vers `notification-hub`.
-- **peertube-ingest** — depose les enregistrements de reunion MinIO (sortie LiveKit
-  Egress) vers PeerTube, en webhook temps reel ou en batch cron quotidien.
-- **thunderbird-filelink-gokapi** — WebExtension Thunderbird (pas un service serveur)
-  implementant l'API `cloudFile` pour Gokapi.
+- **notification-hub** — receives Matrix/Grommunio/Seafile/Vikunja/OnlyOffice webhooks,
+  normalizes each event to a common format, relays it to Novu (in-app notification center).
+- **unified-search** — `GET /search?q=` fanning out in real time to Matrix/Seafile/Vikunja/
+  Grommunio(IMAP), relaying the user's Keycloak token (no re-authentication on the
+  connector side) with a per-service timeout.
+- **presence-aggregator** — consolidates Matrix presence (`m.presence`), Grommunio/EWS
+  (`GetUserAvailability`) and LiveKit (room participants) into a single status
+  (`in-meeting` > `online` > `unavailable` > `offline`), exposed over REST and SSE for the
+  application portal's status bar (2.3).
+- **onlyoffice-mentions** — implements `onRequestUsers` (directory via the Keycloak Admin API)
+  and relays `onRequestSendNotify` to `notification-hub`.
+- **peertube-ingest** — pushes MinIO meeting recordings (LiveKit Egress output)
+  to PeerTube, either via real-time webhook or a daily batch cron job.
+- **thunderbird-filelink-gokapi** — Thunderbird WebExtension (not a backend service)
+  implementing the `cloudFile` API for Gokapi.
 
-## Structure commune (services Node)
+## Common structure (Node services)
 
-Chaque service Node possede son propre `package.json`, `tsconfig.json` (etendant
-`connectors/tsconfig.base.json`), `Dockerfile` multi-stage, `README.md` et des tests
-unitaires (Vitest). La logique metier non triviale est isolee dans des fonctions pures
+Each Node service has its own `package.json`, `tsconfig.json` (extending
+`connectors/tsconfig.base.json`), a multi-stage `Dockerfile`, a `README.md`, and
+unit tests (Vitest). Non-trivial business logic is isolated in pure functions
 (`normalize.ts`, `fanout.ts`, `consolidate.ts`, `transform.ts`, `metadata.ts`/`ingest.ts`
-selon le connecteur) pour rester testable sans dependance reseau.
+depending on the connector) to keep it testable without network dependencies.
 
-## Build Docker
+## Docker build
 
-Chaque `Dockerfile` copie `../tsconfig.base.json` : construire avec `connectors/` comme
-contexte de build, par exemple :
+Each `Dockerfile` copies `../tsconfig.base.json`: build with `connectors/` as the
+build context, for example:
 
 ```bash
 cd connectors
@@ -52,7 +52,7 @@ docker build -f notification-hub/Dockerfile -t notification-hub .
 ## Tests
 
 ```bash
-cd connectors/<nom-du-connecteur>
+cd connectors/<connector-name>
 npm install
 npm test
 ```

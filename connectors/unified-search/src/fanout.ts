@@ -1,13 +1,14 @@
 import { SourceSearchFn, SourceSearchOutcome, SearchResultItem } from "./types";
 
 /**
- * Coeur du fan-out temps reel (etude 2.2 ligne 395) : chaque service est interroge en
- * parallele avec son propre timeout, de sorte qu'un service en carafe ne bloque pas
- * les autres reponses. Promise.allSettled garantit qu'aucun rejet ne casse l'agregation.
+ * Core of the real-time fan-out (study 2.2 line 395): each service is queried in
+ * parallel with its own timeout, so that a stalled service does not block the
+ * other responses. Promise.allSettled guarantees that no rejection breaks the
+ * aggregation.
  *
- * Fonction volontairement pure vis-a-vis du reseau : les `sources` sont injectees en
- * parametre, ce qui permet de tester la logique de fan-out/timeout avec des mocks,
- * sans dependre des vraies implementations HTTP/IMAP.
+ * Deliberately pure with respect to the network: `sources` are injected as a
+ * parameter, which lets the fan-out/timeout logic be tested with mocks,
+ * without depending on the real HTTP/IMAP implementations.
  */
 export async function fanOutSearch(
   query: string,
@@ -63,7 +64,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, source: string):
   });
 }
 
-/** Aplatit les resultats de toutes les sources ayant repondu avec succes, tries par date desc. */
+/** Flattens the results from all sources that responded successfully, sorted by date desc. */
 export function mergeResults(outcomes: SourceSearchOutcome[]): SearchResultItem[] {
   return outcomes
     .flatMap((o) => o.results)

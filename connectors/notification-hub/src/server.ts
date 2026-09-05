@@ -46,8 +46,8 @@ app.post("/webhooks/vikunja", async (req: Request, res: Response) => {
   await handleNormalized(res, normalizeVikunjaEvent(req.body));
 });
 
-// Point d'entree OnlyOffice `onRequestSendNotify` relaye ici par connectors/onlyoffice-mentions
-// (etude 2.7 ligne 487 : "ce connecteur rejoint la liste de ceux a developper en 2.1").
+// OnlyOffice `onRequestSendNotify` entry point, relayed here by connectors/onlyoffice-mentions
+// (study 2.7 line 487: "this connector joins the list of those to be developed in 2.1").
 app.post("/webhooks/onlyoffice-mention", async (req: Request, res: Response) => {
   await handleNormalized(res, normalizeOnlyOfficeMentionEvent(req.body));
 });

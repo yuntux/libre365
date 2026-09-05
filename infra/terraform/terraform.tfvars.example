@@ -1,9 +1,9 @@
-# Copier ce fichier en terraform.tfvars et adapter à l'environnement cible.
-# terraform.tfvars n'est jamais committé (cf. .gitignore) : aucune vraie
-# credential Proxmox n'existe dans ce dépôt (étude 4.5, gestion des secrets
-# externalisée).
+# Copy this file to terraform.tfvars and adapt it to the target environment.
+# terraform.tfvars is never committed (see .gitignore): no real Proxmox
+# credential exists in this repository (study 4.5, externalized secrets
+# management).
 
-deployment_scale = "100" # ou "2000" — cf. locals.tf pour le dimensionnement dérivé
+deployment_scale = "100" # or "2000" — see locals.tf for the derived sizing
 environment       = "production"
 
 proxmox_endpoint      = "https://pve1.example.internal:8006/"

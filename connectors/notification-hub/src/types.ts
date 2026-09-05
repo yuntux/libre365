@@ -1,7 +1,7 @@
 /**
- * Format commun de notification, cf. etude 2.1 ligne 368 :
- * "Un point d'entree unique agregeant les notifications de tous les services".
- * Chaque connecteur source normalise vers cette forme avant relais vers Novu.
+ * Common notification format, see study 2.1 line 368:
+ * "A single entry point aggregating notifications from all services".
+ * Each source connector normalizes to this shape before relaying to Novu.
  */
 export interface NormalizedEvent {
   source: "matrix" | "grommunio" | "seafile" | "vikunja" | "onlyoffice";
@@ -13,7 +13,7 @@ export interface NormalizedEvent {
   timestamp: string;
 }
 
-/** Charge utile brute du webhook Matrix Application Service (transaction PDU-like). */
+/** Raw Matrix Application Service webhook payload (PDU-like transaction). */
 export interface MatrixWebhookPayload {
   type?: string;
   room_id?: string;
@@ -29,7 +29,7 @@ export interface MatrixWebhookPayload {
   target_user_id?: string;
 }
 
-/** Charge utile de webhook Grommunio (evenement nouveau mail simplifie). */
+/** Grommunio webhook payload (simplified new-mail event). */
 export interface GrommunioWebhookPayload {
   event?: string;
   mailboxUser?: string;
@@ -41,7 +41,7 @@ export interface GrommunioWebhookPayload {
   webUrl?: string;
 }
 
-/** Charge utile de webhook Seafile (evenement de partage de fichier). */
+/** Seafile webhook payload (file share event). */
 export interface SeafileWebhookPayload {
   event_type?: string;
   repo_id?: string;
@@ -53,7 +53,7 @@ export interface SeafileWebhookPayload {
   url?: string;
 }
 
-/** Charge utile de webhook Vikunja (assignation de tache). */
+/** Vikunja webhook payload (task assignment). */
 export interface VikunjaWebhookPayload {
   event_name?: string;
   data?: {
@@ -73,8 +73,8 @@ export interface VikunjaWebhookPayload {
 }
 
 /**
- * Charge utile OnlyOffice `onRequestSendNotify` (etude 2.7 ligne 484) :
- * message, emails mentionnes, et lien d'action vers la position du commentaire.
+ * OnlyOffice `onRequestSendNotify` payload (study 2.7 line 484):
+ * message, mentioned emails, and action link to the comment's position.
  */
 export interface OnlyOfficeMentionPayload {
   actionLink?: string;

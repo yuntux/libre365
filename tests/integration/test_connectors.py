@@ -1,18 +1,18 @@
 """
-Tests des connecteurs applicatifs développés pour cette stack (chapitre 2 de
-l'étude: centre de notifications 2.1, recherche unifiée 2.2, agrégateur de
-présence 2.8 - les autres connecteurs listés comme "restant à développer" en
-fin de document ne sont pas encore testables ici).
+Tests for the application connectors built for this stack (study chapter 2:
+notification hub 2.1, unified search 2.2, presence aggregator 2.8 - the
+other connectors listed as "still to be developed" at the end of the
+document are not yet testable here).
 
-Ces tests traitent les connecteurs en boîte noire, via leur API HTTP
-publique, sans connaissance de leur implémentation interne:
-- notification-hub: reçoit un webhook entrant, doit répondre 2xx et exposer
-  l'événement reçu.
-- unified-search: agrège des résultats de recherche provenant de plusieurs
-  sources (mockées ici avec `responses`, pour ne pas dépendre de données
-  réelles dans Seafile/Grommunio/Vikunja au moment du test).
-- presence-aggregator: consolide un statut de présence à partir de
-  plusieurs briques sources et répond un statut unique.
+These tests treat the connectors as black boxes, via their public HTTP API,
+with no knowledge of their internal implementation:
+- notification-hub: receives an inbound webhook, must respond 2xx and
+  expose the received event.
+- unified-search: aggregates search results from several sources (mocked
+  here with `responses`, so as not to depend on real data in
+  Seafile/Grommunio/Vikunja at test time).
+- presence-aggregator: consolidates a presence status from several source
+  components and returns a single status.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ pytestmark = [pytest.mark.timeout(60)]
 
 
 # ---------------------------------------------------------------------------
-# notification-hub (étude 2.1)
+# notification-hub (study 2.1)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -37,17 +37,17 @@ def notification_hub_ready(base_urls, wait_for_service):
 
 def test_notification_hub_accepts_webhook(base_urls, notification_hub_ready):
     """
-    Envoie un webhook générique (format proche de ce qu'émettent Vikunja ou
-    Seafile) et vérifie que notification-hub répond 2xx et enregistre
-    l'événement (relecture via l'API de listing, best-effort si l'API de
-    listing exacte diffère de l'implémentation finale du connecteur).
+    Sends a generic webhook (format close to what Vikunja or Seafile emit)
+    and verifies that notification-hub responds 2xx and records the event
+    (read back via the listing API, best-effort if the exact listing API
+    differs from the connector's final implementation).
     """
     event_id = str(uuid.uuid4())
     webhook_payload = {
         "id": event_id,
         "source": "integration-test",
         "type": "task.created",
-        "title": "Notification de test d'intégration",
+        "title": "Integration test notification",
     }
 
     response = requests.post(
@@ -56,13 +56,13 @@ def test_notification_hub_accepts_webhook(base_urls, notification_hub_ready):
         timeout=15,
     )
     assert 200 <= response.status_code < 300, (
-        f"notification-hub a refusé le webhook: HTTP {response.status_code} - "
+        f"notification-hub rejected the webhook: HTTP {response.status_code} - "
         f"{response.text[:300]}"
     )
 
 
 # ---------------------------------------------------------------------------
-# unified-search (étude 2.2)
+# unified-search (study 2.2)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
@@ -73,13 +73,13 @@ def unified_search_ready(base_urls, wait_for_service):
 @responses.activate
 def test_unified_search_aggregates_multiple_sources(base_urls, unified_search_ready):
     """
-    Mocke les API sources (Seafile, Vikunja, Matrix) que unified-search est
-    censé interroger, pour vérifier isolément sa logique d'agrégation sans
-    dépendre de données réelles présentes dans ces briques au moment du test.
+    Mocks the source APIs (Seafile, Vikunja, Matrix) that unified-search is
+    expected to query, to verify its aggregation logic in isolation without
+    depending on real data present in those components at test time.
 
-    Les URLs mockées visent les mêmes hôtes que `base_urls` pour rester
-    représentatives, mais interceptées par `responses` avant tout appel
-    réseau réel.
+    The mocked URLs target the same hosts as `base_urls` to stay
+    representative, but are intercepted by `responses` before any real
+    network call.
     """
     query = "rapport-integration-test"
 
@@ -108,20 +108,20 @@ def test_unified_search_aggregates_multiple_sources(base_urls, unified_search_re
         timeout=15,
     )
     assert search_response.status_code == 200, (
-        f"unified-search a échoué sur la requête {query!r}: "
+        f"unified-search failed on the query {query!r}: "
         f"HTTP {search_response.status_code} - {search_response.text[:300]}"
     )
 
     payload = search_response.json()
     results = payload.get("results", payload if isinstance(payload, list) else [])
     assert results, (
-        f"unified-search n'a agrégé aucun résultat pour {query!r} alors que "
-        "les sources mockées en renvoyaient."
+        f"unified-search aggregated no results for {query!r} even though "
+        "the mocked sources returned some."
     )
 
 
 # ---------------------------------------------------------------------------
-# presence-aggregator (étude 2.8, connecteur identifié comme "à développer")
+# presence-aggregator (study 2.8, connector identified as "to be developed")
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")

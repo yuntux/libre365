@@ -1,7 +1,7 @@
 {
   "name": "@libre365/unified-search",
   "version": "1.0.0",
-  "description": "Recherche unifiee - fan-out temps reel Matrix/Seafile/Vikunja/Grommunio avec relais du token utilisateur (etude 2.2)",
+  "description": "Unified search - real-time fan-out across Matrix/Seafile/Vikunja/Grommunio with user token relay (study 2.2)",
   "private": true,
   "main": "dist/server.js",
   "scripts": {
