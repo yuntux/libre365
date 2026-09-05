@@ -46,75 +46,76 @@ permissions:
 
 jobs:
   recette-ephemere:
-    name: Recette ephemere docker-compose (${{ inputs.brique }} @ ${{ inputs.version }})
+    name: Ephemeral staging docker-compose (${{ inputs.brique }} @ ${{ inputs.version }})
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verifier la presence de l'environnement docker-compose
+      - name: Check for the docker-compose environment
         id: check
         run: |
           if [ ! -f "docker-compose/docker-compose.yml" ]; then
-            echo "::error::docker-compose/docker-compose.yml absent - impossible de demarrer la recette ephemere."
+            echo "::error::docker-compose/docker-compose.yml missing - cannot start the ephemeral staging environment."
             exit 1
           fi
           echo "present=true" >> "$GITHUB_OUTPUT"
 
-      - name: Demarrer l'environnement (brique=${{ inputs.brique }}, version=${{ inputs.version }})
+      - name: Start the environment (component=${{ inputs.brique }}, version=${{ inputs.version }})
         working-directory: docker-compose
         env:
           RECETTE_BRIQUE: ${{ inputs.brique }}
           RECETTE_VERSION: ${{ inputs.version }}
         run: |
-          # Jeu de donnees de test represente ici par la configuration par
-          # defaut du docker-compose de dev (5.4, point 2 : "pas les donnees
-          # reelles de production") ; le pilotage fin de la version demarree
-          # pour ${{ inputs.brique }} se fera via une variable d'environnement
-          # ou un fichier d'override docker-compose, a cabler par la brique
-          # concernee (hors perimetre de ce workflow generique).
+          # Test dataset represented here by the default configuration of
+          # the dev docker-compose (5.4, point 2: "not real production
+          # data"); fine-grained control of the version started for
+          # ${{ inputs.brique }} will be done via an environment variable
+          # or a docker-compose override file, to be wired up by the
+          # component concerned (out of scope for this generic workflow).
           if [ -f .env.example ] && [ ! -f .env ]; then
             cp .env.example .env
           fi
           docker compose up -d
 
-      - name: Attendre que les services soient sains
+      - name: Wait for the services to be healthy
         working-directory: docker-compose
         run: |
           script="scripts/wait-for-healthy.sh"
           if [ ! -x "$script" ] && [ ! -f "$script" ]; then
-            echo "::error::$script introuvable (script attendu, ecrit par ailleurs dans le depot) - impossible de valider la sante de l'environnement."
+            echo "::error::$script not found (expected script, written elsewhere in the repo) - cannot validate the health of the environment."
             exit 1
           fi
           chmod +x "$script" || true
           "$script"
 
-      - name: Afficher l'etat des services en cas d'echec
+      - name: Show the state of the services on failure
         if: failure()
         working-directory: docker-compose
         run: docker compose ps && docker compose logs --tail=200
 
-      - name: Installer les dependances des tests d'integration
+      - name: Install the integration tests' dependencies
         working-directory: tests/integration
         run: |
           python3 -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Rejouer les scenarios critiques (pytest -m smoke)
+      - name: Replay the critical scenarios (pytest -m smoke)
         id: pytest
         working-directory: tests/integration
         env:
           RECETTE_BRIQUE: ${{ inputs.brique }}
           RECETTE_VERSION: ${{ inputs.version }}
         run: |
-          # Rapport HTML = "rapport de resultats (succes/echec par scenario)"
-          # qui conditionne la decision de promotion (etude 5.5, ligne 797).
-          # continue-on-error au niveau du step (pas du job) : on veut publier
-          # le rapport meme en cas d'echec de scenario, la decision de
-          # promotion restant humaine/automatisee en aval de ce workflow.
+          # HTML report = "results report (success/failure per scenario)"
+          # that conditions the promotion decision (study 5.5, line 797).
+          # continue-on-error at the step level (not the job level): we
+          # want to publish the report even if a scenario fails, the
+          # promotion decision remaining human/automated downstream of
+          # this workflow.
           pytest -m smoke --html=report.html --self-contained-html
         continue-on-error: true
 
-      - name: Publier le rapport de recette en artifact
+      - name: Publish the staging report as an artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -123,16 +124,16 @@ jobs:
           retention-days: 90
           if-no-files-found: warn
 
-      - name: Statut final des scenarios
+      - name: Final status of the scenarios
         if: always()
         run: |
           if [ "${{ steps.pytest.outcome }}" = "failure" ]; then
-            echo "::error::Au moins un scenario smoke a echoue - promotion en production NON recommandee (etude 5.5). Voir le rapport HTML en artifact."
+            echo "::error::At least one smoke scenario failed - promotion to production is NOT recommended (study 5.5). See the HTML report artifact."
             exit 1
           fi
-          echo "Tous les scenarios smoke ont reussi - rapport joint en artifact pour decision de promotion."
+          echo "All smoke scenarios passed - report attached as an artifact for the promotion decision."
 
-      - name: Arreter l'environnement (nettoyage de la recette ephemere)
+      - name: Stop the environment (ephemeral staging cleanup)
         if: always()
         working-directory: docker-compose
         run: docker compose down -v

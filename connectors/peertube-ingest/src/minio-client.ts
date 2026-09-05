@@ -15,7 +15,7 @@ function getClient(): S3Client {
     client = new S3Client({
       endpoint: MINIO_ENDPOINT,
       region: MINIO_REGION,
-      forcePathStyle: true, // requis pour MinIO (etude 1.3/2.12 : MinIO auto-heberge, pas AWS S3)
+      forcePathStyle: true, // required for MinIO (study 1.3/2.12: self-hosted MinIO, not AWS S3)
       credentials: { accessKeyId: MINIO_ACCESS_KEY, secretAccessKey: MINIO_SECRET_KEY },
     });
   }

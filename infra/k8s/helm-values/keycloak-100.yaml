@@ -1,6 +1,6 @@
-# Overlay de dimensionnement — 100 utilisateurs (etude 1.7 L.271 : 2-4 coeurs / 4-8 Go)
-# HA retenue des la cible initiale : 2 replicas minimum meme a 100 utilisateurs.
-# Usage : helm upgrade --install keycloak bitnami/keycloak -f keycloak.yaml -f keycloak-100.yaml
+# Sizing overlay — 100 users (study 1.7 L.271: 2-4 cores / 4-8 GB)
+# HA chosen from the initial target: 2 replicas minimum even at 100 users.
+# Usage: helm upgrade --install keycloak bitnami/keycloak -f keycloak.yaml -f keycloak-100.yaml
 replicaCount: 2
 
 resources:
