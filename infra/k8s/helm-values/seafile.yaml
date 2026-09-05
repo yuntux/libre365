@@ -1,21 +1,20 @@
-# Brique : Seafile — stockage et synchronisation de fichiers (etude 1.4)
-# Chart utilise : haiwen/seafile-server n'a pas de chart Helm officiel publie par
-# Seafile ; chart communautaire retenu : `seafile-charts/seafile-ce`
-#   repo Helm : https://seafile-charts.github.io/seafile-charts (ou fork communautaire
-#   equivalent, ex. `bahamas10/seafile` sur ArtifactHub) — a valider au moment du
-#   deploiement, sinon repli sur manifest raw derive de l'image officielle Docker
-#   `seafileltd/seafile-mc`.
+# Component: Seafile — file storage and synchronization (study 1.4)
+# Chart used: haiwen/seafile-server has no official Helm chart published by Seafile;
+# community chart adopted: `seafile-charts/seafile-ce`
+#   Helm repo: https://seafile-charts.github.io/seafile-charts (or an equivalent
+#   community fork, e.g. `bahamas10/seafile` on ArtifactHub) — to be confirmed at
+#   deployment time, otherwise fall back to a raw manifest derived from the official
+#   `seafileltd/seafile-mc` Docker image.
 #
-# 1.4 L.136 — dimensionnement pilote par le volume de donnees stockees et la bande
-# passante de synchronisation, pas par le nombre d'utilisateurs actifs : pas de variante
-# 100/2000 dediee pour Seafile (contrairement a Synapse/OnlyOffice/Keycloak), un seul
-# fichier de values suffit ; seul `persistence.size` doit etre revu a la hausse avec la
-# croissance du volume de donnees.
+# 1.4 L.136 — sizing driven by the volume of stored data and the sync bandwidth, not
+# by the number of active users: no dedicated 100/2000 variant for Seafile (unlike
+# Synapse/OnlyOffice/Keycloak), a single values file suffices; only
+# `persistence.size` needs to be revised upward as the data volume grows.
 #
-# 1.4 L.141 — limite connue : le clustering horizontal (plusieurs frontaux + cache
-# partage) n'existe que sur l'edition Pro (payante). L'edition Community ci-dessous
-# reste mono-noeud, scalable verticalement uniquement — a anticiper budgetairement au-
-# dela d'un seuil de charge, cf. etude.
+# 1.4 L.141 — known limitation: horizontal clustering (several frontends + shared
+# cache) only exists in the (paid) Pro edition. The Community edition below stays
+# single-node, scalable vertically only — to be anticipated budget-wise beyond a
+# load threshold, see the study.
 
 image:
   repository: seafileltd/seafile-mc
