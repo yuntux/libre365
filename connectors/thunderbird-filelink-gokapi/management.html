@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Gokapi Filelink</title>
+    <style>
+      body { font-family: sans-serif; padding: 1em; max-width: 32em; }
+      label { display: block; margin-top: 0.75em; font-weight: bold; }
+      input { width: 100%; box-sizing: border-box; padding: 0.4em; margin-top: 0.2em; }
+      button { margin-top: 1em; padding: 0.5em 1em; }
+      #status { margin-top: 0.75em; font-size: 0.9em; }
+    </style>
+  </head>
+  <body>
+    <h3>Parametres du compte Gokapi</h3>
+    <p>Ces informations sont utilisees par <code>background.js</code> pour deposer les pieces jointes.</p>
+
+    <label for="baseUrl">URL de l'instance Gokapi</label>
+    <input id="baseUrl" type="url" placeholder="https://gokapi.example.org" />
+
+    <label for="apiKey">Cle API Gokapi</label>
+    <input id="apiKey" type="password" placeholder="Cle associee au compte OIDC de l'expediteur" />
+
+    <label for="expiryDays">Duree de conservation (jours, optionnel)</label>
+    <input id="expiryDays" type="number" min="1" placeholder="ex: 14" />
+
+    <label for="allowedDownloads">Nombre maximum de telechargements (optionnel)</label>
+    <input id="allowedDownloads" type="number" min="1" placeholder="ex: 10" />
+
+    <button id="save">Enregistrer</button>
+    <div id="status"></div>
+
+    <script src="management.js"></script>
+  </body>
+</html>
