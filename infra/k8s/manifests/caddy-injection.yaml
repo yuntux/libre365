@@ -1,0 +1,43 @@
+# 2.3 L.407-417 — Bandeau applicatif transverse (menu, cloche de notification, zone de
+# recherche) injecte via reverse proxy plutot qu'un portail iframe (ecarte pour raisons
+# de securite : clickjacking, cookies tiers, API navigateur degradees en iframe).
+#
+# Ce ConfigMap contient uniquement le SNIPPET HTML injecte (le "bandeau"). La logique
+# d'injection elle-meme (plugin `caddy2-html-injection-plugin` ou equivalent `replace`/
+# `sub_filter` de Caddy) est configuree dans le Caddyfile, cf.
+# infra/k8s/helm-values/caddy-deployment.yaml (Caddyfile ConfigMap principal).
+#
+# Le point d'ancrage DOM (ici la balise </body>) est fragile aux montees de version de
+# chaque application cible (2.3 L.413) : a revalider a chaque mise a jour majeure d'une
+# brique (Element Web, Seafile, Vikunja...).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-html-banner
+  namespace: open365
+  labels:
+    app.kubernetes.io/name: caddy
+    app.kubernetes.io/component: portail-applicatif
+data:
+  banner.html: |
+    <!-- Bandeau applicatif transverse open365 — injecte avant </body> -->
+    <div id="open365-banner" data-open365-banner>
+      <nav id="open365-banner-menu">
+        <!-- Liens vers chaque brique : Element, Seafile, Vikunja, Visio, Grommunio-web, PeerTube -->
+      </nav>
+      <div id="open365-banner-search">
+        <!-- 2.2 L.398-399 — Zone de recherche unifiee : fan-out temps reel vers les APIs
+             natives de chaque service (Matrix /search, Seafile, Vikunja, Grommunio IMAP),
+             avec le token Keycloak de l'utilisateur relaye a chaque appel. -->
+      </div>
+      <div id="open365-banner-notifications">
+        <!-- 2.1 L.381-382 — Cloche de notification : centre Novu, alimente par les
+             connecteurs webhook par service. -->
+      </div>
+      <div id="open365-banner-presence">
+        <!-- 2.8 L.503-504 — Statut de presence consolide (Matrix m.presence,
+             Grommunio GetUserAvailability, etat d'appel LiveKit). -->
+      </div>
+    </div>
+    <script src="/open365-banner/banner.js" defer></script>
+    <link rel="stylesheet" href="/open365-banner/banner.css">

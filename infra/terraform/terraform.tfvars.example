@@ -1,0 +1,37 @@
+# Copier ce fichier en terraform.tfvars et adapter à l'environnement cible.
+# terraform.tfvars n'est jamais committé (cf. .gitignore) : aucune vraie
+# credential Proxmox n'existe dans ce dépôt (étude 4.5, gestion des secrets
+# externalisée).
+
+deployment_scale = "100" # ou "2000" — cf. locals.tf pour le dimensionnement dérivé
+environment       = "production"
+
+proxmox_endpoint      = "https://pve1.example.internal:8006/"
+proxmox_api_token     = "terraform@pve!open365-token=00000000-0000-0000-0000-000000000000"
+proxmox_ssh_username  = "root"
+proxmox_tls_insecure  = false
+
+proxmox_node_names = ["pve1", "pve2", "pve3"]
+
+network_bridge   = "vmbr0"
+network_vlan_id  = 100
+network_gateway  = "10.10.0.1"
+network_dns_servers = ["10.10.0.2", "9.9.9.9"]
+
+storage_pool     = "local-lvm"
+storage_pool_iso = "local"
+
+ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... exploitation@open365",
+]
+
+grommunio_iso_file_id          = "local:iso/grommunio-appliance-2026.06.iso"
+kubernetes_cloud_image_file_id = "local:iso/debian-12-generic-amd64.qcow2"
+
+grommunio_static_ip = "10.10.0.10/24"
+
+kubernetes_control_plane_static_ips = [
+  "10.10.0.21/24",
+  "10.10.0.22/24",
+  "10.10.0.23/24",
+]

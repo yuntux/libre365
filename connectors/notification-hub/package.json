@@ -1,0 +1,22 @@
+{
+  "name": "@open365/notification-hub",
+  "version": "1.0.0",
+  "description": "Centre de notifications unifie - ingestion Matrix/Grommunio/Seafile/Vikunja/OnlyOffice vers Novu (etude 2.1, 2.7)",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4",
+    "vitest": "^1.6.0"
+  }
+}

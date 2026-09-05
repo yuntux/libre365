@@ -1,0 +1,27 @@
+# Overlay de dimensionnement — 2000 utilisateurs (etude 1.2 L.88)
+# Usage : helm upgrade --install synapse ananace-charts/matrix-synapse -f synapse.yaml -f synapse-2000.yaml
+synapse:
+  resources:
+    requests:
+      cpu: "3"
+      memory: "2.8Gi"
+    limits:
+      cpu: "6"
+      memory: "5.6Gi"
+  workers:
+    synchrotron:
+      replicaCount: 3
+    genericWorkers:
+      replicaCount: 4
+    federationSender:
+      replicaCount: 2
+
+postgresql:
+  primary:
+    resources:
+      requests:
+        cpu: "2"
+        memory: "9Gi"
+      limits:
+        cpu: "4"
+        memory: "18Gi"

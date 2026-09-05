@@ -1,0 +1,85 @@
+# Brique : Visio (DINUM/LaSuite numérique "Meet") — etude 1.3 L.106-120
+# Chart utilise : suitenumerique/meet (si publie sur https://github.com/suitenumerique/meet
+#   /charts) — a defaut de chart Helm officiel publie au moment de la redaction, se
+#   rabattre sur un manifest raw (Deployment/Service/Ingress) derive de l'image officielle
+#   `lasuite/meet-backend` + `lasuite/meet-frontend` (Django REST Framework, cf. etude
+#   2.9 L.519). Ce fichier de values est ecrit au format "chart" pour rester coherent
+#   avec la convention du depot ; a adapter en manifests raw si aucun chart n'est
+#   effectivement disponible au moment du deploiement.
+#
+# backend visio = LiveKit (1.3 L.106), meme cluster LiveKit que Element Call (2.4 L.432).
+# Egress des enregistrements vers MinIO S3 (2.12 L.585-592).
+
+backend:
+  image:
+    repository: lasuite/meet-backend
+    tag: "latest" # a figer sur un tag versionne avant mise en production
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+  env:
+    DJANGO_SETTINGS_MODULE: "meet.settings.production"
+    # 1.7 — SSO Keycloak (OIDC)
+    OIDC_OP_AUTHORIZATION_ENDPOINT: "https://sso.open365.example.org/realms/open365/protocol/openid-connect/auth"
+    OIDC_OP_TOKEN_ENDPOINT: "https://sso.open365.example.org/realms/open365/protocol/openid-connect/token"
+    OIDC_OP_USER_ENDPOINT: "https://sso.open365.example.org/realms/open365/protocol/openid-connect/userinfo"
+    OIDC_RP_CLIENT_ID: "visio-meet"
+    # secret client OIDC : cf. secret oidc-client-secrets, non versionne
+    LIVEKIT_API_URL: "https://livekit.open365.example.org"
+    # 2.12 L.587 — MinIO auto-heberge comme destination S3 de LiveKit Egress, plutot
+    # qu'un volume reseau partage (NFS) entre pods pour un fichier ecrit en local par le
+    # pod Egress.
+    AWS_S3_ENDPOINT_URL: "http://minio.open365.svc.cluster.local:9000"
+    AWS_STORAGE_BUCKET_NAME: "visio-recordings"
+    RECORDING_ENABLE: "true"
+
+frontend:
+  image:
+    repository: lasuite/meet-frontend
+    tag: "latest"
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "300m"
+      memory: "256Mi"
+
+postgresql:
+  enabled: true
+  auth:
+    database: meet
+    existingSecret: visio-meet-postgres-secret
+
+redis:
+  enabled: true
+  # session/cache Django
+
+# 2.12 L.585-589 — Egress LiveKit configure pour ecrire vers le bucket MinIO
+# "visio-recordings" (cf. minio.yaml), pas de retention geree ici (fixee au niveau du
+# bucket / cf. politique de cycle de vie MinIO).
+liveKitEgress:
+  s3:
+    endpoint: "http://minio.open365.svc.cluster.local:9000"
+    bucket: "visio-recordings"
+    accessKeySecretRef: minio-egress-credentials
+    forcePathStyle: true
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: visio.open365.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: visio-meet-tls
+      hosts:
+        - visio.open365.example.org
