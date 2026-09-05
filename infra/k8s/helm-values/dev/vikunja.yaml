@@ -1,0 +1,28 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values.
+# Vikunja has no -100/-2000 sizing overlay (see vikunja.yaml header: a single sizing
+# suffices from 100 to 2000 users) — this file plays the same "applied second, on
+# top" role for the dev tier.
+#
+# Usage:
+#   helm upgrade --install vikunja vikunja/vikunja -n libre365-dev \
+#     -f vikunja.yaml -f dev/vikunja.yaml
+#
+# Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are
+# exactly the ones already used in vikunja.yaml.
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+# postgresql.enabled (base file) is left untouched: no `postgresql.primary.resources`
+# key is attested anywhere in this repo for the go-vikunja/helm-charts chart
+# specifically (unlike the Bitnami-based keycloak/synapse charts), so none is guessed
+# here — left at the chart's own defaults (unverifiable third-party schema, no
+# network access to confirm).

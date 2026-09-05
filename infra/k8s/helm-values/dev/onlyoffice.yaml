@@ -1,0 +1,39 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values, used INSTEAD
+# of the onlyoffice-100.yaml / onlyoffice-2000.yaml production sizing overlays
+# (mutually exclusive alternatives to this one, not to be stacked with it). Because
+# the base onlyoffice.yaml carries no replicaCount/resources of its own (those only
+# exist in the -100/-2000 overlays), this file must set them directly.
+#
+# Usage:
+#   helm upgrade --install onlyoffice onlyoffice/docs-cloud -n libre365-dev \
+#     -f onlyoffice.yaml -f dev/onlyoffice.yaml
+#
+# Key paths reused below are exactly the ones already used in onlyoffice.yaml /
+# onlyoffice-100.yaml / onlyoffice-2000.yaml.
+
+# 1.5 L.198 — the base cluster-from-day-one design is a production concern; a single
+# Document Server instance is plenty for local dev.
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1"
+    memory: "2Gi"
+
+# redis.master.resources key path attested in onlyoffice-2000.yaml. Redis itself
+# (session storage, base onlyoffice.yaml) is kept enabled since Document Server
+# depends on it functionally, not only for clustering — only its footprint is
+# trimmed here.
+redis:
+  master:
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "250m"
+        memory: "256Mi"

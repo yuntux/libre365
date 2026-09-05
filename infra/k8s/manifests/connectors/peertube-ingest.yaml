@@ -1,0 +1,65 @@
+# Component: peertube-ingest — in-house connector, uploads meeting recordings
+# from MinIO to PeerTube (study, chapter 2.12). No Helm chart: small in-house
+# Python/FastAPI service (connectors/peertube-ingest), built locally by k3d's
+# dev workflow rather than published to a registry — raw Deployment + Service,
+# following the same style as infra/k8s/manifests/gokapi.yaml.
+#
+# Image built locally (`k3d image import`) and never pulled from a registry —
+# see dev-cluster/README.md for the build/import step run before `kubectl apply`.
+# replicas: 1 — dev tier only, fast iteration over availability ("durcir en
+# dev pour aller plus vite").
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: peertube-ingest
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: peertube-ingest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: peertube-ingest
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: peertube-ingest
+    spec:
+      containers:
+        - name: peertube-ingest
+          image: libre365/peertube-ingest:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4005
+          env:
+            - name: PORT
+              value: "4005"
+            # PeerTube and MinIO are Helm releases in this namespace —
+            # in-cluster Service DNS names, same as used by
+            # infra/k8s/manifests/caddy.yaml.
+            - name: PEERTUBE_URL
+              value: "http://peertube.libre365.svc.cluster.local:9000"
+            - name: MINIO_URL
+              value: "http://minio.libre365.svc.cluster.local:9000"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peertube-ingest
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: peertube-ingest
+spec:
+  selector:
+    app.kubernetes.io/name: peertube-ingest
+  ports:
+    - port: 4005
+      targetPort: 4005

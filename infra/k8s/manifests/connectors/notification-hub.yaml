@@ -1,0 +1,68 @@
+# Component: notification-hub — in-house connector, unified notification center
+# (study, chapter 2.1 and 2.7). No Helm chart: this is a small in-house
+# Python/FastAPI service (connectors/notification-hub), built locally by k3d's
+# dev workflow rather than published to a registry — raw Deployment + Service,
+# following the same style as infra/k8s/manifests/gokapi.yaml.
+#
+# Image built locally (`k3d image import`) and never pulled from a registry —
+# see dev-cluster/README.md for the build/import step run before `kubectl apply`.
+# replicas: 1 — dev tier only, fast iteration over availability ("durcir en
+# dev pour aller plus vite").
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-hub
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: notification-hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-hub
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-hub
+    spec:
+      containers:
+        - name: notification-hub
+          image: libre365/notification-hub:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4001
+          env:
+            - name: PORT
+              value: "4001"
+            # novu-mock stays on docker-compose (never deployed to the k3d dev
+            # cluster, see platform.yaml `other_ports`) — reached from inside
+            # the cluster via k3d's built-in host alias, at the port
+            # docker-compose publishes it on (NOVU_MOCK_PORT: 13000).
+            - name: NOVU_API_URL
+              value: "http://host.k3d.internal:13000"
+            # Synapse is a Helm release in this namespace — in-cluster Service
+            # DNS name, same as used by infra/k8s/manifests/caddy.yaml.
+            - name: SYNAPSE_URL
+              value: "http://synapse.libre365.svc.cluster.local:8008"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-hub
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: notification-hub
+spec:
+  selector:
+    app.kubernetes.io/name: notification-hub
+  ports:
+    - port: 4001
+      targetPort: 4001

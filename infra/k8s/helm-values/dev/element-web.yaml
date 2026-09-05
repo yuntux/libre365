@@ -1,0 +1,27 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values.
+# Element Web has no -100/-2000 sizing overlay (see element-web.yaml header: it is a
+# stateless static SPA client, sizing only varies by replica count) — this file plays
+# the same "applied second, on top" role for the dev tier.
+#
+# Usage:
+#   helm upgrade --install element-web ananace-charts/matrix-element-web \
+#     -n libre365-dev -f element-web.yaml -f dev/element-web.yaml
+#
+# Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are
+# exactly the ones already used in element-web.yaml.
+
+# Single instance: the base file's replicaCount: 2 is a redundancy concern for a
+# static frontend, not a dev-speed concern.
+replicaCount: 1
+
+# The base file's requests/limits are already small (static file serving, no
+# server-side rendering); trimmed a bit further for a local k3d node shared with
+# every other brick.
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"

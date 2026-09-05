@@ -1,0 +1,47 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values, used INSTEAD
+# of the synapse-100.yaml / synapse-2000.yaml production sizing overlays (mutually
+# exclusive alternatives to this one, not to be stacked with it).
+#
+# Usage:
+#   helm upgrade --install synapse ananace-charts/matrix-synapse -n libre365-dev \
+#     -f synapse.yaml -f dev/synapse.yaml
+#
+# Key paths reused below are exactly the ones already used in synapse.yaml /
+# synapse-100.yaml / synapse-2000.yaml (nested under `synapse:`, per the
+# ananace-chart convention). No key not already attested elsewhere in this repo for
+# this chart has been introduced.
+
+synapse:
+  # 1.2 L.89 — the base synapse.yaml turns on "workers" mode (federation-sender,
+  # federation-reader, synchrotron x2, generic-workers x2, media-repository), which
+  # is the production architecture target but means 7+ extra pods to schedule and
+  # wait on in a local k3d cluster for no functional benefit in dev (a single
+  # Synapse process handles the load of a handful of dev users just fine).
+  # Disabled here for dev speed using the same `workers.enabled` toggle the base
+  # file already sets to true.
+  workers:
+    enabled: false
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+postgresql:
+  primary:
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+
+# Not touched here (intentionally): livenessProbe/readinessProbe timings,
+# autoscaling, PodDisruptionBudget. Not attested anywhere in this repo's existing
+# Synapse values files, and no network access in this sandbox to confirm the
+# ananace-chart's exact schema for them — left at the chart's own defaults.

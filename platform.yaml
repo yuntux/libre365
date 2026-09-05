@@ -232,11 +232,35 @@ connector_ports:
   PEERTUBE_INGEST_PORT: 4005
 
 # -----------------------------------------------------------------------------
-# Dev/test infrastructure ports (dedicated databases, study 4.6) and services
-# without a dedicated `services.*` entry (Novu mock, study 2.1).
+# Services kept on plain docker-compose (never deployed to the k3d dev
+# cluster, see dev-cluster/README.md): Grommunio for the reason already
+# documented in the `grommunio_dev` entry above, and the Novu mock because it
+# has no counterpart chart of its own to reuse (novu.yaml is the full
+# production chart's api/worker/ws stack, disproportionate for a mock).
+# Each chart-backed brique's own Postgres/database now lives inside its
+# Helm release in the dev cluster (see infra/k8s/helm-values/dev/), so there
+# is no longer a standalone dev-tier Postgres port to track here.
 # -----------------------------------------------------------------------------
 other_ports:
-  POSTGRES_KEYCLOAK_PORT: 5433
-  POSTGRES_SYNAPSE_PORT: 5434
-  POSTGRES_ONLYOFFICE_PORT: 5435
   NOVU_MOCK_PORT: 13000
+
+# -----------------------------------------------------------------------------
+# Local Kubernetes dev cluster (k3d), reusing the production Helm
+# values/charts (infra/k8s/helm-values/, infra/k8s/manifests/) instead of a
+# second, hand-maintained docker-compose definition per brique - see
+# dev-cluster/README.md for the full rationale and workflow. Generates
+# dev-cluster/k3d-config.yaml (port mappings only; cluster shape/topology is
+# fixed directly in that file's template in scripts/sync_platform.py).
+#
+# Port mappings cover every `services.*.ports` entry EXCEPT `grommunio_dev`
+# (stays on docker-compose, see `other_ports` above) plus `connector_ports`
+# (the 5 in-house connectors, deployed via infra/k8s/manifests/connectors/).
+# The node-port range is widened below the Kubernetes default (30000-32767)
+# so these existing port numbers (3456, 4001-4005, 8008-9002, etc.) can be
+# used as NodePorts as-is, without remapping them yet again.
+# -----------------------------------------------------------------------------
+dev_cluster:
+  name: libre365-dev
+  servers: 1
+  agents: 2
+  node_port_range: "3000-32767"
