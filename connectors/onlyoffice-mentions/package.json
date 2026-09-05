@@ -1,7 +1,7 @@
 {
-  "name": "@open365/presence-aggregator",
+  "name": "@open365/onlyoffice-mentions",
   "version": "1.0.0",
-  "description": "Agregateur de presence Matrix/Grommunio-EWS/LiveKit consolidee pour le bandeau du portail (etude 2.8)",
+  "description": "Handler onRequestUsers / onRequestSendNotify OnlyOffice, relais vers notification-hub (etude 2.7)",
   "private": true,
   "main": "dist/server.js",
   "scripts": {
@@ -11,8 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "livekit-server-sdk": "^2.9.0"
+    "express": "^4.19.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

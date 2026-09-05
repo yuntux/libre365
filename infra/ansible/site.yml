@@ -1,0 +1,25 @@
+---
+# Playbook maître — inclut les playbooks par brique dans l'ordre de dépendance
+# fonctionnelle : Keycloak d'abord (SSO central dont dépendent les autres
+# briques, étude 1.7), puis Grommunio (indépendant du SSO applicatif, cf.
+# playbooks/grommunio.yml), puis les briques conteneurisées consommant les
+# clients OIDC déjà créés (Matrix, Seafile, OnlyOffice).
+#
+# Prérequis : le cluster Kubernetes et la VM Grommunio doivent déjà être
+# provisionnés par Terraform (infra/terraform/) et l'inventaire généré/à jour
+# (cf. scripts/render-inventory-from-terraform.sh).
+
+- name: "0. Réalm Keycloak et clients OIDC (SSO central — étude 1.7)"
+  import_playbook: playbooks/keycloak-realm.yml
+
+- name: "1. VM appliance Grommunio (GAL CardDAV, admin web désactivée — étude 1.1, 2.13)"
+  import_playbook: playbooks/grommunio.yml
+
+- name: "2. Domaine Matrix/Synapse et provider OIDC (étude 1.2)"
+  import_playbook: playbooks/matrix.yml
+
+- name: "3. Seafile (partage authentifié, connecteur OnlyOffice — étude 1.4, 2.11)"
+  import_playbook: playbooks/seafile.yml
+
+- name: "4. OnlyOffice (tchat désactivé par défaut — étude 2.6)"
+  import_playbook: playbooks/onlyoffice.yml
