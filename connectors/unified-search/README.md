@@ -1,8 +1,8 @@
 # unified-search
 
 Unified search via real-time fan-out (study 2.2). `GET /search?q=...` queries Matrix
-(`/search`), Seafile (search API), Vikunja (`tasks/all?s=`) and Grommunio (IMAP SEARCH,
-structured stub) concurrently, with a per-service timeout (2s by default) that isolates a
+(`/search`), Seafile (search API), Vikunja (`tasks/all?s=`) and Grommunio (real IMAP
+SEARCH) concurrently, with a per-service timeout (2s by default) that isolates a
 slow service without blocking the other responses.
 
 Implemented in Python (FastAPI + uvicorn, with `uvloop` as the event loop), for
@@ -21,10 +21,16 @@ central index (see the discussion in study 2.2).
 ## Grommunio / IMAP
 
 Grommunio does not expose a generic REST search API. `app/sources/grommunio.py`
-lays out the structure of an IMAP SEARCH call via an async IMAP client (commented out,
-ready to be enabled) and documents the XOAUTH2 authentication mechanism that lets the
-same user token be relayed to IMAP. The active implementation is a simplified stub that
-simulates network latency, so the fan-out/timeout logic can be exercised end to end.
+connects over IMAP with `aioimaplib` and authenticates via XOAUTH2, relaying the
+same user token that came in on the request (RFC 7628) — no re-authentication or
+service account, consistent with the other sources. It then runs `SEARCH TEXT`
+against `INBOX` and fetches `RFC822.HEADER` for each matching message to build the
+result's title/date.
+
+`aioimaplib`'s `Response.lines` format for a FETCH command isn't part of its public
+API, so the header-literal extraction (`_extract_fetch_literal`) was verified against
+a minimal fake IMAP server that speaks the real wire protocol
+(`tests/test_grommunio.py`), not just against mocks of the client class.
 
 ## Endpoints
 
@@ -44,6 +50,8 @@ simulates network latency, so the fan-out/timeout logic can be exercised end to 
 | `VIKUNJA_BASE_URL` | `https://vikunja.example.org` | Vikunja URL |
 | `GROMMUNIO_IMAP_HOST` | `mail.example.org` | Grommunio IMAP host |
 | `GROMMUNIO_IMAP_PORT` | `993` | IMAP port |
+| `GROMMUNIO_IMAP_TIMEOUT_SECONDS` | `10` | Per-IMAP-command timeout (independent of the fan-out's own `SEARCH_TIMEOUT_MS`) |
+| `GROMMUNIO_WEBMAIL_BASE_URL` | `https://mail.example.org/webapp` | Base URL used to build each result's webmail deep link |
 
 ## Structure
 
