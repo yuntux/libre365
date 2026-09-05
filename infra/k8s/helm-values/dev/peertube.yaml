@@ -1,0 +1,28 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values.
+# PeerTube has no -100/-2000 sizing overlay — this file plays the same "applied
+# second, on top" role for the dev tier.
+#
+# Usage:
+#   helm upgrade --install peertube peertube-helm/peertube -n libre365-dev \
+#     -f peertube.yaml -f dev/peertube.yaml
+#
+# Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are
+# exactly the ones already used in peertube.yaml.
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+# postgresql.enabled / redis.enabled (base file) are left untouched: both are
+# functional requirements of PeerTube (jobs queue, DB), not HA-only toggles, and no
+# `postgresql.primary.resources` / `redis.master.resources` key is attested anywhere
+# in this repo for this specific community chart, so none is guessed here — left at
+# the chart's own defaults (unverifiable third-party schema, no network access to
+# confirm).
