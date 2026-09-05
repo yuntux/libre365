@@ -57,7 +57,7 @@ services:
       retries: 20
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.6
+    image: quay.io/keycloak/keycloak:26.0.7
     restart: unless-stopped
     # Mode dev (start-dev) : pas de TLS, H2/Postgres au choix, adapte au
     # dev/test uniquement - cf. etude 4.4 pour le cluster Keycloak de prod.
@@ -216,7 +216,7 @@ services:
       retries: 20
 
   onlyoffice-documentserver:
-    image: onlyoffice/documentserver:8.2.2
+    image: onlyoffice/documentserver:9.4
     restart: unless-stopped
     environment:
       DB_TYPE: postgres

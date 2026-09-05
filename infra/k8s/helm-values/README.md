@@ -5,6 +5,22 @@ Configuration Kubernetes des briques conteneurisees retenues par l'etude
 repertoire : deploye en VM appliance Proxmox, cf. chapitre 4.3 et `infra/terraform/` /
 `infra/ansible/` (geres par une autre equipe).
 
+## Versions d'image : source unique
+
+Les champs `image.repository`/`image.tag` de ce repertoire (et la ligne
+`image:` brute de `../manifests/gokapi.yaml`) sont generes depuis
+`../../../platform.yaml` par `../../../scripts/sync_platform.py` — la meme
+source que les tags utilises par `docker-compose/`. **Ne pas editer un tag ou
+un repository d'image directement dans un fichier de ce dossier** : le
+prochain `sync_platform.py` l'ecraserait, et la CI (`platform-drift-check`)
+detecte toute edition manuelle non resynchronisee. Pour changer une version,
+editer `platform.yaml` puis lancer :
+
+```bash
+pip install -r ../../../scripts/requirements.txt
+python3 ../../../scripts/sync_platform.py
+```
+
 ## Convention de nommage : overlays `-100` / `-2000`
 
 Pour les briques dont le dimensionnement varie reellement selon l'echelle (Synapse,

@@ -25,6 +25,17 @@ Pour tout arreter et supprimer les volumes (repartir de zero) :
 docker compose down -v
 ```
 
+## Versions et ports : source unique
+
+Les tags d'image de ce fichier et le bloc de ports de `.env.example` (entre
+les marqueurs `BEGIN/END GENERATED PORTS`) sont generes depuis
+[`../platform.yaml`](../platform.yaml) par `../scripts/sync_platform.py` -
+c'est aussi la source des `image.tag`/`image.repository` de
+`infra/k8s/helm-values/` et des ports par defaut de `tests/integration/`.
+**Ne pas modifier un tag ou un port directement ici** : editer
+`platform.yaml`, relancer le script, committer le diff. Voir le README
+racine du depot pour le detail.
+
 ## Services et ports exposes sur localhost
 
 | Service | Image | Port(s) hote | Identifiants par defaut (dev only) |

@@ -57,6 +57,10 @@ synapse:
   federation:
     enabled: true
 
+  image:
+    tag: v1.114.0
+    repository: matrixdotorg/synapse
+
 postgresql:
   enabled: true
   auth:

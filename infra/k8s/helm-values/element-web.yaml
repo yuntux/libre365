@@ -12,7 +12,7 @@ replicaCount: 2
 
 image:
   repository: vectorim/element-web
-  tag: "v1.11"
+  tag: "v1.11.86"
 
 config:
   default_server_config:

@@ -12,7 +12,7 @@
 
 image:
   repository: chocobozzz/peertube
-  tag: "v6-bookworm"
+  tag: "v6.3.2-bookworm"
 
 replicaCount: 1
 

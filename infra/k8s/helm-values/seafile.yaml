@@ -19,7 +19,7 @@
 
 image:
   repository: seafileltd/seafile-mc
-  tag: "11.0-latest"
+  tag: "11.0.13"
 
 replicaCount: 1 # mono-noeud, edition Community (1.4 L.141)
 

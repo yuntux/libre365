@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: gokapi
-          image: f0rc3/gokapi:latest # a figer sur un tag versionne avant mise en production
+          image: f0rc3/gokapi:v1.9.6
           ports:
             - containerPort: 53842
           env:

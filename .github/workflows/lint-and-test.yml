@@ -180,3 +180,38 @@ jobs:
             exit 0
           fi
           docker compose -f "$compose_file" config
+
+  platform-drift-check:
+    name: Dérive versions/ports (platform.yaml)
+    runs-on: ubuntu-latest
+    # platform.yaml (racine) est la source unique des tags d'image et des
+    # ports partagés par docker-compose/ ET infra/k8s/helm-values/ (voir son
+    # en-tête). Ce job garantit qu'aucun de ces fichiers consommateurs n'a été
+    # édité à la main sans repasser par `scripts/sync_platform.py` — faute de
+    # quoi le tier dev/test et la cible de production divergeraient
+    # silencieusement, exactement le risque que platform.yaml existe pour
+    # éliminer.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check for platform.yaml
+        id: check
+        run: |
+          if [ -f "platform.yaml" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::platform.yaml absent pour l'instant - job ignore."
+          fi
+
+      - name: Install scripts/requirements.txt
+        if: steps.check.outputs.present == 'true'
+        run: pip install -r scripts/requirements.txt
+
+      - name: sync_platform.py --check
+        if: steps.check.outputs.present == 'true'
+        run: python3 scripts/sync_platform.py --check

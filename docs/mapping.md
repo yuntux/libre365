@@ -29,6 +29,7 @@ le code correspondant. À tenir à jour à chaque nouvelle brique/connecteur.
 | GAL en CardDAV | 2.13 | `infra/ansible/playbooks/grommunio.yml` (`GAL_ENABLED`) |
 | Réservation de salles | 2.14 | Aucun code — comportement natif Grommunio, documenté (`docs/room-booking.md`) |
 | Infra Proxmox / Kubernetes | 4.1–4.7 | `infra/terraform/`, `infra/k8s/` |
+| Source unique versions/ports (docker-compose ↔ Helm ↔ tests) | 4.1 (IaC reconstructible, sans dérive) | `platform.yaml`, `scripts/sync_platform.py` |
 | Environnements dev/recette/prod | 4.6 | `docker-compose/`, `infra/k8s/helm-values/*-{dev,staging,prod}.yaml` |
 | Veille CVE / versions / recette éphémère | 5.2–5.5 | `.github/workflows/` |
 | Tests d'intégration pérennes | 5.5 | `tests/integration/` |

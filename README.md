@@ -33,6 +33,37 @@ Toute l'infrastructure doit pouvoir être reconstruite depuis ce dépôt seul
 sont pilotés par variable pour couvrir la trajectoire 100 → 2000+
 utilisateurs sans réécriture, jamais codés en dur.
 
+## Une seule source pour les versions et les ports : `platform.yaml`
+
+L'environnement de développement (`docker-compose/`) et la cible de
+production (`infra/k8s/`) décrivent les mêmes briques par deux mécanismes
+différents (image Docker Hub vs. chart Helm) : sans précaution, leurs tags de
+version et leurs ports dérivent l'un de l'autre silencieusement — c'est
+d'ailleurs déjà arrivé une fois dans ce dépôt (les ports par défaut de
+`tests/integration/` avaient divergé de ceux de `docker-compose/`).
+
+[`platform.yaml`](./platform.yaml) est désormais la seule source autorisée
+pour ces valeurs. Il alimente :
+- les tags d'image dans `docker-compose/docker-compose.yml` et les
+  `FROM node:...` des `connectors/*/Dockerfile` ;
+- `image.repository`/`image.tag` dans `infra/k8s/helm-values/*.yaml` (et la
+  ligne `image:` brute de `infra/k8s/manifests/gokapi.yaml`) ;
+- le bloc de ports généré dans `docker-compose/.env.example` ;
+- les ports par défaut de `tests/integration/conftest.py`, via le fichier
+  généré `tests/integration/_platform_defaults.py`.
+
+Workflow : éditer `platform.yaml`, puis :
+
+```bash
+pip install -r scripts/requirements.txt
+python3 scripts/sync_platform.py          # applique les changements
+python3 scripts/sync_platform.py --check  # utilisé par la CI : échoue en cas de dérive
+```
+
+Ne jamais modifier un tag ou un port directement dans un fichier généré/patché
+— il sera écrasé (ou, en CI, la dérive sera détectée et bloquera la pull
+request) à la prochaine synchronisation.
+
 ## Démarrage rapide (environnement de développement)
 
 ```bash

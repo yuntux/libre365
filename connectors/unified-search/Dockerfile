@@ -1,6 +1,6 @@
 # Build context attendu : le repertoire connectors/ (pas ce sous-dossier).
 # docker build -f unified-search/Dockerfile -t unified-search .   # depuis connectors/
-FROM node:20-alpine AS build
+FROM node:20.17-alpine AS build
 WORKDIR /app
 COPY tsconfig.base.json /tsconfig.base.json
 COPY unified-search/package.json ./
@@ -9,7 +9,7 @@ COPY unified-search/src ./src
 RUN npm install
 RUN npm run build
 
-FROM node:20-alpine
+FROM node:20.17-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY unified-search/package.json ./

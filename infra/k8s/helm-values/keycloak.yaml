@@ -16,7 +16,7 @@
 
 image:
   repository: bitnami/keycloak
-  tag: "26"
+  tag: "26.0.7"
 
 auth:
   adminUser: admin

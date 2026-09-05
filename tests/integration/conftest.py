@@ -12,6 +12,15 @@ Toutes les URLs/ports sont donc lus depuis des variables d'environnement, avec
 des valeurs par défaut alignées sur les ports par défaut du docker-compose
 local. Ne jamais coder en dur une URL dans un fichier de test: passer par la
 fixture `base_urls`.
+
+Les ports par défaut eux-mêmes ne sont PAS recopiés ici en dur : ils viennent
+de `_platform_defaults.py`, généré depuis `platform.yaml` (racine du dépôt)
+par `scripts/sync_platform.py` — la même source que celle qui pilote
+`docker-compose/.env.example`. Objectif explicite : éliminer le risque de
+dérive entre les ports réellement exposés par docker-compose et ceux que
+cette suite utilise par défaut (une dérive silencieuse s'était déjà produite
+ici avant l'introduction de platform.yaml : Gokapi, PeerTube et Caddy avaient
+des ports par défaut obsolètes).
 """
 
 from __future__ import annotations
@@ -24,6 +33,8 @@ from typing import Callable, Optional
 import pytest
 import requests
 
+from _platform_defaults import DEFAULT_PORTS
+
 
 # ---------------------------------------------------------------------------
 # Résolution des URLs de service
@@ -32,6 +43,12 @@ import requests
 def _env_url(var_name: str, default: str) -> str:
     """Lit une URL de base dans l'environnement, sans slash de fin."""
     return os.environ.get(var_name, default).rstrip("/")
+
+
+def _default_url(port_var: str, path: str = "") -> str:
+    """URL localhost par défaut construite à partir d'un port de
+    `_platform_defaults.DEFAULT_PORTS` (donc de `platform.yaml`)."""
+    return f"http://localhost:{DEFAULT_PORTS[port_var]}{path}"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -70,25 +87,25 @@ def base_urls() -> BaseUrls:
     (voir tests/integration/README.md).
     """
     return BaseUrls(
-        keycloak=_env_url("KEYCLOAK_URL", "http://localhost:8080"),
+        keycloak=_env_url("KEYCLOAK_URL", _default_url("KEYCLOAK_PORT")),
         grommunio_imap_host=os.environ.get("GROMMUNIO_IMAP_HOST", "localhost"),
         grommunio_imap_port=int(os.environ.get("GROMMUNIO_IMAP_PORT", "993")),
         grommunio_smtp_host=os.environ.get("GROMMUNIO_SMTP_HOST", "localhost"),
         grommunio_smtp_port=int(os.environ.get("GROMMUNIO_SMTP_PORT", "587")),
-        seafile=_env_url("SEAFILE_URL", "http://localhost:8082"),
-        onlyoffice=_env_url("ONLYOFFICE_URL", "http://localhost:8083"),
-        matrix=_env_url("MATRIX_URL", "http://localhost:8008"),
-        element=_env_url("ELEMENT_URL", "http://localhost:8081"),
-        vikunja=_env_url("VIKUNJA_URL", "http://localhost:3456"),
-        gokapi=_env_url("GOKAPI_URL", "http://localhost:8090"),
-        minio=_env_url("MINIO_URL", "http://localhost:9000"),
-        peertube=_env_url("PEERTUBE_URL", "http://localhost:9001"),
-        caddy=_env_url("CADDY_URL", "http://localhost:80"),
-        notification_hub=_env_url("NOTIFICATION_HUB_URL", "http://localhost:4001"),
-        unified_search=_env_url("UNIFIED_SEARCH_URL", "http://localhost:4002"),
-        presence_aggregator=_env_url("PRESENCE_AGGREGATOR_URL", "http://localhost:4003"),
-        onlyoffice_mentions=_env_url("ONLYOFFICE_MENTIONS_URL", "http://localhost:4004"),
-        peertube_ingest=_env_url("PEERTUBE_INGEST_URL", "http://localhost:4005"),
+        seafile=_env_url("SEAFILE_URL", _default_url("SEAFILE_PORT")),
+        onlyoffice=_env_url("ONLYOFFICE_URL", _default_url("ONLYOFFICE_PORT")),
+        matrix=_env_url("MATRIX_URL", _default_url("SYNAPSE_CLIENT_PORT")),
+        element=_env_url("ELEMENT_URL", _default_url("ELEMENT_PORT")),
+        vikunja=_env_url("VIKUNJA_URL", _default_url("VIKUNJA_PORT")),
+        gokapi=_env_url("GOKAPI_URL", _default_url("GOKAPI_PORT")),
+        minio=_env_url("MINIO_URL", _default_url("MINIO_API_PORT")),
+        peertube=_env_url("PEERTUBE_URL", _default_url("PEERTUBE_PORT")),
+        caddy=_env_url("CADDY_URL", _default_url("CADDY_HTTP_PORT")),
+        notification_hub=_env_url("NOTIFICATION_HUB_URL", _default_url("NOTIFICATION_HUB_PORT")),
+        unified_search=_env_url("UNIFIED_SEARCH_URL", _default_url("UNIFIED_SEARCH_PORT")),
+        presence_aggregator=_env_url("PRESENCE_AGGREGATOR_URL", _default_url("PRESENCE_AGGREGATOR_PORT")),
+        onlyoffice_mentions=_env_url("ONLYOFFICE_MENTIONS_URL", _default_url("ONLYOFFICE_MENTIONS_PORT")),
+        peertube_ingest=_env_url("PEERTUBE_INGEST_URL", _default_url("PEERTUBE_INGEST_PORT")),
     )
 
 

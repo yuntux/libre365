@@ -12,7 +12,7 @@ replicaCount: 2
 
 image:
   repository: vikunja/vikunja
-  tag: "latest" # a figer sur un tag versionne avant mise en production
+  tag: "0.24.3"
 
 resources:
   requests:

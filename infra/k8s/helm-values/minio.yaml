@@ -8,6 +8,10 @@
 # dependance cloud. La retention sur ce bucket est fixee par le cabinet lui-meme (regle
 # de cycle de vie generique ou son absence), plutot que subie (cf. 2.12 L.587).
 
+image:
+  repository: minio/minio
+  tag: RELEASE.2024-10-13T13-34-11Z
+
 mode: distributed # HA multi-noeud, coherent avec l'objectif de croissance (chapitre 4.1)
 replicas: 4
 

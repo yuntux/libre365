@@ -59,7 +59,14 @@ avec un backoff avant de lancer les assertions métier.
 Toutes les URLs de service ont une valeur par défaut cohérente avec
 `docker-compose/docker-compose.yml`, mais peuvent être surchargées pour
 pointer la suite vers un autre environnement (dev local avec des ports
-remappés, ou environnement de recette éphémère - étude 4.4/5.4) :
+remappés, ou environnement de recette éphémère - étude 4.4/5.4).
+
+Ces valeurs par défaut ne sont **pas** recopiées à la main : elles viennent de
+`_platform_defaults.py`, généré depuis `../../platform.yaml` (racine du
+dépôt) par `../../scripts/sync_platform.py` — la même source qui pilote les
+ports de `docker-compose/.env.example` et les tags d'image de
+`infra/k8s/helm-values/`. Pour changer un port par défaut, éditer
+`platform.yaml`, jamais `_platform_defaults.py` ni `conftest.py` directement.
 
 | Variable                     | Défaut                     | Brique                          |
 |-------------------------------|-----------------------------|----------------------------------|
@@ -75,10 +82,10 @@ remappés, ou environnement de recette éphémère - étude 4.4/5.4) :
 | `MATRIX_URL`                   | `http://localhost:8008`     | Synapse (homeserver Matrix)     |
 | `ELEMENT_URL`                  | `http://localhost:8081`     | Element (client web)            |
 | `VIKUNJA_URL`                  | `http://localhost:3456`     | Vikunja                         |
-| `GOKAPI_URL`                   | `http://localhost:8090`     | Gokapi                          |
+| `GOKAPI_URL`                   | `http://localhost:53842`    | Gokapi                          |
 | `MINIO_URL`                    | `http://localhost:9000`     | MinIO                           |
-| `PEERTUBE_URL`                 | `http://localhost:9001`     | PeerTube                        |
-| `CADDY_URL`                    | `http://localhost:80`       | Caddy (reverse proxy)           |
+| `PEERTUBE_URL`                 | `http://localhost:9002`     | PeerTube                        |
+| `CADDY_URL`                    | `http://localhost:10080`    | Caddy (reverse proxy)           |
 | `NOTIFICATION_HUB_URL`         | `http://localhost:4001`     | Connecteur notification-hub     |
 | `UNIFIED_SEARCH_URL`           | `http://localhost:4002`     | Connecteur unified-search       |
 | `PRESENCE_AGGREGATOR_URL`      | `http://localhost:4003`     | Connecteur presence-aggregator  |

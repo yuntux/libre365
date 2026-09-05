@@ -1,0 +1,238 @@
+# =============================================================================
+# open365 - registre unique des versions et des ports.
+# =============================================================================
+#
+# Ce fichier est la SEULE source autorisée pour :
+#   - les tags/versions d'image utilisés à la fois par l'environnement de
+#     développement (docker-compose/, étude 4.6) et par la cible de
+#     production (infra/k8s/helm-values, étude 4.4) ;
+#   - les ports par défaut exposés par docker-compose et consommés par la
+#     suite de tests d'intégration (tests/integration/).
+#
+# Ne JAMAIS modifier un tag/port directement dans docker-compose.yml,
+# infra/k8s/helm-values/*.yaml, infra/k8s/manifests/*.yaml, un Dockerfile de
+# connecteur ou tests/integration/_platform_defaults.py : ces fichiers sont
+# (ré)générés/patchés à partir de celui-ci. Workflow :
+#
+#   1. Éditer platform.yaml
+#   2. pip install -r scripts/requirements.txt
+#   3. python3 scripts/sync_platform.py        # applique les changements
+#   4. Relire le diff, committer
+#
+# La CI vérifie qu'aucune dérive n'a été introduite à la main :
+#   python3 scripts/sync_platform.py --check   # échoue si un fichier généré
+#                                               # ne correspond plus à ce fichier
+#
+# Voir docs/mapping.md pour le lien avec l'étude sortie-office365-etude.md.
+
+# -----------------------------------------------------------------------------
+# Images génériques réutilisées par plusieurs services dans docker-compose
+# (évite de répéter/faire dériver le même tag Postgres/Redis/MariaDB/Node à
+# 3-5 endroits différents du fichier).
+# -----------------------------------------------------------------------------
+shared:
+  postgres: "16.4-alpine"
+  redis: "7.4-alpine"
+  mariadb: "10.11"
+  # Base des connecteurs (connectors/*/Dockerfile, build ET runtime stage) et
+  # du mock Novu du tier dev (docker-compose/config/novu-mock).
+  node: "20.17-alpine"
+
+# -----------------------------------------------------------------------------
+# Briques applicatives : une entrée par brique retenue au chapitre 1 de
+# l'étude. `version` est la valeur unique propagée aux DEUX cibles quand elles
+# partagent le même éditeur d'image ; `helm.image_repository` documente le cas
+# où le chart de production republie l'image sous un registre différent
+# (Bitnami notamment) - la valeur `version` reste la référence commune même si
+# le tag exact généré diffère légèrement de celui du fournisseur amont.
+# -----------------------------------------------------------------------------
+#
+# `ports` : dictionnaire {NOM_EXACT_DE_LA_VARIABLE: valeur}, tel qu'utilisé
+# littéralement dans docker-compose.yml et .env.example — déclaré
+# explicitement plutôt que dérivé par convention, car les noms historiques ne
+# suivent pas tous le même schéma (SYNAPSE_CLIENT_PORT, MINIO_API_PORT,
+# CADDY_HTTP_PORT...). C'est la garantie qu'un renommage de variable dans
+# platform.yaml se voit immédiatement dans le diff plutôt que d'être déduit
+# silencieusement.
+services:
+  keycloak:
+    version: "26.0.7" # étude 1.7
+    ports: { KEYCLOAK_PORT: 8080 }
+    compose:
+      image: quay.io/keycloak/keycloak
+    helm:
+      file: infra/k8s/helm-values/keycloak.yaml
+      image_repository: bitnami/keycloak
+      tag_path: .image.tag
+
+  synapse:
+    version: "v1.114.0" # étude 1.2
+    ports: { SYNAPSE_CLIENT_PORT: 8008, SYNAPSE_FEDERATION_PORT: 8448 }
+    compose:
+      image: matrixdotorg/synapse
+    helm:
+      file: infra/k8s/helm-values/synapse.yaml
+      image_repository: matrixdotorg/synapse
+      # Chart ananace-chart/matrix-synapse : tout ce qui concerne Synapse est
+      # nesté sous la clé racine `synapse:` (workers, oidc, federation...) —
+      # l'override d'image suit la même convention plutôt qu'un `.image.tag`
+      # à la racine, absent de ce chart.
+      tag_path: synapse.image.tag
+
+  element_web:
+    version: "v1.11.86" # étude 1.2
+    ports: { ELEMENT_PORT: 8081 }
+    compose:
+      image: vectorim/element-web
+    helm:
+      file: infra/k8s/helm-values/element-web.yaml
+      image_repository: vectorim/element-web
+      tag_path: .image.tag
+
+  element_call:
+    # étude 1.3 - pas encore figé côté chart (cf. TODO déjà présent dans le
+    # fichier values) : ce champ documente l'intention, la valeur reste
+    # "latest-ce" tant que le chantier "à figer avant prod" n'est pas fait.
+    version: "latest-ce"
+    compose: null # pas de conteneur docker-compose dédié : Element Call est
+      # exercé via le widget MatrixRTC embarqué dans Element Web (1.3), pas
+      # comme service autonome dans le tier dev/test.
+    helm:
+      file: infra/k8s/helm-values/element-call.yaml
+      image_repository: ghcr.io/element-hq/element-call
+      tag_path: .image.tag
+
+  visio:
+    # étude 1.3 - LaSuite Meet (backend Django + frontend), pas de service
+    # docker-compose dédié à ce stade (pas encore intégré au tier dev/test :
+    # à ajouter si le connecteur widget Matrix↔Visio, 2.4, doit être testé
+    # en local). `version` s'applique aux deux images, publiées ensemble.
+    version: "latest" # a figer sur un tag versionne avant mise en production
+    compose: null
+    helm_images:
+      - file: infra/k8s/helm-values/visio-meet.yaml
+        image_repository: lasuite/meet-backend
+        tag_path: backend.image.tag
+      - file: infra/k8s/helm-values/visio-meet.yaml
+        image_repository: lasuite/meet-frontend
+        tag_path: frontend.image.tag
+
+  seafile:
+    version: "11.0.13" # étude 1.4
+    ports: { SEAFILE_PORT: 8082 }
+    compose:
+      image: seafileltd/seafile-mc
+    helm:
+      file: infra/k8s/helm-values/seafile.yaml
+      image_repository: seafileltd/seafile-mc
+      tag_path: .image.tag
+
+  onlyoffice:
+    # étude 1.5 - >= 9.4 est un point tranché explicitement dans l'étude
+    # (levée du plafond de connexions, simplification d'architecture) : le
+    # tier dev/test tournait par erreur sur 8.2.2 avant l'introduction de
+    # platform.yaml - corrigé ici, pas seulement dans le fichier Helm.
+    version: "9.4"
+    ports: { ONLYOFFICE_PORT: 8083 }
+    compose:
+      image: onlyoffice/documentserver
+    helm:
+      file: infra/k8s/helm-values/onlyoffice.yaml
+      image_repository: onlyoffice/documentserver
+      tag_path: .image.tag
+
+  vikunja:
+    version: "0.24.3" # étude 1.6
+    ports: { VIKUNJA_PORT: 3456 }
+    compose:
+      image: vikunja/vikunja
+    helm:
+      file: infra/k8s/helm-values/vikunja.yaml
+      image_repository: vikunja/vikunja
+      tag_path: .image.tag
+
+  gokapi:
+    version: "v1.9.6" # étude 1.8
+    ports: { GOKAPI_PORT: 53842 }
+    compose:
+      image: f0rc3/gokapi
+    helm:
+      # Pas de chart Helm officiel (cf. infra/k8s/helm-values/README.md) :
+      # manifest Deployment brut, patché par substitution directe de la ligne
+      # `image:` plutôt que par chemin YAML structuré.
+      file: infra/k8s/manifests/gokapi.yaml
+      image_repository: f0rc3/gokapi
+      raw_image_line: true
+
+  minio:
+    version: "RELEASE.2024-10-13T13-34-11Z" # étude 2.12
+    ports: { MINIO_API_PORT: 9000, MINIO_CONSOLE_PORT: 9001 }
+    compose:
+      image: minio/minio
+    helm:
+      file: infra/k8s/helm-values/minio.yaml
+      image_repository: minio/minio
+      tag_path: .image.tag
+
+  peertube:
+    version: "v6.3.2-bookworm" # étude 2.12
+    ports: { PEERTUBE_PORT: 9002 }
+    compose:
+      image: chocobozzz/peertube
+    helm:
+      file: infra/k8s/helm-values/peertube.yaml
+      image_repository: chocobozzz/peertube
+      tag_path: .image.tag
+
+  caddy:
+    version: "2.8.4-alpine" # étude 2.3
+    ports: { CADDY_HTTP_PORT: 10080, CADDY_HTTPS_PORT: 10443 }
+    compose:
+      image: caddy
+    helm: null # infra/k8s/manifests/caddy.yaml utilise une image custom
+      # (build xcaddy + plugin d'injection, registry interne) : le tag Caddy
+      # de base qui y est embarqué se maintient manuellement dans le
+      # Dockerfile de build de cette image, pas ici (pas de tag `caddy:X`
+      # directement présent dans le manifest K8s à synchroniser).
+
+  novu:
+    # étude 2.1 - centre de notifications de production (Helm officiel) ;
+    # le tier dev/test utilise un mock local (docker-compose/config/novu-mock),
+    # sans image externe à synchroniser côté compose. Le chart officiel Novu
+    # gère lui-même les images de ses 3 sous-composants (api/worker/ws) sans
+    # champ `image.tag` unique exploitable ici : non synchronisé par ce
+    # script, la version du chart (`--version` au `helm upgrade`) reste la
+    # référence à figer séparément le jour du déploiement réel.
+    compose: null
+    helm: null
+
+  grommunio_dev:
+    version: "core-c9" # image dev/test uniquement, cf. étude 4.3
+    ports: { GROMMUNIO_DEV_HTTP_PORT: 8443 }
+    compose:
+      image: grommunio/gromox-container
+    helm: null # étude 4.3 : VM Proxmox appliance en production, jamais en
+      # conteneur Kubernetes - aucun fichier Helm équivalent à synchroniser.
+
+# -----------------------------------------------------------------------------
+# Connecteurs développés en propre (chapitre 2) : pas de tag de version tiers
+# (construits depuis ce dépôt), seul le port par défaut est centralisé pour
+# éviter la dérive déjà constatée entre docker-compose/.env.example et
+# tests/integration/conftest.py.
+# -----------------------------------------------------------------------------
+connector_ports:
+  NOTIFICATION_HUB_PORT: 4001
+  UNIFIED_SEARCH_PORT: 4002
+  PRESENCE_AGGREGATOR_PORT: 4003
+  ONLYOFFICE_MENTIONS_PORT: 4004
+  PEERTUBE_INGEST_PORT: 4005
+
+# -----------------------------------------------------------------------------
+# Ports d'infrastructure dev/test (bases de données dédiées, étude 4.6) et
+# services sans entrée `services.*` dédiée (mock Novu, étude 2.1).
+# -----------------------------------------------------------------------------
+other_ports:
+  POSTGRES_KEYCLOAK_PORT: 5433
+  POSTGRES_SYNAPSE_PORT: 5434
+  POSTGRES_ONLYOFFICE_PORT: 5435
+  NOVU_MOCK_PORT: 13000
