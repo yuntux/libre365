@@ -1,0 +1,60 @@
+# Brique : MinIO — stockage objet compatible S3 (etude 2.12 L.587)
+# Chart utilise : minio/minio (chart officiel MinIO)
+#   repo Helm : https://charts.min.io/
+#   chart    : minio
+#
+# 2.12 L.587 — MinIO auto-heberge retenu comme destination S3 de LiveKit Egress plutot
+# qu'un partage de filesystem (NFS) entre pods : composant auto-heberge de plus, pas une
+# dependance cloud. La retention sur ce bucket est fixee par le cabinet lui-meme (regle
+# de cycle de vie generique ou son absence), plutot que subie (cf. 2.12 L.587).
+
+mode: distributed # HA multi-noeud, coherent avec l'objectif de croissance (chapitre 4.1)
+replicas: 4
+
+resources:
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+persistence:
+  enabled: true
+  size: 500Gi
+  storageClass: ""
+
+# 2.12 L.587-592 — bucket dedie aux enregistrements de reunion (destination Egress
+# LiveKit) + bucket dedie au depot intermediaire avant reprise par PeerTube.
+buckets:
+  - name: visio-recordings
+    policy: none
+    purge: false
+  - name: peertube-staging
+    policy: none
+    purge: false
+
+# 2.12 L.589 — notifications ObjectCreated exposees via webhook, consommees par le
+# connecteur de depot vers PeerTube (batch quotidien, cf. peertube.yaml et connectors/,
+# hors perimetre de ce depot k8s).
+existingSecret: minio-root-credentials
+
+ingress:
+  enabled: true
+  ingressClassName: ""
+  hosts:
+    - s3.open365.example.org
+  tls:
+    - secretName: minio-tls
+      hosts:
+        - s3.open365.example.org
+
+consoleIngress:
+  enabled: true
+  ingressClassName: ""
+  hosts:
+    - minio-console.open365.example.org
+  tls:
+    - secretName: minio-console-tls
+      hosts:
+        - minio-console.open365.example.org

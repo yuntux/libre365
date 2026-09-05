@@ -1,0 +1,88 @@
+---
+# Configuration post-déploiement de la VM appliance Grommunio (étude 1.1, 2.13,
+# 4.3). L'appliance elle-même est provisionnée par Terraform
+# (infra/terraform/grommunio.tf) ; ce playbook intervient une fois l'appliance
+# installée et accessible en SSH.
+
+- name: "Configurer la VM appliance Grommunio"
+  hosts: grommunio
+  become: true
+  vars:
+    grommunio_dav_config_path: /etc/gromox/dav/grommunio-dav.cfg
+    # GAL en CardDAV — étude 2.13, ligne ~608-616 : fonctionnalité native
+    # ajoutée en 2026.06.1, désactivée par défaut, à activer dès le déploiement
+    # initial pour que Thunderbird/Apple Mail disposent du GAL comme Outlook
+    # en MAPI/EWS.
+    grommunio_gal_enabled: true
+    # TTL par défaut de l'ordre de l'heure : équilibre fraîcheur de l'annuaire
+    # (arrivées/départs de consultants) et charge sur le serveur DAV (2.13,
+    # ligne ~613) — 3600 secondes retenu comme valeur de référence.
+    grommunio_gal_cache_ttl_seconds: 3600
+    # Admin web désactivée pour rester sous le seuil des 5 utilisateurs
+    # gratuits de la console Grommunio (étude 1.1, ligne ~53 : "piloté sans
+    # l'interface d'administration web (CLI/API/fichiers de configuration)
+    # pour éviter le coût de licence au-delà de 5 utilisateurs").
+    grommunio_admin_web_enabled: false
+
+  tasks:
+    - name: "S'assurer que le répertoire de configuration grommunio-dav existe"
+      ansible.builtin.file:
+        path: "{{ grommunio_dav_config_path | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: "Activer le GAL en CardDAV (GAL_ENABLED, GAL_CACHE_TTL) — étude 2.13"
+      ansible.builtin.lineinfile:
+        path: "{{ grommunio_dav_config_path }}"
+        create: true
+        owner: root
+        group: root
+        mode: "0640"
+        regexp: "^{{ item.key }}\\s*="
+        line: "{{ item.key }} = {{ item.value }}"
+      loop:
+        - { key: "GAL_ENABLED", value: "{{ grommunio_gal_enabled | lower }}" }
+        - { key: "GAL_CACHE_TTL", value: "{{ grommunio_gal_cache_ttl_seconds }}" }
+      notify: "Redémarrer grommunio-dav"
+
+    - name: "Désactiver l'interface d'administration web Grommunio"
+      ansible.builtin.systemd:
+        name: gromox-adaptor.service
+        enabled: false
+        state: stopped
+      when: not grommunio_admin_web_enabled
+      ignore_errors: true # le nom exact du service dépend de la version d'appliance installée ; à ajuster en recette
+
+    - name: "Bloquer l'accès réseau à la console d'admin web en complément (défense en profondeur)"
+      community.general.ufw:
+        rule: deny
+        port: "8080"
+        proto: tcp
+      when: not grommunio_admin_web_enabled
+      ignore_errors: true # ufw peut ne pas être le pare-feu retenu sur l'appliance ; adapter selon l'image
+
+    - name: "S'assurer que le connecteur EWS est actif (compatibilité Outlook, Apple Mail, Thunderbird — étude 1.9)"
+      ansible.builtin.systemd:
+        name: gromox-http.service
+        state: started
+        enabled: true
+
+    - name: "S'assurer que le connecteur EAS/ActiveSync est actif (mobile — étude 1.1)"
+      ansible.builtin.systemd:
+        name: gromox-zcore.service
+        state: started
+        enabled: true
+
+    - name: "S'assurer que MAPI/RPC-HTTP est actif (compatibilité Outlook native — étude 1.1)"
+      ansible.builtin.systemd:
+        name: gromox-http.service
+        state: started
+        enabled: true
+
+  handlers:
+    - name: "Redémarrer grommunio-dav"
+      ansible.builtin.systemd:
+        name: gromox-dav.service
+        state: restarted

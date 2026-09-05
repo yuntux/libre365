@@ -1,0 +1,65 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Paris",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 10,
+  "packageRules": [
+    {
+      "description": "Etude 5.3 (lignes 781-784) : suivi automatique des versions des images de conteneurs de chaque brique. Regroupement par brique (une PR par service applicatif) pour que chaque montee de version puisse etre validee independamment en recette ephemere (voir ephemeral-staging.yml).",
+      "matchManagers": ["dockerfile", "docker-compose", "kubernetes", "helm-values"],
+      "matchFileNames": ["docker-compose/**", "infra/k8s/helm-values/**"],
+      "groupName": "images {{packageName}}",
+      "groupSlug": "image-{{packageName}}",
+      "commitMessagePrefix": "chore(images):",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Providers Terraform du depot IaC (etude 4.5) : proxmox (bpg/proxmox) et autres providers utilises sous infra/terraform. Groupes ensemble, hebdomadaire, car une montee de provider necessite un terraform validate/plan de tout le module.",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/terraform/**"],
+      "groupName": "terraform providers",
+      "groupSlug": "terraform-providers",
+      "commitMessagePrefix": "chore(terraform):",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Roles/collections Ansible du depot IaC (etude 4.5), groupes separement des providers Terraform.",
+      "matchManagers": ["ansible", "ansible-galaxy"],
+      "matchFileNames": ["infra/ansible/**"],
+      "groupName": "ansible dependencies",
+      "groupSlug": "ansible-deps",
+      "commitMessagePrefix": "chore(ansible):",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Dependances npm de chaque connecteur developpe en propre (chapitre 2), groupees par connecteur pour garder une correspondance 1:1 avec les tests unitaires du connecteur concerne (voir lint-and-test.yml).",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["connectors/**"],
+      "groupName": "connector {{parentDir}}",
+      "groupSlug": "connector-{{parentDir}}",
+      "commitMessagePrefix": "chore(connectors):",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Mises a jour majeures de versions applicatives (images des briques) : jamais automerge, correspondent au cas 'nouvelle fonctionnalite ou correctif de securite' de l'etude 5.3 qui doit systematiquement declencher le cycle recette ephemere + rejeu des tests (5.4/5.5) avant promotion.",
+      "matchManagers": ["dockerfile", "docker-compose", "kubernetes", "helm-values"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "automerge": false
+    },
+    {
+      "description": "Correctifs de securite (CVE) sur les dependances npm des connecteurs : priorite plus elevee, sans automerge (validation via lint-and-test.yml requise).",
+      "matchManagers": ["npm"],
+      "vulnerabilityAlerts": true,
+      "prPriority": 10,
+      "automerge": false
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security", "dependencies"]
+  },
+  "osvVulnerabilityAlerts": true
+}

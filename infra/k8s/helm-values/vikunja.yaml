@@ -1,0 +1,62 @@
+# Brique : Vikunja — gestion de taches (etude 1.6 L.228-229)
+# Chart utilise : chart communautaire `vikunja/helm-charts` (https://vikunja.io, depot
+#   GitHub `go-vikunja/helm-charts`)
+#   repo Helm : https://vikunja.github.io/helm-charts
+#
+# 1.6 L.229 — dimensionnement 2-4 coeurs / 4 Go RAM suffisant pour 100 comme 2000
+# utilisateurs (sauf usage massif d'API/automatisations) : pas de variante 100/2000
+# dediee, un seul fichier de values suffit ici, contrairement a Synapse/OnlyOffice/
+# Keycloak dont le dimensionnement croit reellement avec l'echelle.
+
+replicaCount: 2
+
+image:
+  repository: vikunja/vikunja
+  tag: "latest" # a figer sur un tag versionne avant mise en production
+
+resources:
+  requests:
+    cpu: "1"
+    memory: "2Gi"
+  limits:
+    cpu: "4"
+    memory: "4Gi"
+
+env:
+  VIKUNJA_SERVICE_PUBLICURL: "https://taches.open365.example.org"
+  VIKUNJA_SERVICE_ENABLECALDAV: "true" # 1.6 tableau — integration calendrier native
+  # 1.7 — SSO Keycloak (OIDC natif Vikunja)
+  VIKUNJA_AUTH_OPENID_ENABLED: "true"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_0_NAME: "Open365 SSO"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_0_AUTHURL: "https://sso.open365.example.org/realms/open365"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTID: "vikunja"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTSECRET:
+    valueFrom:
+      secretKeyRef:
+        name: vikunja-oidc-secret
+        key: client-secret
+
+postgresql:
+  enabled: true
+  auth:
+    database: vikunja
+    existingSecret: vikunja-postgres-secret
+
+persistence:
+  files:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: taches.open365.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: vikunja-tls
+      hosts:
+        - taches.open365.example.org

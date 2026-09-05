@@ -1,0 +1,57 @@
+---
+# Configuration Seafile — étude 1.4 (brique retenue) et 2.11 (interdiction des
+# liens de partage non authentifiés, complémentaire de Gokapi pour le partage
+# externe, 1.8) et 1.5 (connecteur OnlyOffice).
+#
+# Seafile est déployé par Helm dans le cluster Kubernetes
+# (infra/k8s/helm-values/seafile.yaml, hors périmètre de cette tâche) ; ce
+# playbook porte la configuration applicative (seahub_settings.py) via
+# ConfigMap.
+
+- name: "Configurer seahub_settings.py (partage authentifié, connecteur OnlyOffice)"
+  hosts: seafile
+  connection: local
+  gather_facts: false
+  vars:
+    seafile_namespace: "seafile"
+    seafile_configmap: "seahub-settings"
+    # Étude 2.11, ligne ~564-565 : "SHARE_LINK_LOGIN_REQUIRED = True [...] force
+    # la connexion pour consulter tout lien de partage" — pour que tout partage
+    # externe non authentifié passe exclusivement par Gokapi (1.8).
+    seafile_share_link_login_required: true
+    # Permission désactivable par rôle plutôt que seulement restreindre la
+    # consultation (2.11) — ici positionnée globalement par défaut ; le
+    # découpage par rôle précis (seahub_settings.py, ROLE_PERMISSIONS) est un
+    # réglage à affiner en recette selon les profils de consultants.
+    seafile_can_generate_share_link_default: true
+    # Connecteur OnlyOffice — étude 1.5 : "OFFICE_SERVER_TYPE" documenté par
+    # Seafile lui-même pour l'intégration OnlyOffice/Collabora.
+    seafile_office_server_type: "OnlyOffice"
+    seafile_onlyoffice_url: "https://{{ onlyoffice_domain }}"
+
+  tasks:
+    - name: "Rendre seahub_settings.py"
+      ansible.builtin.template:
+        src: ../templates/seahub_settings.py.j2
+        dest: "{{ playbook_dir }}/../rendered/seahub_settings.py"
+        mode: "0640"
+
+    - name: "Publier seahub_settings.py comme ConfigMap Kubernetes"
+      ansible.builtin.command: >-
+        kubectl create configmap {{ seafile_configmap }}
+        --namespace {{ seafile_namespace }}
+        --from-file=seahub_settings.py={{ playbook_dir }}/../rendered/seahub_settings.py
+        --dry-run=client -o yaml
+      register: seafile_configmap_manifest
+      changed_when: false
+
+    - name: "kubectl apply de la configuration Seafile"
+      ansible.builtin.shell: |
+        echo '{{ seafile_configmap_manifest.stdout }}' | kubectl apply -f -
+      changed_when: true
+
+    - name: "Redémarrer les pods Seahub pour prendre en compte la configuration"
+      ansible.builtin.command: >-
+        kubectl rollout restart deployment/seahub
+        --namespace {{ seafile_namespace }}
+      changed_when: true

@@ -1,0 +1,59 @@
+# Configuration Synapse minimale pour l'environnement docker-compose dev/test
+# (etude 1.2 / 4.6). PAS la configuration de production (pas de workers, pas
+# de TLS federation reel - cf. 4.4 pour le mode "workers" cible en Kubernetes).
+server_name: "matrix.open365.localhost"
+pid_file: /data/homeserver.pid
+public_baseurl: "http://localhost:8008/"
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+        compress: false
+
+# NB: l'image Synapse ne fait pas de substitution de variables d'environnement
+# dans un homeserver.yaml fourni tel quel (contrairement au docker-compose.yml
+# qui, lui, lit .env) - ces valeurs sont donc dupliquees ici en dur, et
+# doivent rester alignees avec .env.example / .env (valeurs dev only).
+database:
+  name: psycopg2
+  args:
+    user: "synapse"
+    password: "devonly-changeme-synapse-db"
+    database: "synapse"
+    host: postgres-synapse
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+# Volume nomme "synapse-data" (cf. docker-compose.yml) pour les media stores
+media_store_path: /data/media_store
+uploads_path: /data/uploads
+
+# Desactive en dev/test : pas de federation reelle avec d'autres serveurs
+# Matrix ; simplifie la CI en n'exigeant pas de TLS/DNS federation valides.
+federation_domain_whitelist: []
+
+registration_shared_secret: "devonly-changeme-synapse-registration"
+enable_registration: true
+enable_registration_without_verification: true
+
+macaroon_secret_key: "devonly-changeme-synapse-macaroon"
+form_secret: "devonly-changeme-synapse-form"
+
+report_stats: false
+
+signing_key_path: "/data/matrix.open365.localhost.signing.key"
+
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+# Application services (webhook Matrix -> centre de notifications, etude 2.1)
+# a completer par l'agent connecteurs via un fichier monte dans
+# app_service_config_files une fois connectors/notification-hub pret.
+app_service_config_files: []
+
+log_config: "/data/log.config"

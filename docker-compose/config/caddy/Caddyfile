@@ -1,0 +1,80 @@
+# Caddyfile de reverse proxy dev/test (etude 4.6).
+# En production (Kubernetes, etude 4.4) le portail applicatif transverse
+# (bandeau menu + cloche notifications + recherche, etude 2.3) est assure par
+# Caddy + un plugin d'injection HTML (ex. caddy2-html-injection-plugin) qui
+# reecrit le HTML de chaque application a la volee pour y inserer ce bandeau,
+# sans toucher au code des applications (etude 2.3, ligne "Injection HTML
+# cote reverse proxy"). Ici, en dev/test, Caddy ne fait qu'un reverse-proxy
+# simple par sous-chemin vers chaque brique, SANS le plugin d'injection
+# (non compile dans l'image caddy:2-alpine officielle - il faudrait une
+# image Caddy custom avec `xcaddy build --with ...`, hors scope d'un
+# environnement de test leger). Le snippet ci-dessous documente a quoi
+# ressemblerait l'injection en production, a titre de reference uniquement.
+
+{
+	admin off
+}
+
+:80 {
+	# --- Portail : redirection racine vers Element (client de reference) ---
+	redir / /chat/ 302
+
+	# --- Bandeau applicatif transverse (etude 2.3) --------------------------
+	# En PRODUCTION uniquement (non actif ici), le snippet d'injection
+	# ressemblerait a ceci (necessite le plugin caddy2-html-injection-plugin,
+	# absent de l'image caddy:2-alpine standard) :
+	#
+	# route /chat/* {
+	#     reverse_proxy element:80
+	#     html_injection {
+	#         selector "body"
+	#         position "prepend"
+	#         html `<div id="open365-banner">...menu, cloche, recherche...</div>`
+	#     }
+	# }
+
+	handle_path /chat/* {
+		reverse_proxy element:80
+	}
+
+	handle_path /keycloak/* {
+		reverse_proxy keycloak:8080
+	}
+
+	handle_path /matrix/* {
+		reverse_proxy synapse:8008
+	}
+
+	handle_path /files/* {
+		reverse_proxy seafile:80
+	}
+
+	handle_path /office/* {
+		reverse_proxy onlyoffice-documentserver:80
+	}
+
+	handle_path /tasks/* {
+		reverse_proxy vikunja:3456
+	}
+
+	handle_path /share/* {
+		reverse_proxy gokapi:53842
+	}
+
+	handle_path /video/* {
+		reverse_proxy peertube:9000
+	}
+
+	handle_path /s3/* {
+		reverse_proxy minio:9000
+	}
+
+	handle {
+		respond "open365 dev portal - see docker-compose/README.md for the per-service ports" 200
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,0 +1,121 @@
+# Brique : Gokapi — mise a disposition de gros fichiers avec E2EE (etude 1.8 L.311-312)
+# Pas de chart Helm officiel connu pour Gokapi (Forceu/Gokapi) : manifest raw
+# Deployment + Service + PVC, derive de l'image officielle `f0rc3/gokapi`.
+#
+# 1.8 L.311-312 — deux conditions imperatives au deploiement :
+#   1. Activer explicitement le niveau de chiffrement 3 (E2EE) — ce n'est PAS le
+#      comportement par defaut de Gokapi.
+#   2. NE PAS ACTIVER la fonctionnalite "File Request" (depot par un tiers externe sans
+#      compte) : elle contourne l'E2EE meme si le niveau 3 est actif par ailleurs (1.8
+#      L.304, L.312).
+# OIDC natif vers Keycloak (1.8 L.303, L.306) — utiliser IMPERATIVEMENT la documentation
+# Keycloak a jour de Gokapi au moment du deploiement (un exemple de configuration
+# anterieur permettait un acces non autorise, cf. 1.8 L.306).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gokapi
+  namespace: open365
+  labels:
+    app.kubernetes.io/name: gokapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gokapi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gokapi
+    spec:
+      containers:
+        - name: gokapi
+          image: f0rc3/gokapi:latest # a figer sur un tag versionne avant mise en production
+          ports:
+            - containerPort: 53842
+          env:
+            # 1.8 L.302 — niveau de chiffrement 3 = veritable E2EE, a activer
+            # EXPLICITEMENT (pas le defaut).
+            - name: GOKAPI_ENCRYPTION_LEVEL
+              value: "3"
+            # 1.8 L.304 — File Request desactive volontairement : ne pas positionner
+            # GOKAPI_FILE_REQUEST_ENABLED=true ici.
+            - name: GOKAPI_FILE_REQUEST_ENABLED
+              value: "false"
+            # 1.7/1.8 L.303 — OIDC natif vers Keycloak
+            - name: GOKAPI_OAUTH_PROVIDER
+              value: "keycloak"
+            - name: GOKAPI_OAUTH_ISSUER_URL
+              value: "https://sso.open365.example.org/realms/open365"
+            - name: GOKAPI_OAUTH_CLIENT_ID
+              value: "gokapi"
+            - name: GOKAPI_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gokapi-oidc-secret
+                  key: client-secret
+            - name: GOKAPI_PUBLIC_URL
+              value: "https://depot.open365.example.org"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          volumeMounts:
+            - name: gokapi-data
+              mountPath: /app/data
+      volumes:
+        - name: gokapi-data
+          persistentVolumeClaim:
+            claimName: gokapi-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gokapi-data
+  namespace: open365
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 200Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gokapi
+  namespace: open365
+  labels:
+    app.kubernetes.io/name: gokapi
+spec:
+  selector:
+    app.kubernetes.io/name: gokapi
+  ports:
+    - port: 80
+      targetPort: 53842
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gokapi
+  namespace: open365
+spec:
+  ingressClassName: ""
+  tls:
+    - hosts:
+        - depot.open365.example.org
+      secretName: gokapi-tls
+  rules:
+    - host: depot.open365.example.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gokapi
+                port:
+                  number: 80

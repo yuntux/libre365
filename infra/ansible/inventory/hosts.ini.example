@@ -1,0 +1,42 @@
+# Copier en inventory/hosts.ini, ou générer automatiquement depuis les sorties
+# Terraform (voir scripts/render-inventory-from-terraform.sh) plutôt que
+# maintenir ce fichier à la main en production — étude 4.5 : provisionnement
+# Terraform, configuration Ansible, sur le même dépôt.
+
+[grommunio]
+grommunio-vm ansible_host=10.10.0.10 ansible_user=root
+
+[k8s_control_plane]
+k8s-cp-1 ansible_host=10.10.0.21 ansible_user=debian
+k8s-cp-2 ansible_host=10.10.0.22 ansible_user=debian
+k8s-cp-3 ansible_host=10.10.0.23 ansible_user=debian
+
+[k8s_workers]
+# Alimenté dynamiquement (nombre variable selon deployment_scale, cf.
+# infra/terraform/locals.tf) — exemple statique pour l'échelle "100" (3 workers).
+k8s-worker-1 ansible_host=10.10.0.31 ansible_user=debian
+k8s-worker-2 ansible_host=10.10.0.32 ansible_user=debian
+k8s-worker-3 ansible_host=10.10.0.33 ansible_user=debian
+
+[k8s_control_plane:vars]
+ansible_python_interpreter=/usr/bin/python3
+
+[k8s_workers:vars]
+ansible_python_interpreter=/usr/bin/python3
+
+# L'hôte "localhost" porte les playbooks qui pilotent des API distantes
+# uniquement (Keycloak REST, Matrix admin API) sans connexion SSH nécessaire.
+[control_apis]
+localhost ansible_connection=local
+
+[keycloak:children]
+control_apis
+
+[matrix:children]
+control_apis
+
+[seafile:children]
+control_apis
+
+[onlyoffice:children]
+control_apis

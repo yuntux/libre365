@@ -1,0 +1,81 @@
+# Brique : Novu — centre de notifications unifie (etude 2.1 L.381-382)
+# Chart utilise : novuhq/helm-charts (chart officiel Novu)
+#   repo Helm : https://novuhq.github.io/helm-charts
+#   chart    : novu
+#
+# 2.1 L.382 — Novu retenu pour l'UI de centre de notif et l'infrastructure multi-canal ;
+# l'ingestion (connecteurs webhook Matrix Application Service, webhook/IMAP Grommunio,
+# webhook Seafile, webhook Vikunja) constitue le vrai chantier de developpement,
+# independant de l'outil retenu — hors perimetre de ce depot k8s (voir connectors/).
+# Reutilise egalement par la recherche unifiee (2.2 L.399) et l'agregateur de presence
+# (2.8 L.504), qui partagent la meme brique d'ingestion/connecteurs.
+
+api:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+worker:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+ws:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+web:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+mongodb:
+  enabled: true
+  auth:
+    existingSecret: novu-mongodb-secret
+
+redis:
+  enabled: true
+
+# 1.7 — provisionnement des comptes/organisation via SSO Keycloak au niveau du portail
+# applicatif transverse (2.3) plutot que via l'auth native Novu (Novu n'est pas expose
+# directement aux consultants comme une application a part entiere, mais integre dans le
+# bandeau, cf. caddy-injection.yaml).
+env:
+  API_ROOT_URL: "https://notifications.open365.example.org/api"
+  WS_URL: "wss://notifications.open365.example.org"
+  FRONT_BASE_URL: "https://notifications.open365.example.org"
+
+ingress:
+  enabled: true
+  className: ""
+  hosts:
+    - host: notifications.open365.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: novu-tls
+      hosts:
+        - notifications.open365.example.org

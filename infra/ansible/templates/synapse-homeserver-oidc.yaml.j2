@@ -1,0 +1,19 @@
+# Extrait de homeserver.yaml généré par playbooks/matrix.yml — à fusionner
+# avec le reste de la configuration Synapse portée par le chart Helm (hors
+# périmètre de cette tâche). Étude 1.2 : Matrix retenu pour son alignement
+# Tchap/DINUM et sa maturité SSO (contrairement à Dendrite, écarté faute de
+# support SSO/OIDC natif) ; étude 1.7 : Keycloak comme SSO central.
+server_name: "{{ synapse_server_name }}"
+
+oidc_providers:
+  - idp_id: keycloak
+    idp_name: "Open365 SSO"
+    issuer: "{{ keycloak_base_url }}/realms/{{ keycloak_target_realm }}"
+    client_id: "{{ synapse_oidc_client_id }}"
+    client_secret: "{{ synapse_oidc_client_secret }}"
+    scopes: ["openid", "profile", "email"]
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ '{{' }} user.preferred_username {{ '}}' }}"
+        display_name_template: "{{ '{{' }} user.name {{ '}}' }}"
+    skip_verification: false

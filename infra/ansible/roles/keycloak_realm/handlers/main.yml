@@ -1,0 +1,4 @@
+---
+# Aucun handler nécessaire à ce stade : les modules community.general.keycloak_*
+# appliquent leurs changements directement via l'API Keycloak, sans service
+# local à redémarrer sur le nœud exécutant Ansible.
