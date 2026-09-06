@@ -96,3 +96,58 @@ def test_coverage_ignores_domains_without_a_caddy_site(tmp_path, monkeypatch):
     platform = _platform("libre365.example.org", {"sso": "sso", "mail": "mail"})
 
     assert sync_platform.check_domain_coverage(platform) == []
+
+
+def _onboarding_platform(base: str) -> dict:
+    return _platform(base, {"matrix": "matrix", "files": "files", "taches": "taches", "mail": "mail"})
+
+
+def test_qr_svg_markup_has_no_xml_declaration_and_is_embeddable():
+    markup = sync_platform._qr_svg_markup("https://example.org")
+
+    assert markup.startswith("<svg")
+    assert markup.endswith("</svg>")
+    assert "<?xml" not in markup
+
+
+def test_onboarding_mobileconfig_carries_no_personal_data():
+    """Study 2.5's design (and the reason this page can be unauthenticated,
+    per review) depends on the .mobileconfig never containing a username,
+    email or password - only the server hostname."""
+    import plistlib
+
+    change = sync_platform.compute_onboarding_changes(_onboarding_platform("libre365.example.org"))[0]
+    manifest = yaml_load_configmap(change.desired)
+    mobileconfig = plistlib.loads(manifest["data"]["grommunio-eas.mobileconfig"].encode())
+
+    payload = mobileconfig["PayloadContent"][0]
+    assert payload["EASHost"] == "mail.libre365.example.org"
+    assert "EASUsername" not in payload
+    assert "EASPassword" not in payload
+    assert "EASEmailAddress" not in payload
+
+
+def test_onboarding_html_reflects_the_current_domain():
+    change = sync_platform.compute_onboarding_changes(_onboarding_platform("libre365.example.org"))[0]
+    manifest = yaml_load_configmap(change.desired)
+    index_html = manifest["data"]["index.html"]
+
+    assert "element://https://matrix.libre365.example.org" in index_html
+    assert "https://files.libre365.example.org" in index_html
+    assert "https://taches.libre365.example.org" in index_html
+    assert "https://mail.libre365.example.org" in index_html
+    assert index_html.count("<svg") == 4
+
+
+def test_onboarding_regenerates_for_a_different_base_domain():
+    change = sync_platform.compute_onboarding_changes(_onboarding_platform("new-base.example.net"))[0]
+    manifest = yaml_load_configmap(change.desired)
+
+    assert "matrix.new-base.example.net" in manifest["data"]["index.html"]
+    assert "libre365.example.org" not in manifest["data"]["index.html"]
+
+
+def yaml_load_configmap(text: str) -> dict:
+    import yaml
+
+    return yaml.safe_load(text)

@@ -18,6 +18,7 @@ Files touched:
     - infra/k8s/manifests/caddy.yaml      (domain names)
     - connectors/*/Dockerfile             (Python base tag, patched in place)
     - connectors/thunderbird-filelink-gokapi/manifest.json  (domain name)
+    - infra/k8s/manifests/onboarding.yaml  (generated: onboarding page + QR codes, study 2.5)
     - tests/integration/_platform_defaults.py  (generated file, do not edit)
 
 Never writes to platform.yaml itself.
@@ -26,10 +27,16 @@ Never writes to platform.yaml itself.
 from __future__ import annotations
 
 import argparse
+import html
+import io
 import re
 import sys
+import textwrap
+import urllib.parse
 from pathlib import Path
 
+import qrcode
+import qrcode.image.svg
 import yaml
 from ruamel.yaml import YAML
 
@@ -462,6 +469,242 @@ def compute_env_example_changes(platform: dict) -> list[Change]:
     return [Change(path, new_text, ".env.example (ports block)")]
 
 
+def _qr_svg_markup(data: str) -> str:
+    """Renders `data` as an inline <svg> fragment (no XML declaration, ready
+    to embed directly in HTML), using the `qrcode` package's own SvgPathImage
+    factory - a well-established, independently maintained implementation,
+    not a hand-rolled QR encoder (getting the error-correction/matrix-
+    placement algorithm subtly wrong would silently produce an
+    unscannable code, not an obvious bug)."""
+    buffer = io.BytesIO()
+    qrcode.make(data, image_factory=qrcode.image.svg.SvgPathImage, box_size=8).save(buffer)
+    return buffer.getvalue().decode("utf-8").split("?>", 1)[1].strip()
+
+
+def _store_search_links(app_name: str) -> str:
+    """Deliberately links to each store's SEARCH results rather than a
+    specific listing (exact bundle ID / package name), since neither could
+    be verified against the live App Store/Play Store from this
+    environment - a wrong guessed direct link is worse than a search page
+    the user picks the right result from once."""
+    apple = f"https://apps.apple.com/search?term={urllib.parse.quote(app_name)}"
+    google = f"https://play.google.com/store/search?q={urllib.parse.quote(app_name)}&c=apps"
+    return f'<a href="{apple}">App Store</a> / <a href="{google}">Play Store</a> (search results, not a direct link - see this script\'s header comment)'
+
+
+def compute_onboarding_changes(platform: dict) -> list[Change]:
+    """Study 2.5 (L.454-457): "A static onboarding page (HTML, behind
+    Caddy) listing each application with an App Store/Play Store link and
+    a preconfigured deep-link QR code" + "An optional .mobileconfig file to
+    preconfigure the Grommunio mail account (ActiveSync) on Mac/iPhone" -
+    explicitly "No MDM infrastructure" (2.5's own conclusion).
+
+    GENERATED, not hand-edited (same convention as
+    tests/integration/_platform_defaults.py): each QR code is a rendered
+    SVG encoding of a URL containing the domain, which sub_domain()'s plain
+    text substitution (used everywhere else in this file) cannot
+    "re-render" if the domain changes - only regenerating from
+    platform.yaml can.
+
+    The .mobileconfig is deliberately GENERIC: only the EAS server
+    hostname, no username/password/email baked in - iOS/macOS prompts for
+    those interactively during profile installation instead. This is what
+    makes it safe to publish on this UNAUTHENTICATED static page: nothing
+    personal or secret is in it. A per-user personalized profile would need
+    its own small backend (SSO-gated generation) sitting behind
+    authentication - out of scope here, and it would contradict 2.5's own
+    "no MDM server" conclusion."""
+    domains = platform.get("domains")
+    if not domains:
+        return []
+    base = domains["base"]
+    sub = domains["subdomains"]
+
+    apps = [
+        {
+            "name": "Element (Matrix chat, study 1.2)",
+            "store_name": "Element Messenger",
+            "qr_target": f"element://https://{sub['matrix']}.{base}",
+            "instructions": (
+                "Install Element, then scan this code to auto-configure the firm's "
+                "homeserver (deep-link format per study 2.5, L.446)."
+            ),
+        },
+        {
+            "name": "Seafile (files, study 1.4)",
+            "store_name": "Seafile",
+            "qr_target": f"https://{sub['files']}.{base}",
+            "instructions": (
+                'Install Seafile, choose "Add an account", then scan this code '
+                "(or type the address shown) as the server URL."
+            ),
+        },
+        {
+            "name": "Vikunja (tasks, study 1.6)",
+            "store_name": "Vikunja",
+            "qr_target": f"https://{sub['taches']}.{base}",
+            "instructions": "Install Vikunja, then scan this code (or type the address shown) as the server URL.",
+        },
+        {
+            "name": "Grommunio webmail (study 1.1)",
+            "store_name": None,  # no dedicated app - native Mail app via the .mobileconfig below instead
+            "qr_target": f"https://{sub['mail']}.{base}",
+            "instructions": (
+                "Scan to open webmail directly in a mobile browser, or use the native "
+                "Mail app via the .mobileconfig profile below (Mac/iPhone, EAS/ActiveSync, no MDM)."
+            ),
+        },
+    ]
+
+    cards = []
+    for app in apps:
+        store_line = (
+            f"<p class=\"store\">{_store_search_links(app['store_name'])}</p>"
+            if app["store_name"]
+            else ""
+        )
+        card = f"""    <div class="app-card">
+      <h2>{html.escape(app['name'])}</h2>
+      <div class="qr">{_qr_svg_markup(app['qr_target'])}</div>
+      <p>{html.escape(app['instructions'])}</p>
+      <p class="target"><code>{html.escape(app['qr_target'])}</code></p>"""
+        if store_line:
+            card += f"\n      {store_line}"
+        card += "\n    </div>"
+        cards.append(card)
+    app_cards = "\n".join(cards)
+
+    mail_domain = f"{sub['mail']}.{base}"
+    onboarding_html = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>libre365 - Get started</title>
+<style>
+  :root {{
+    --libre365-brand-primary: #2B3B58;
+    --libre365-brand-secondary: #F55364;
+    --libre365-brand-surface: #EEEEEE;
+    --libre365-brand-text: #0C141A;
+    --libre365-brand-on-primary: #FFFFFF;
+  }}
+  body {{
+    font-family: "Aileron", system-ui, -apple-system, sans-serif;
+    background: var(--libre365-brand-surface);
+    color: var(--libre365-brand-text);
+    margin: 0;
+    padding: 2rem;
+  }}
+  h1 {{ color: var(--libre365-brand-primary); }}
+  .grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+    max-width: 1100px;
+    margin: 2rem auto;
+  }}
+  .app-card {{
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+  }}
+  .app-card h2 {{ font-size: 1.1rem; color: var(--libre365-brand-primary); margin-top: 0; }}
+  .qr {{ width: 160px; margin: 1rem auto; }}
+  .qr svg {{ width: 100%; height: auto; }}
+  .target code {{ font-size: .8rem; word-break: break-all; }}
+  a {{ color: var(--libre365-brand-primary); }}
+  a:hover {{ color: var(--libre365-brand-secondary); }}
+  .mobileconfig {{ text-align: center; margin: 2rem auto; max-width: 500px; }}
+</style>
+</head>
+<body>
+<h1>Get started</h1>
+<p>Install and configure the firm's applications on your Mac, iPhone, or Android device.
+Scan the code for each application with your phone's camera.</p>
+
+<div class="grid">
+{app_cards}
+</div>
+
+<div class="mobileconfig">
+  <h2>Mac / iPhone mail account (Grommunio, EAS)</h2>
+  <p>Preconfigures the mail server address only - you'll be asked for your username
+  and password when installing the profile, never stored in this file.</p>
+  <p><a href="grommunio-eas.mobileconfig">Download the configuration profile</a></p>
+</div>
+</body>
+</html>
+"""
+
+    mobileconfig = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.eas.account</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>org.libre365.eas.account</string>
+            <key>PayloadUUID</key>
+            <string>FC23DD3A-771F-407D-A1C3-61C917955644</string>
+            <key>PayloadDisplayName</key>
+            <string>libre365 mail (Grommunio)</string>
+            <key>EASHost</key>
+            <string>{mail_domain}</string>
+            <key>EASUseSSL</key>
+            <true/>
+        </dict>
+    </array>
+    <key>PayloadDisplayName</key>
+    <string>libre365 - Grommunio mail account</string>
+    <key>PayloadIdentifier</key>
+    <string>org.libre365.eas.profile</string>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>E0C4750C-D0C1-4A8D-8743-AA9CF43B0C4C</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>
+"""
+
+    manifest_yaml = f"""# GENERATED by scripts/sync_platform.py from platform.yaml - do not edit by
+# hand (same convention as tests/integration/_platform_defaults.py): each
+# QR code below is a rendered SVG encoding of a URL containing the domain,
+# which sub_domain()'s plain text substitution (used everywhere else in
+# this file) cannot "re-render" if the domain changes - only regenerating
+# from platform.yaml can. Study 2.5 (L.454-457), see
+# compute_onboarding_changes()'s docstring in scripts/sync_platform.py for
+# the full rationale, including why the .mobileconfig below carries no
+# personal data (safe to serve from this UNAUTHENTICATED page) and why the
+# App/Play Store links point at search results rather than a specific
+# listing.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: onboarding-page
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: caddy
+    app.kubernetes.io/component: onboarding
+data:
+  index.html: |
+{textwrap.indent(onboarding_html, '    ')}
+  grommunio-eas.mobileconfig: |
+{textwrap.indent(mobileconfig, '    ')}"""
+
+    path = REPO_ROOT / "infra/k8s/manifests/onboarding.yaml"
+    return [Change(path, manifest_yaml, "infra/k8s/manifests/onboarding.yaml (generated: onboarding page + QR codes)")]
+
+
 def compute_test_defaults_changes(platform: dict) -> list[Change]:
     path = REPO_ROOT / "tests" / "integration" / "_platform_defaults.py"
     port_map = all_ports(platform)
@@ -516,6 +759,7 @@ def main() -> int:
     changes += compute_env_example_changes(platform)
     changes += compute_test_defaults_changes(platform)
     changes += compute_domain_changes(platform)
+    changes += compute_onboarding_changes(platform)
 
     dirty = [c for c in changes if c.is_dirty()]
 
