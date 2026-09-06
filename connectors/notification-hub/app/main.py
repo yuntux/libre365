@@ -7,6 +7,8 @@ Novu via the REST API.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import os
 from contextlib import asynccontextmanager
 from typing import List, Optional
@@ -15,6 +17,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from .auth import InvalidToken, verify_token
 from .normalize import (
     normalize_grommunio_event,
     normalize_matrix_event,
@@ -22,10 +25,15 @@ from .normalize import (
     normalize_seafile_event,
     normalize_vikunja_event,
 )
-from .novu_client import trigger_novu_notification
+from .novu_client import NOVU_API_KEY, trigger_novu_notification
 from .types import NormalizedEvent
 
 PORT = int(os.environ.get("PORT", "4001"))
+# Novu's own "application identifier" (public, not a secret) - a value from
+# Novu's own admin settings, generated when the Novu instance/organization
+# is first set up (self-hosted), not something this repo can pin ahead of
+# time - see infra/k8s/manifests/external-secrets.yaml's own comment.
+NOVU_APP_ID = os.environ.get("NOVU_APP_ID", "")
 
 
 @asynccontextmanager
@@ -95,6 +103,41 @@ async def webhook_vikunja(request: Request) -> JSONResponse:
 async def webhook_onlyoffice_mention(request: Request) -> JSONResponse:
     body = await request.json()
     return await _handle_normalized(request, normalize_onlyoffice_mention_event(body))
+
+
+@app.get("/widget/session")
+async def widget_session(request: Request) -> JSONResponse:
+    """Cross-cutting app-portal banner's notification bell (study 2.1, 2.3):
+    Novu's own notification-center widget does not support OIDC at all - it
+    authenticates subscribers via an HMAC-SHA256(NOVU_API_KEY, subscriberId)
+    hash instead (verified against Novu's own source,
+    apps/api/src/app/shared/helpers/is-valid-hmac.ts /
+    libs/application-generic/src/utils/hmac.ts). The subscriberId itself
+    still comes from a REAL OIDC-verified Keycloak token (`sub` claim, via
+    app/auth.py's JWKS signature check) - HMAC only takes over for this last,
+    Novu-specific handshake, which this connector's server-side NOVU_API_KEY
+    (never sent to the browser) is required for regardless."""
+    try:
+        claims = verify_token(request.headers.get("authorization") or "")
+    except InvalidToken as err:
+        return JSONResponse(status_code=401, content={"error": str(err)})
+
+    subscriber_id = claims.get("sub", "")
+    if not NOVU_API_KEY or not NOVU_APP_ID:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "NOVU_API_KEY/NOVU_APP_ID not configured on this connector"},
+        )
+
+    hmac_hash = hmac.new(
+        NOVU_API_KEY.encode("utf-8"), subscriber_id.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
+    return {
+        "applicationIdentifier": NOVU_APP_ID,
+        "subscriberId": subscriber_id,
+        "hmacHash": hmac_hash,
+    }
 
 
 @app.get("/healthz")

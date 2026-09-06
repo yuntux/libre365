@@ -24,22 +24,35 @@ data:
     <!-- libre365 cross-cutting application banner — injected before </body> -->
     <div id="libre365-banner" data-libre365-banner>
       <nav id="libre365-banner-menu">
-        <!-- Links to each component: Element, Seafile, Vikunja, Visio, Grommunio-web, PeerTube -->
+        <!-- Populated by banner.js from GET /portal/apps (study 2.3): only
+             the apps the caller's Keycloak group(s) grant, see
+             infra/ansible/roles/keycloak_realm and connectors/unified-search's
+             app/main.py. Empty until the silent-SSO login completes. -->
       </nav>
       <div id="libre365-banner-search">
         <!-- 2.2 L.398-399 — Unified search area: real-time fan-out to each service's
              native APIs (Matrix /search, Seafile, Vikunja, Grommunio IMAP),
              with the user's Keycloak token relayed on every call. -->
+        <input type="search" id="libre365-search-input" placeholder="Rechercher…" autocomplete="off" disabled>
+        <div id="libre365-search-results" hidden></div>
       </div>
       <div id="libre365-banner-notifications">
         <!-- 2.1 L.381-382 — Notification bell: Novu center, fed by the
              per-service webhook connectors. -->
+        <button type="button" id="libre365-notif-bell" aria-label="Notifications" disabled>
+          🔔<span id="libre365-notif-badge" hidden>0</span>
+        </button>
+        <div id="libre365-notif-panel" hidden></div>
       </div>
       <div id="libre365-banner-presence">
         <!-- 2.8 L.503-504 — Consolidated presence status (Matrix m.presence,
              Grommunio GetUserAvailability, LiveKit call state). -->
+        <span id="libre365-presence-dot" data-status="unknown" title="Statut de présence"></span>
       </div>
     </div>
+    <!-- Hidden iframe target for the silent-SSO (prompt=none) redirect, see
+         banner.js's `silentSso()` - never shown, torn down after each
+         attempt. -->
     <script src="/libre365-banner/banner.js" defer></script>
     <link rel="stylesheet" href="/libre365-banner/banner.css">
   # banner.css/banner.js were referenced by the snippet above from the very
@@ -125,6 +138,90 @@ data:
     body {
       margin-top: 48px !important;
     }
+
+    #libre365-search-input {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      color: var(--libre365-brand-on-primary);
+      padding: 4px 8px;
+      font-size: 13px;
+      width: 220px;
+    }
+
+    #libre365-search-input::placeholder {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    #libre365-search-results,
+    #libre365-notif-panel {
+      position: absolute;
+      top: 48px;
+      right: 16px;
+      max-height: 70vh;
+      overflow-y: auto;
+      background: var(--libre365-brand-surface);
+      color: var(--libre365-brand-text);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      min-width: 280px;
+      z-index: 2147483001;
+    }
+
+    #libre365-search-results {
+      left: 16px;
+      right: auto;
+      width: 320px;
+    }
+
+    #libre365-search-results a,
+    #libre365-notif-panel .libre365-notif-item {
+      display: block;
+      padding: 8px 12px;
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      font-size: 13px;
+    }
+
+    #libre365-search-results a:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    #libre365-notif-bell {
+      position: relative;
+      background: none;
+      border: none;
+      color: var(--libre365-brand-on-primary);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    #libre365-notif-badge {
+      position: absolute;
+      top: -6px;
+      right: -8px;
+      background: var(--libre365-brand-secondary);
+      color: var(--libre365-brand-on-primary);
+      border-radius: 999px;
+      font-size: 10px;
+      line-height: 1;
+      padding: 2px 5px;
+    }
+
+    #libre365-presence-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #888;
+    }
+
+    #libre365-presence-dot[data-status="online"] { background: #2ecc71; }
+    #libre365-presence-dot[data-status="in-meeting"] { background: #f5a623; }
+    #libre365-presence-dot[data-status="unavailable"] { background: #f5a623; }
+    #libre365-presence-dot[data-status="offline"] { background: #888; }
   gokapi-branding.html: |
     <!-- Tasmane branding for Gokapi (study 1.8) - colors ONLY, injected the
          same way as banner.html above but on the depot.<domain> site block
@@ -190,14 +287,352 @@ data:
       }
     </style>
   banner.js: |
-    // libre365 cross-cutting application banner (study 2.3) - client-side
-    // wiring is deliberately NOT implemented here: this file exists only
-    // so /libre365-banner/banner.js (referenced by banner.html above)
-    // stops 404ing on every page load. Populating #libre365-banner-menu,
-    // -search, -notifications and -presence (2.1/2.2/2.8) is separate,
-    // substantial feature work - see connectors/notification-hub/,
-    // connectors/unified-search/ and connectors/presence-aggregator/ for
-    // the backend APIs this would call.
+    // libre365 cross-cutting application banner (study 2.3): silent-SSO
+    // (OIDC Authorization Code + PKCE, `prompt=none`) against the
+    // "libre365-portal" public Keycloak client, then wires the menu
+    // (GET /portal/apps, unified-search), search (GET /search,
+    // unified-search) and notification bell (GET /widget/session,
+    // notification-hub, then Novu's own widget API directly) using the
+    // resulting access token. The presence dot polls presence-aggregator
+    // unauthenticated (see that connector's own main.py - no user token
+    // check there today).
+    //
+    // KEYCLOAK_ISSUER/CLIENT_ID/API_BASE/NOVU_SOCKET_URL below are literal
+    // values kept in sync with platform.yaml by scripts/sync_platform.py
+    // (this file is in DOMAIN_TARGET_FILES) - do not hand-edit them,
+    // change platform.yaml and re-run that script instead.
     (function () {
       "use strict";
+
+      var KEYCLOAK_ISSUER = "https://sso.libre365.example.org/realms/libre365";
+      var CLIENT_ID = "libre365-portal";
+      var API_BASE = "https://api.libre365.example.org";
+      var NOVU_SOCKET_URL = "https://notifications.libre365.example.org";
+      var CALLBACK_URL = window.location.origin + "/libre365-banner/sso-silent-callback.html";
+      var TOKEN_STORAGE_KEY = "libre365-banner-token";
+
+      var APP_LABELS = {
+        chat: "Messagerie",
+        files: "Fichiers",
+        taches: "Tâches",
+        videos: "Vidéos",
+        sso: "Identité (SSO)",
+        seaweedfs_admin: "Stockage (admin)",
+        notifications_admin: "Notifications (admin)"
+      };
+
+      // ---- PKCE helpers (Web Crypto API, no external library needed) ----
+
+      function base64UrlEncode(buffer) {
+        var bytes = new Uint8Array(buffer);
+        var binary = "";
+        for (var i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      }
+
+      function randomVerifier() {
+        var bytes = new Uint8Array(32);
+        window.crypto.getRandomValues(bytes);
+        return base64UrlEncode(bytes.buffer);
+      }
+
+      function challengeFromVerifier(verifier) {
+        var data = new TextEncoder().encode(verifier);
+        return window.crypto.subtle.digest("SHA-256", data).then(base64UrlEncode);
+      }
+
+      // ---- Silent SSO (hidden iframe, prompt=none) ----
+
+      function silentSso() {
+        var verifier = randomVerifier();
+        window.sessionStorage.setItem("libre365-pkce-verifier", verifier);
+
+        return challengeFromVerifier(verifier).then(function (challenge) {
+          var authUrl = new URL(KEYCLOAK_ISSUER + "/protocol/openid-connect/auth");
+          authUrl.searchParams.set("client_id", CLIENT_ID);
+          authUrl.searchParams.set("redirect_uri", CALLBACK_URL);
+          authUrl.searchParams.set("response_type", "code");
+          authUrl.searchParams.set("scope", "openid");
+          authUrl.searchParams.set("prompt", "none");
+          authUrl.searchParams.set("code_challenge", challenge);
+          authUrl.searchParams.set("code_challenge_method", "S256");
+
+          return new Promise(function (resolve, reject) {
+            var iframe = document.createElement("iframe");
+            iframe.style.display = "none";
+
+            var timeoutId = window.setTimeout(function () {
+              cleanup();
+              reject(new Error("silent SSO timed out"));
+            }, 8000);
+
+            function cleanup() {
+              window.clearTimeout(timeoutId);
+              window.removeEventListener("message", onMessage);
+              if (iframe.parentNode) {
+                iframe.parentNode.removeChild(iframe);
+              }
+            }
+
+            function onMessage(event) {
+              if (event.origin !== window.location.origin || !event.data) {
+                return;
+              }
+              cleanup();
+              var params = new URLSearchParams(String(event.data).replace(/^[#?]/, ""));
+              if (params.get("error")) {
+                // Not logged in / consent needed / disabled SSO cookie - the
+                // banner degrades to logged-out (no menu/search/notifications).
+                reject(new Error(params.get("error")));
+                return;
+              }
+              resolve(params.get("code"));
+            }
+
+            window.addEventListener("message", onMessage);
+            iframe.src = authUrl.toString();
+            document.body.appendChild(iframe);
+          });
+        });
+      }
+
+      function exchangeCodeForToken(code) {
+        var verifier = window.sessionStorage.getItem("libre365-pkce-verifier");
+        var body = new URLSearchParams();
+        body.set("grant_type", "authorization_code");
+        body.set("client_id", CLIENT_ID);
+        body.set("redirect_uri", CALLBACK_URL);
+        body.set("code", code);
+        body.set("code_verifier", verifier);
+
+        return fetch(KEYCLOAK_ISSUER + "/protocol/openid-connect/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: body.toString()
+        }).then(function (response) {
+          if (!response.ok) {
+            throw new Error("token exchange failed: " + response.status);
+          }
+          return response.json();
+        }).then(function (tokenResponse) {
+          return tokenResponse.access_token;
+        });
+      }
+
+      function getAccessToken() {
+        return silentSso().then(exchangeCodeForToken);
+      }
+
+      // ---- Menu (GET /portal/apps) ----
+
+      function loadMenu(token) {
+        return fetch(API_BASE + "/portal/apps", {
+          headers: { Authorization: "Bearer " + token }
+        }).then(function (response) {
+          if (!response.ok) {
+            throw new Error("/portal/apps failed: " + response.status);
+          }
+          return response.json();
+        }).then(function (body) {
+          var nav = document.getElementById("libre365-banner-menu");
+          if (!nav) {
+            return;
+          }
+          nav.innerHTML = "";
+          (body.apps || []).forEach(function (appEntry) {
+            var link = document.createElement("a");
+            link.href = appEntry.url;
+            link.textContent = APP_LABELS[appEntry.key] || appEntry.key;
+            nav.appendChild(link);
+          });
+        });
+      }
+
+      // ---- Unified search (GET /search?q=) ----
+
+      function setupSearch(token) {
+        var input = document.getElementById("libre365-search-input");
+        var results = document.getElementById("libre365-search-results");
+        if (!input || !results) {
+          return;
+        }
+        input.disabled = false;
+
+        var debounceId = null;
+        input.addEventListener("input", function () {
+          window.clearTimeout(debounceId);
+          var query = input.value.trim();
+          if (!query) {
+            results.hidden = true;
+            results.innerHTML = "";
+            return;
+          }
+          debounceId = window.setTimeout(function () {
+            fetch(API_BASE + "/search?q=" + encodeURIComponent(query), {
+              headers: { Authorization: "Bearer " + token }
+            }).then(function (response) {
+              return response.ok ? response.json() : { results: [] };
+            }).then(function (body) {
+              results.innerHTML = "";
+              (body.results || []).slice(0, 20).forEach(function (item) {
+                var link = document.createElement("a");
+                link.href = item.url || "#";
+                link.textContent = (item.title || item.text || item.source || "?") + " — " + (item.source || "");
+                results.appendChild(link);
+              });
+              results.hidden = (body.results || []).length === 0;
+            }).catch(function () {
+              results.hidden = true;
+            });
+          }, 300);
+        });
+      }
+
+      // ---- Notifications (GET /widget/session, then Novu's widget API) ----
+
+      function setupNotifications(token) {
+        var bell = document.getElementById("libre365-notif-bell");
+        var badge = document.getElementById("libre365-notif-badge");
+        var panel = document.getElementById("libre365-notif-panel");
+        if (!bell || !badge || !panel) {
+          return;
+        }
+
+        fetch(API_BASE + "/widget/session", {
+          headers: { Authorization: "Bearer " + token }
+        }).then(function (response) {
+          if (!response.ok) {
+            throw new Error("/widget/session failed: " + response.status);
+          }
+          return response.json();
+        }).then(function (session) {
+          return fetch(NOVU_SOCKET_URL + "/v1/widgets/session/initialize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(session)
+          }).then(function (response) {
+            if (!response.ok) {
+              throw new Error("Novu session init failed: " + response.status);
+            }
+            return response.json();
+          });
+        }).then(function (novuSession) {
+          bell.disabled = false;
+          var novuToken = novuSession.token;
+
+          function refreshUnseen() {
+            fetch(NOVU_SOCKET_URL + "/v1/widgets/notifications/unseen", {
+              headers: { Authorization: "Bearer " + novuToken }
+            }).then(function (response) {
+              return response.ok ? response.json() : { data: { count: 0 } };
+            }).then(function (body) {
+              var count = (body.data && body.data.count) || 0;
+              badge.textContent = String(count);
+              badge.hidden = count === 0;
+            });
+          }
+
+          bell.addEventListener("click", function () {
+            panel.hidden = !panel.hidden;
+            if (panel.hidden) {
+              return;
+            }
+            fetch(NOVU_SOCKET_URL + "/v1/widgets/notifications/feed", {
+              headers: { Authorization: "Bearer " + novuToken }
+            }).then(function (response) {
+              return response.ok ? response.json() : { data: [] };
+            }).then(function (body) {
+              panel.innerHTML = "";
+              (body.data || []).slice(0, 20).forEach(function (notification) {
+                var item = document.createElement("div");
+                item.className = "libre365-notif-item";
+                item.textContent = (notification.content || notification.payload && notification.payload.text) || "…";
+                panel.appendChild(item);
+              });
+            });
+          });
+
+          refreshUnseen();
+          window.setInterval(refreshUnseen, 30000);
+        }).catch(function () {
+          // Novu unreachable/unconfigured (e.g. NOVU_APP_ID not yet set at
+          // deployment, see notification-hub.yaml) - bell stays disabled
+          // rather than showing a broken control.
+        });
+      }
+
+      // ---- Presence dot (GET /presence/{sub}, unauthenticated) ----
+
+      function setupPresence(userId) {
+        var dot = document.getElementById("libre365-presence-dot");
+        if (!dot || !userId) {
+          return;
+        }
+
+        function refresh() {
+          fetch(API_BASE + "/presence/" + encodeURIComponent(userId)).then(function (response) {
+            return response.ok ? response.json() : null;
+          }).then(function (body) {
+            if (body && body.status) {
+              dot.setAttribute("data-status", body.status);
+            }
+          }).catch(function () {
+            // Presence is best-effort decoration - a failed poll just
+            // leaves the dot at its previous/unknown state.
+          });
+        }
+
+        refresh();
+        window.setInterval(refresh, 15000);
+      }
+
+      function decodeJwtSub(token) {
+        try {
+          var payload = token.split(".")[1];
+          var json = window.atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+          return JSON.parse(json).sub;
+        } catch (err) {
+          return null;
+        }
+      }
+
+      // ---- Entry point ----
+
+      getAccessToken().then(function (token) {
+        loadMenu(token);
+        setupSearch(token);
+        setupNotifications(token);
+        setupPresence(decodeJwtSub(token));
+      }).catch(function () {
+        // Not logged in yet (no Keycloak SSO cookie), or silent SSO
+        // otherwise failed - the banner stays visible with its static
+        // shell (search box disabled, empty menu, disabled bell) rather
+        // than forcing a visible redirect to Keycloak on every page load.
+      });
     })();
+  sso-silent-callback.html: |
+    <!DOCTYPE html>
+    <!-- Static target of the "libre365-portal" client's silent-SSO
+         (prompt=none) redirect, loaded inside banner.js's hidden iframe.
+         Its only job is to hand the resulting URL fragment/query (the
+         authorization `code`, or an `error`) back to the parent window
+         via postMessage - the parent (banner.js) does the actual token
+         exchange, since it alone knows the PKCE code_verifier it
+         generated (kept in the parent's own sessionStorage, never passed
+         into this iframe). -->
+    <html>
+      <head><meta charset="utf-8"><title>libre365 SSO</title></head>
+      <body>
+        <script>
+          (function () {
+            "use strict";
+            var payload = window.location.search || window.location.hash;
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage(payload, window.location.origin);
+            }
+          })();
+        </script>
+      </body>
+    </html>

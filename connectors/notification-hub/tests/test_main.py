@@ -1,7 +1,12 @@
+import hashlib
+import hmac
+from unittest.mock import patch
+
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.auth import InvalidToken
 from app.main import app
 
 
@@ -74,3 +79,52 @@ async def test_onlyoffice_mention_webhook_relays_one_event_per_mentioned_email()
         )
     assert response.status_code == 200
     assert response.json() == {"relayed": 2, "total": 2}
+
+
+@pytest.mark.asyncio
+async def test_widget_session_rejects_missing_token():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/widget/session")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_widget_session_rejects_an_invalid_token():
+    with patch("app.main.verify_token", side_effect=InvalidToken("bad signature")):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/widget/session", headers={"Authorization": "Bearer t"})
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_widget_session_computes_the_real_novu_hmac_hash():
+    with (
+        patch("app.main.verify_token", return_value={"sub": "alice"}),
+        patch("app.main.NOVU_API_KEY", "the-secret-key"),
+        patch("app.main.NOVU_APP_ID", "the-app-id"),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/widget/session", headers={"Authorization": "Bearer t"})
+
+    assert response.status_code == 200
+    expected_hash = hmac.new(b"the-secret-key", b"alice", hashlib.sha256).hexdigest()
+    assert response.json() == {
+        "applicationIdentifier": "the-app-id",
+        "subscriberId": "alice",
+        "hmacHash": expected_hash,
+    }
+
+
+@pytest.mark.asyncio
+async def test_widget_session_requires_novu_to_be_configured():
+    with (
+        patch("app.main.verify_token", return_value={"sub": "alice"}),
+        patch("app.main.NOVU_API_KEY", ""),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/widget/session", headers={"Authorization": "Bearer t"})
+    assert response.status_code == 503

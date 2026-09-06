@@ -34,6 +34,10 @@ libre365_locale_available: "{{ _platform.locale.available }}"
 libre365_test_user_username: "{{ _platform.test_dataset.username }}"
 libre365_test_user_email: "{{ _platform.test_dataset.email }}"
 
+# Study 2.3 - cross-cutting app-portal banner groups, single source is
+# platform.yaml's `portal.groups` (see that file's own comment).
+libre365_portal_groups: "{{ _platform.portal.groups }}"
+
 keycloak_base_url: "https://{{ _platform.domains.subdomains.sso }}.{{ libre365_domain }}"
 # "master" is Keycloak's own built-in bootstrap realm - every Keycloak
 # instance ships exactly one, used only to authenticate admin REST API
@@ -52,6 +56,7 @@ keycloak_admin_password: "{{ vault_keycloak_admin_password | default(omit) }}"
 grommunio_domain: "{{ _platform.domains.subdomains.mail }}.{{ libre365_domain }}"
 grommunio_autodiscover_domain: "{{ _platform.domains.subdomains.autodiscover }}.{{ libre365_domain }}"
 matrix_domain: "{{ _platform.domains.subdomains.matrix }}.{{ libre365_domain }}"
+chat_domain: "{{ _platform.domains.subdomains.chat }}.{{ libre365_domain }}"
 seafile_domain: "{{ _platform.domains.subdomains.files }}.{{ libre365_domain }}"
 onlyoffice_domain: "{{ _platform.domains.subdomains.office }}.{{ libre365_domain }}"
 vikunja_domain: "{{ _platform.domains.subdomains.taches }}.{{ libre365_domain }}"
