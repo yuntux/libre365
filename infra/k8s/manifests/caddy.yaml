@@ -51,6 +51,17 @@ data:
         file_server
     }
 
+    # Mozilla autoconfig for Thunderbird (study 1.9) — static XML, no
+    # injection. Served at the fixed path Thunderbird's account wizard
+    # checks (http(s)://autoconfig.<domain>/mail/config-v1.1.xml); content
+    # comes from the caddy-autoconfig ConfigMap below, mounted at
+    # /srv/autoconfig/mail so the file lands at
+    # /srv/autoconfig/mail/config-v1.1.xml. See docs/clients.md.
+    autoconfig.libre365.example.org {
+        root * /srv/autoconfig
+        file_server
+    }
+
     # 2.3 L.417 — each application stays in native full-screen navigation; the
     # cross-cutting top bar is injected via the HTML injection plugin before
     # </body>, a DOM anchor point fragile to version upgrades (2.3 L.413) to be
@@ -158,6 +169,61 @@ data:
         reverse_proxy novu-api.libre365.svc.cluster.local:3000
     }
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-autoconfig
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: caddy
+data:
+  # Mozilla autoconfig for Thunderbird (study 1.9) — served by the
+  # autoconfig.libre365.example.org Caddyfile site block above, mounted at
+  # /srv/autoconfig/mail so this key lands at
+  # /srv/autoconfig/mail/config-v1.1.xml (the fixed path Thunderbird's
+  # account wizard requests). See docs/clients.md for the full rationale
+  # and the "exchange" vs. "imap"/"smtp" server blocks below.
+  config-v1.1.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <clientConfig version="1.1">
+      <emailProvider id="libre365.example.org">
+        <domain>libre365.example.org</domain>
+        <displayName>libre365</displayName>
+        <displayShortName>libre365</displayShortName>
+
+        <!-- Primary path (study 1.9 L.325/350): native EWS account, since
+             Grommunio emulates Exchange Web Services and Thunderbird has
+             supported native Exchange/EWS accounts since 91. When
+             Thunderbird's account wizard can use this block, no separate
+             Microsoft Autodiscover round-trip is needed. -->
+        <incomingServer type="exchange">
+          <hostname>mail.libre365.example.org</hostname>
+          <ewsURL>https://mail.libre365.example.org/EWS/Exchange.asmx</ewsURL>
+          <username>%EMAILADDRESS%</username>
+          <authentication>password-cleartext</authentication>
+        </incomingServer>
+
+        <!-- Fallback (study 1.9's own documented alternative): plain
+             IMAP/SMTP, for a Thunderbird build or a client that doesn't
+             use the exchange block above. -->
+        <incomingServer type="imap">
+          <hostname>mail.libre365.example.org</hostname>
+          <port>993</port>
+          <socketType>SSL</socketType>
+          <username>%EMAILADDRESS%</username>
+          <authentication>password-cleartext</authentication>
+        </incomingServer>
+
+        <outgoingServer type="smtp">
+          <hostname>mail.libre365.example.org</hostname>
+          <port>587</port>
+          <socketType>STARTTLS</socketType>
+          <username>%EMAILADDRESS%</username>
+          <authentication>password-cleartext</authentication>
+        </outgoingServer>
+      </emailProvider>
+    </clientConfig>
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -200,6 +266,8 @@ spec:
             - name: banner-snippet
               mountPath: /etc/caddy/snippets/banner.html
               subPath: banner.html
+            - name: autoconfig
+              mountPath: /srv/autoconfig/mail
       volumes:
         - name: caddyfile
           configMap:
@@ -207,6 +275,9 @@ spec:
         - name: banner-snippet
           configMap:
             name: caddy-html-banner
+        - name: autoconfig
+          configMap:
+            name: caddy-autoconfig
 ---
 apiVersion: v1
 kind: Service
@@ -227,7 +298,7 @@ metadata:
     # Single line, no spaces after the commas: external-dns splits this
     # value on "," without necessarily trimming whitespace, so a folded
     # multi-line scalar here would risk a leading-space-prefixed hostname.
-    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org"
+    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,autoconfig.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org"
 spec:
   selector:
     app.kubernetes.io/name: caddy

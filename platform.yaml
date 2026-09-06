@@ -310,6 +310,16 @@ domains:
       # infra/ansible/group_vars/all.yml, not by anything under
       # infra/k8s/. Listed in scripts/sync_platform.py's
       # DOMAINS_WITHOUT_CADDY_SITE for that reason, same as `registry`.
+    autodiscover: autodiscover # Microsoft Autodiscover protocol (study 1.9)
+      # - Outlook/EAS-style clients resolve account settings against
+      # Grommunio's own Exchange emulation here. Same reasoning as `mail`:
+      # NOT Caddy-fronted, since Grommunio terminates its own HTTPS
+      # certificate for this hostname too (a CNAME to `mail.<base>` is the
+      # simplest way to populate it - see docs/clients.md). Listed in
+      # DOMAINS_WITHOUT_CADDY_SITE for that reason.
+    autoconfig: autoconfig # Mozilla autoconfig (config-v1.1.xml) for
+      # Thunderbird (study 1.9) - via Caddy, static file
+      # (infra/k8s/manifests/caddy.yaml). See docs/clients.md.
     sso: sso # Keycloak (study 1.7)
     matrix: matrix # Synapse client/federation (study 1.2)
     chat: chat # Element Web, via Caddy (study 1.2/2.3)

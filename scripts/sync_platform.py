@@ -186,13 +186,16 @@ def compute_domain_changes(platform: dict) -> list[Change]:
 # visio-meet.yaml and element-call.yaml both USE a LiveKit URL
 # (LIVEKIT_URL/LIVEKIT_API_URL) but neither DEPLOYS LiveKit itself; that gap
 # is explained in infra/k8s/helm-values/README.md's "Out of scope for this
-# directory" section, not in either of those two files — and `mail`
-# (Grommunio) is a Proxmox VM appliance, not a Kubernetes Service at all
-# (see infra/ansible/, consumed directly by group_vars/all.yml instead).
-# Every other domain in platform.yaml is expected to be reachable through
-# Caddy (../k8s/manifests/caddy.yaml) — see infra/k8s/helm-values/README.md,
+# directory" section, not in either of those two files — `mail` (Grommunio)
+# is a Proxmox VM appliance, not a Kubernetes Service at all (see
+# infra/ansible/, consumed directly by group_vars/all.yml instead) — and
+# `autodiscover` is the Microsoft Autodiscover hostname for the same
+# Grommunio VM (study 1.9), populated the same way as `mail` (see
+# docs/clients.md), not through Caddy either. Every other domain in
+# platform.yaml is expected to be reachable through Caddy
+# (../k8s/manifests/caddy.yaml) — see infra/k8s/helm-values/README.md,
 # "Public entry point: Caddy".
-DOMAINS_WITHOUT_CADDY_SITE = {"registry", "livekit", "mail"}
+DOMAINS_WITHOUT_CADDY_SITE = {"registry", "livekit", "mail", "autodiscover"}
 
 
 def check_domain_coverage(platform: dict) -> list[str]:
