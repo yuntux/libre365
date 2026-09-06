@@ -346,6 +346,30 @@ connector_ports:
   PEERTUBE_INGEST_PORT: 4005
 
 # -----------------------------------------------------------------------------
+# Cross-cutting app-portal banner (study 2.3) — which apps show in the top-bar
+# menu depends on the logged-in user's Keycloak group, read from the `groups`
+# claim of the token the banner's own silent-SSO client obtains (see
+# infra/ansible/roles/keycloak_realm and connectors/unified-search's
+# `/portal/apps` endpoint - GENERATED into that connector's manifest by
+# scripts/sync_platform.py, do not hand-edit the env var there).
+#
+# Every user lands in whichever group has `default: true` unless explicitly
+# added to another one. This ships 2 starting groups as a real, working
+# example - which roles at the firm actually need more/fewer apps is a
+# business decision for the firm to make, not something this repo can
+# invent; adjust freely, `apps` values are subdomain keys from `domains.
+# subdomains` below.
+# -----------------------------------------------------------------------------
+portal:
+  groups:
+    - name: consultants
+      default: true
+      apps: [chat, files, taches, videos]
+    - name: admin-si
+      default: false
+      apps: [chat, files, taches, videos, sso, seaweedfs_admin, notifications_admin]
+
+# -----------------------------------------------------------------------------
 # Services kept on plain docker-compose (never deployed to the k3d dev
 # cluster, see dev-cluster/README.md): only Grommunio, for the reason
 # already documented in the `grommunio_dev` entry above - a Proxmox VM
@@ -438,6 +462,11 @@ domains:
     videos: videos # PeerTube, via Caddy (study 2.12/2.3)
     s3: s3 # SeaweedFS S3 API (study 2.12)
     seaweedfs_admin: seaweedfs-admin # SeaweedFS Admin UI (study 2.12)
+    portal_api: api # App-portal banner's own backend (study 2.3) - Caddy
+      # site path-routing to unified-search's /search+/portal, notification-
+      # hub's /widget/session and presence-aggregator's /presence, none of
+      # which had a public route before the banner needed to reach them
+      # directly from the browser.
     notifications: notifications # Novu (study 2.1)
     notifications_admin: notifications-admin # Novu admin dashboard (study 1.7/2.1)
       # - Novu's own `web` UI (template/workflow management), gated by

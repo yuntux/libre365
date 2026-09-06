@@ -40,6 +40,7 @@ Never writes to platform.yaml itself.
 import argparse
 import html
 import io
+import json
 import re
 import sys
 import textwrap
@@ -104,6 +105,29 @@ def sub_image_tag(text: str, repository: str, new_tag: str) -> str:
         r"(image:\s*)" + re.escape(repository) + r":[^\s\"']+"
     )
     return pattern.sub(lambda m: f"{m.group(1)}{repository}:{new_tag}", text)
+
+
+def sub_env_value(text: str, var_name: str, new_value: str, quote: str = '"') -> str:
+    """Replaces the `value: "..."` (or `value: '...'`, see `quote` - needed
+    for a JSON-string value, which would otherwise conflict with double
+    quotes) of a raw-manifest container `env:` entry named `var_name`
+    (`- name: <var_name>` ... `value: "<old>"`, optionally with comment
+    lines in between, as used throughout infra/k8s/manifests/connectors/) -
+    the same anchor-on-a-stable-identifier principle as sub_image_tag/
+    sub_domain above, here anchored on the env var's own name rather than a
+    repository or subdomain."""
+    pattern = re.compile(
+        r"(- name: "
+        + re.escape(var_name)
+        + r"\n(?:[ \t]*#[^\n]*\n)*[ \t]*value: "
+        + re.escape(quote)
+        + r")[^"
+        + re.escape(quote)
+        + r"]*("
+        + re.escape(quote)
+        + r")"
+    )
+    return pattern.sub(lambda m: f"{m.group(1)}{new_value}{m.group(2)}", text)
 
 
 def sub_from_tag(text: str, repository: str, new_tag: str) -> str:
@@ -183,6 +207,7 @@ DOMAIN_TARGET_FILES = [
     "infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml",
     "infra/k8s/helm-values/oauth2-proxy-novu.yaml",
     "infra/k8s/manifests/caddy.yaml",
+    "infra/k8s/manifests/caddy-injection.yaml",
     "infra/k8s/manifests/gokapi.yaml",
     "infra/k8s/helm-values/external-dns.yaml",
     "connectors/thunderbird-filelink-gokapi/manifest.json",
@@ -325,6 +350,10 @@ OIDC_CLIENT_APP_FILES = {
     # itself (see docs/oidc.md and each oauth2-proxy-*.yaml's own header).
     "onlyoffice": "infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml",
     "novu": "infra/k8s/helm-values/oauth2-proxy-novu.yaml",
+    # Public client (no secret) for the app-portal banner's own silent-SSO
+    # flow (study 2.3) - "app config" here is banner.js itself, which uses
+    # this client_id directly (public clients have nothing to keep secret).
+    "libre365-portal": "infra/k8s/manifests/caddy-injection.yaml",
 }
 
 
@@ -345,14 +374,16 @@ def check_oidc_coverage(platform: dict) -> list[str]:
     guarantee, not something to silently "fix" by generating hand-authored
     application config."""
     defaults_path = REPO_ROOT / "infra/ansible/roles/keycloak_realm/defaults/main.yml"
-    defaults_text = defaults_path.read_text()
-    client_ids = re.findall(r'client_id:\s*"([^"]+)"', defaults_text)
+    with defaults_path.open() as f:
+        defaults_doc = yaml.safe_load(f)
+    clients = defaults_doc.get("keycloak_oidc_clients") or []
 
     secrets_text = (REPO_ROOT / "infra/k8s/manifests/external-secrets.yaml").read_text()
     declared_secret_names = set(re.findall(r"^\s*name:\s*(\S+-oidc-secret)\s*$", secrets_text, re.MULTILINE))
 
     problems = []
-    for client_id in client_ids:
+    for client in clients:
+        client_id = client["client_id"]
         rel_path = OIDC_CLIENT_APP_FILES.get(client_id)
         if rel_path is None:
             problems.append(
@@ -369,6 +400,12 @@ def check_oidc_coverage(platform: dict) -> list[str]:
                 f'Keycloak client "{client_id}" has no matching client_id configured in {rel_path} '
                 "(the realm declares the client, but nothing on the application side would ever use it)"
             )
+
+        # Public clients (no secret - PKCE instead, e.g. "libre365-portal",
+        # a browser-side SPA client) have no secret to wire at all, unlike
+        # every confidential client below.
+        if client.get("public_client"):
+            continue
 
         app_secret_names = set(re.findall(r"([a-z0-9][a-z0-9-]*-oidc-secret)", app_text))
         if not app_secret_names:
@@ -908,6 +945,58 @@ def compute_dev_caddy_change(platform: dict) -> list[Change]:
     return [Change(dev_path, buf.getvalue(), "infra/k8s/manifests/dev/caddy.yaml (Caddyfile, generated from the production one)")]
 
 
+def compute_portal_config_changes(platform: dict) -> list[Change]:
+    """Cross-cutting app-portal banner (study 2.3): resolves platform.yaml's
+    `portal.groups` (app KEYS, e.g. "chat") against `domains` into full URLs,
+    the same single-source-of-truth principle as every other generated
+    value in this script - connectors/unified-search's `/portal/apps`
+    endpoint only ever sees ready-to-use URLs, never platform.yaml's own
+    subdomain-key naming.
+
+    Also patches KEYCLOAK_ISSUER on both connectors that verify the
+    banner's Keycloak token (unified-search, notification-hub) - kept here
+    rather than as a third `_BARE_DOMAIN_PATTERNS`-style entry since it
+    needs `services.keycloak.realm_name` alongside `domains`, not just the
+    base domain."""
+    domains = platform.get("domains")
+    portal = platform.get("portal")
+    if not domains or not portal:
+        return []
+
+    base = domains["base"]
+    subdomains = domains["subdomains"]
+    realm_name = platform["services"]["keycloak"]["realm_name"]
+    issuer = f"https://{subdomains['sso']}.{base}/realms/{realm_name}"
+
+    resolved_groups = [
+        {
+            "name": group["name"],
+            "default": group.get("default", False),
+            "apps": [
+                {"key": key, "url": f"https://{subdomains[key]}.{base}"}
+                for key in group.get("apps", [])
+            ],
+        }
+        for group in portal["groups"]
+    ]
+    groups_json = json.dumps(resolved_groups, separators=(",", ":"))
+
+    changes = []
+
+    search_path = REPO_ROOT / "infra/k8s/manifests/connectors/unified-search.yaml"
+    search_text = search_path.read_text()
+    search_text = sub_env_value(search_text, "PORTAL_GROUPS_JSON", groups_json, quote="'")
+    search_text = sub_env_value(search_text, "KEYCLOAK_ISSUER", issuer)
+    changes.append(Change(search_path, search_text, "infra/k8s/manifests/connectors/unified-search.yaml (portal groups/issuer)"))
+
+    hub_path = REPO_ROOT / "infra/k8s/manifests/connectors/notification-hub.yaml"
+    hub_text = hub_path.read_text()
+    hub_text = sub_env_value(hub_text, "KEYCLOAK_ISSUER", issuer)
+    changes.append(Change(hub_path, hub_text, "infra/k8s/manifests/connectors/notification-hub.yaml (issuer)"))
+
+    return changes
+
+
 def compute_test_defaults_changes(platform: dict) -> list[Change]:
     path = REPO_ROOT / "tests" / "integration" / "_platform_defaults.py"
     port_map = all_ports(platform)
@@ -1002,6 +1091,7 @@ def main() -> int:
     changes += compute_domain_changes(platform)
     changes += compute_onboarding_changes(platform)
     changes += compute_dev_caddy_change(platform)
+    changes += compute_portal_config_changes(platform)
 
     dirty = [c for c in changes if c.is_dirty()]
 

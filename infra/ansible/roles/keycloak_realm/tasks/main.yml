@@ -99,7 +99,10 @@
     name: "{{ item.name }}"
     root_url: "{{ item.root_url }}"
     redirect_uris: "{{ item.redirect_uris }}"
+    web_origins: "{{ item.web_origins | default(omit) }}"
     public_client: "{{ item.public_client | default(false) }}"
+    attributes: "{{ item.attributes | default(omit) }}"
+    protocol_mappers: "{{ item.protocol_mappers | default(omit) }}"
     protocol: "openid-connect"
     standard_flow_enabled: true
     direct_access_grants_enabled: false
@@ -139,6 +142,20 @@
     label: "{{ item.item.client_id }}"
   when: item.skipped is not defined
 
+- name: "Create/update the app-portal banner's Keycloak groups (study 2.3)"
+  community.general.keycloak_group:
+    auth_keycloak_url: "{{ keycloak_base_url }}"
+    auth_realm: "{{ keycloak_admin_realm }}"
+    auth_username: "{{ keycloak_admin_user }}"
+    auth_password: "{{ keycloak_admin_password }}"
+    realm: "{{ keycloak_realm_name }}"
+    name: "{{ item.name }}"
+    state: present
+  no_log: true
+  loop: "{{ keycloak_realm_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 - name: "Create the representative test user (study 4.4, point 2) - OPT-IN, dev/staging only"
   community.general.keycloak_user:
     auth_keycloak_url: "{{ keycloak_base_url }}"
@@ -154,6 +171,12 @@
       - type: password
         value: "{{ keycloak_realm_test_user_password }}"
         temporary: false
+    # Same default group a real new user would land in without further
+    # provisioning (study 2.3) - exercises connectors/unified-search's
+    # `/portal/apps` fallback-to-default path for real in every test run,
+    # rather than only in the unit tests that mock it.
+    groups:
+      - "{{ (keycloak_realm_groups | selectattr('default', 'true') | first).name }}"
     state: present
   no_log: true
   when: keycloak_realm_test_user_enabled | bool

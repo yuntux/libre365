@@ -40,6 +40,7 @@ visio-meet-postgres-secret:password
 visio-meet-postgres-secret:postgres-password
 onlyoffice-redis-secret:redis-password
 novu-mongodb-secret:mongodb-root-password
+novu-api-key:api-key
 seaweedfs-s3-credentials:access-key
 seaweedfs-s3-credentials:secret-key
 seaweedfs-admin-credentials:admin-user
