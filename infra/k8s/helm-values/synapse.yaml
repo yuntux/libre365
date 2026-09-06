@@ -73,8 +73,12 @@ persistence:
     size: 100Gi
     storageClass: ""
 
+# Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
+# see keycloak.yaml's ingress comment for the full rationale. Caddy fronts
+# both the client API (matrix.libre365.example.org) and federation
+# (matrix.libre365.example.org:8448) for this chart.
 ingress:
-  enabled: true
+  enabled: false
   className: ""
   hosts:
     - host: matrix.libre365.example.org

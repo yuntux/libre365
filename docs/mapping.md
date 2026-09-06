@@ -17,7 +17,7 @@ block/connector.
 | Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code) |
 | Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/` |
 | Unified search | 2.2 | `connectors/unified-search/` |
-| Portal / Caddy HTML injection | 2.3 | `infra/k8s/helm-values/caddy.yaml`, `infra/k8s/manifests/caddy-injection.yaml` |
+| Portal / Caddy HTML injection | 2.3 | `infra/k8s/manifests/caddy.yaml` (sole public entry point, no Ingress Controller/cert-manager needed - see `infra/k8s/helm-values/README.md`), `infra/k8s/manifests/caddy-injection.yaml` |
 | Chat/video continuity (Matrix ↔ video conferencing widget) | 2.4 | `connectors/matrix-visio-widget/` |
 | Native application onboarding | 2.5 | `docs/onboarding/` |
 | Disabling OnlyOffice chat | 2.6 | `infra/k8s/helm-values/onlyoffice.yaml` (`document.permissions.chat`) |

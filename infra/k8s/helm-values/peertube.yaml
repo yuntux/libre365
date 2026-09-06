@@ -65,8 +65,10 @@ persistence:
     size: 1Ti
     storageClass: ""
 
+# Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
+# see keycloak.yaml's ingress comment for the full rationale.
 ingress:
-  enabled: true
+  enabled: false
   className: ""
   hosts:
     - host: videos.libre365.example.org

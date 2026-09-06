@@ -5,6 +5,29 @@ Kubernetes configuration for the containerized components chosen by the study
 directory: deployed as a Proxmox appliance VM, see chapter 4.3 and
 `infra/terraform/` / `infra/ansible/` (managed by another team).
 
+## Public entry point: Caddy, not each chart's own Ingress
+
+Every chart below ships its own native Kubernetes `ingress:` (and, for
+MinIO, `consoleIngress:`) block — but each one is set to **`enabled: false`**
+here. No Ingress Controller (nginx-ingress, Traefik...) is deployed anywhere
+in this repository to satisfy those objects, and running one just to
+duplicate routing that already exists elsewhere would add an unused
+mechanism. `../manifests/caddy.yaml` is the sole public HTTP(S) entry point
+for every service in `platform.yaml`'s `domains` list (its Caddyfile
+reverse-proxies directly to each chart's Service), and needs no
+cert-manager either: Caddy obtains and renews TLS certificates
+automatically for any bare-domain site address, a built-in feature
+("Automatic HTTPS"). See `../manifests/caddy.yaml`'s header comment for the
+full rationale, including how Matrix federation (a separate port, 8448) and
+the two MinIO endpoints (S3 API + console) are covered too.
+
+The `hosts`/`hostname`/`tls` fields in each disabled `ingress:` block are
+kept as documentation of where that chart expects to be reached (and stay
+in sync with `platform.yaml`'s `domains` via the same `sync_platform.py`
+patcher, see below) — re-enabling one instead of routing through Caddy
+would first need a real Ingress Controller deployed, which is out of scope
+today.
+
 ## Image versions: single source of truth
 
 The `image.repository`/`image.tag` fields in this directory (and the raw
