@@ -7,8 +7,9 @@
 # roles/openbao_config/README.md), then Keycloak (central SSO the other
 # components depend on, study 1.7), then Grommunio (independent of the
 # application SSO, see playbooks/grommunio.yml), then the containerized
-# components consuming the already-created OIDC clients (Matrix, Seafile,
-# OnlyOffice).
+# components consuming the already-created OIDC clients (Seafile,
+# OnlyOffice) - Matrix/Synapse's OIDC config is entirely chart-native
+# (infra/k8s/helm-values/synapse.yaml), no separate Ansible step needed.
 #
 # Prerequisite: the Kubernetes cluster and the Grommunio VM must already be
 # provisioned by Terraform (infra/terraform/) and the inventory
@@ -31,9 +32,6 @@
 
 - name: "3b. Automate Grommunio's Let's Encrypt certificate (certbot, issuance + renewal — closes a gap noted during review)"
   import_playbook: playbooks/grommunio-cert.yml
-
-- name: "4. Matrix/Synapse domain and OIDC provider (study 1.2)"
-  import_playbook: playbooks/matrix.yml
 
 - name: "5. Seafile (authenticated sharing, OnlyOffice connector — study 1.4, 2.11)"
   import_playbook: playbooks/seafile.yml

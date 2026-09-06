@@ -44,3 +44,4 @@ vikunja_domain: "{{ _platform.domains.subdomains.taches }}.{{ libre365_domain }}
 gokapi_domain: "{{ _platform.domains.subdomains.depot }}.{{ libre365_domain }}"
 novu_domain: "{{ _platform.domains.subdomains.notifications }}.{{ libre365_domain }}"
 peertube_domain: "{{ _platform.domains.subdomains.videos }}.{{ libre365_domain }}"
+visio_domain: "{{ _platform.domains.subdomains.visio }}.{{ libre365_domain }}"

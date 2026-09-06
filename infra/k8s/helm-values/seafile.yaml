@@ -48,10 +48,19 @@ env:
         name: onlyoffice-jwt-secret
         key: secret
 
-  # 1.7 — Keycloak SSO (native Seafile OIDC)
+  # 1.7 — Keycloak SSO (native Seafile OIDC). Client secret from
+  # seafile-oidc-secret (infra/k8s/manifests/external-secrets.yaml,
+  # OpenBao-sourced) - found missing during a review pass (OAUTH_CLIENT_ID
+  # was set with no matching OAUTH_CLIENT_SECRET anywhere, so the OAuth
+  # token exchange could never actually complete).
   ENABLE_OAUTH: "true"
   OAUTH_PROVIDER_DOMAIN: "sso.libre365.example.org"
   OAUTH_CLIENT_ID: "seafile"
+  OAUTH_CLIENT_SECRET:
+    valueFrom:
+      secretKeyRef:
+        name: seafile-oidc-secret
+        key: client-secret
 
   SEAFILE_SERVER_HOSTNAME: "files.libre365.example.org"
 

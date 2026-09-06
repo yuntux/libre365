@@ -149,3 +149,133 @@ def yaml_load_configmap(text: str) -> dict:
     import yaml
 
     return yaml.safe_load(text)
+
+
+# --- check_oidc_coverage() -------------------------------------------------
+#
+# Regression tests for the audit findings fixed on request ("est-ce que la
+# connexion OIDC via Keycloak est bien configurée pour toutes les
+# applications ?"): Gokapi/Seafile/PeerTube had a client_id with no client
+# secret ever wired (dangling secretKeyRef, no ExternalSecret), and Visio
+# (LaSuite Meet) had full app-side config referencing a Keycloak client that
+# was never created at all. check_oidc_coverage() must catch both shapes of
+# gap, and never false-positive on a fully-wired client.
+
+
+def _write_oidc_fixture(
+    tmp_path,
+    monkeypatch,
+    *,
+    defaults_client_ids: list[str],
+    app_file_text: str,
+    external_secrets_text: str,
+) -> None:
+    defaults_dir = tmp_path / "infra" / "ansible" / "roles" / "keycloak_realm" / "defaults"
+    defaults_dir.mkdir(parents=True)
+    clients_yaml = "\n".join(f'  - client_id: "{cid}"\n    name: "{cid}"' for cid in defaults_client_ids)
+    (defaults_dir / "main.yml").write_text(f"keycloak_oidc_clients:\n{clients_yaml}\n")
+
+    app_dir = tmp_path / "infra" / "k8s" / "helm-values"
+    app_dir.mkdir(parents=True)
+    (app_dir / "seafile.yaml").write_text(app_file_text)
+
+    manifests_dir = tmp_path / "infra" / "k8s" / "manifests"
+    manifests_dir.mkdir(parents=True)
+    (manifests_dir / "external-secrets.yaml").write_text(external_secrets_text)
+
+    monkeypatch.setattr(sync_platform, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(sync_platform, "OIDC_CLIENT_APP_FILES", {"seafile": "infra/k8s/helm-values/seafile.yaml"})
+
+
+def test_oidc_coverage_passes_when_client_id_and_secret_are_both_wired(tmp_path, monkeypatch):
+    _write_oidc_fixture(
+        tmp_path, monkeypatch,
+        defaults_client_ids=["seafile"],
+        app_file_text=(
+            'OAUTH_CLIENT_ID: "seafile"\n'
+            "OAUTH_CLIENT_SECRET:\n"
+            "  valueFrom:\n"
+            "    secretKeyRef:\n"
+            "      name: seafile-oidc-secret\n"
+        ),
+        external_secrets_text="metadata:\n  name: seafile-oidc-secret\n",
+    )
+
+    assert sync_platform.check_oidc_coverage({}) == []
+
+
+def test_oidc_coverage_flags_a_client_id_with_no_matching_secret(tmp_path, monkeypatch):
+    """Reproduces the Seafile/Gokapi/PeerTube shape: client_id is set
+    app-side, but the ExternalSecret backing its secret was never declared
+    (a dangling secretKeyRef the Kubernetes Secret would never materialize for)."""
+    _write_oidc_fixture(
+        tmp_path, monkeypatch,
+        defaults_client_ids=["seafile"],
+        app_file_text=(
+            'OAUTH_CLIENT_ID: "seafile"\n'
+            "OAUTH_CLIENT_SECRET:\n"
+            "  valueFrom:\n"
+            "    secretKeyRef:\n"
+            "      name: seafile-oidc-secret\n"
+        ),
+        external_secrets_text="metadata:\n  name: some-other-secret\n",
+    )
+
+    problems = sync_platform.check_oidc_coverage({})
+
+    assert len(problems) == 1
+    assert "seafile-oidc-secret" in problems[0]
+    assert "no matching ExternalSecret" in problems[0]
+
+
+def test_oidc_coverage_flags_a_client_never_configured_app_side(tmp_path, monkeypatch):
+    """Reproduces the Visio/LaSuite Meet shape: the realm declares a
+    Keycloak client, but nothing on the application side ever references it."""
+    _write_oidc_fixture(
+        tmp_path, monkeypatch,
+        defaults_client_ids=["seafile"],
+        app_file_text="# no OIDC config here at all\n",
+        external_secrets_text="metadata:\n  name: seafile-oidc-secret\n",
+    )
+
+    problems = sync_platform.check_oidc_coverage({})
+
+    assert any("no matching client_id configured" in p for p in problems)
+
+
+def test_oidc_coverage_flags_a_client_id_wired_with_no_secret_reference_at_all(tmp_path, monkeypatch):
+    _write_oidc_fixture(
+        tmp_path, monkeypatch,
+        defaults_client_ids=["seafile"],
+        app_file_text='OAUTH_CLIENT_ID: "seafile"\n# secret never referenced\n',
+        external_secrets_text="metadata:\n  name: seafile-oidc-secret\n",
+    )
+
+    problems = sync_platform.check_oidc_coverage({})
+
+    assert len(problems) == 1
+    assert "references no" in problems[0]
+
+
+def test_oidc_coverage_flags_a_client_missing_from_the_app_files_mapping(tmp_path, monkeypatch):
+    """A client_id declared in Keycloak's defaults with no entry at all in
+    OIDC_CLIENT_APP_FILES - the mapping itself falling out of sync, distinct
+    from a wired-but-broken client."""
+    _write_oidc_fixture(
+        tmp_path, monkeypatch,
+        defaults_client_ids=["seafile", "unmapped-client"],
+        app_file_text=(
+            'OAUTH_CLIENT_ID: "seafile"\n'
+            "OAUTH_CLIENT_SECRET:\n"
+            "  valueFrom:\n"
+            "    secretKeyRef:\n"
+            "      name: seafile-oidc-secret\n"
+        ),
+        external_secrets_text="metadata:\n  name: seafile-oidc-secret\n",
+    )
+
+    problems = sync_platform.check_oidc_coverage({})
+
+    assert len(problems) == 1
+    assert "unmapped-client" in problems[0]
+    assert "does not know which application file" in problems[0]

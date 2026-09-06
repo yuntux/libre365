@@ -29,7 +29,17 @@ backend:
     OIDC_OP_TOKEN_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/token"
     OIDC_OP_USER_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/userinfo"
     OIDC_RP_CLIENT_ID: "visio-meet"
-    # OIDC client secret: see the oidc-client-secrets secret, not versioned
+    # Client secret from visio-meet-oidc-secret (external-secrets.yaml,
+    # OpenBao-sourced) - the Keycloak client itself ("visio-meet") didn't
+    # exist at all until a review pass added it
+    # (infra/ansible/roles/keycloak_realm/defaults/main.yml); this env var
+    # previously pointed at a vaguely-named "oidc-client-secrets" secret
+    # that was never actually declared anywhere as an ExternalSecret.
+    OIDC_RP_CLIENT_SECRET:
+      valueFrom:
+        secretKeyRef:
+          name: visio-meet-oidc-secret
+          key: client-secret
     LIVEKIT_API_URL: "https://livekit.libre365.example.org"
     # 2.12 L.587 — self-hosted MinIO as the S3 destination for LiveKit Egress, rather
     # than a shared network volume (NFS) between pods for a file written locally by

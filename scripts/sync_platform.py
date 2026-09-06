@@ -22,6 +22,15 @@ Files touched:
     - infra/k8s/manifests/onboarding.yaml  (generated: onboarding page + QR codes, study 2.5)
     - tests/integration/_platform_defaults.py  (generated file, do not edit)
 
+Also enforces (never generates/patches, only fails loudly on drift, both in
+apply and --check mode):
+    - domain coverage: every platform.yaml subdomain has a Caddyfile site
+      block and external-dns hostname entry (check_domain_coverage())
+    - OIDC coverage: every Keycloak client declared in
+      infra/ansible/roles/keycloak_realm/defaults/main.yml has a matching
+      application-side client_id and a real ExternalSecret backing its
+      client secret (check_oidc_coverage(), see docs/oidc.md)
+
 Never writes to platform.yaml itself.
 """
 
@@ -270,6 +279,84 @@ def check_domain_coverage(platform: dict) -> list[str]:
                 f"{fqdn} has a Caddyfile site block but is missing from the Caddy Service's "
                 "external-dns.alpha.kubernetes.io/hostname annotation in infra/k8s/manifests/caddy.yaml "
                 "(external-dns would never create its DNS record)"
+            )
+    return problems
+
+
+# One entry per `keycloak_oidc_clients` client_id declared in
+# infra/ansible/roles/keycloak_realm/defaults/main.yml — maps it to the
+# infra/k8s/helm-values (or manifests) file where the application side of
+# that same OIDC client is expected to be configured. Not every client_id
+# matches its app file's name 1:1 (matrix-synapse -> synapse.yaml,
+# gokapi -> manifests/gokapi.yaml, not helm-values/), hence an explicit
+# mapping rather than a naming guess.
+OIDC_CLIENT_APP_FILES = {
+    "seafile": "infra/k8s/helm-values/seafile.yaml",
+    "vikunja": "infra/k8s/helm-values/vikunja.yaml",
+    "matrix-synapse": "infra/k8s/helm-values/synapse.yaml",
+    "gokapi": "infra/k8s/manifests/gokapi.yaml",
+    "peertube": "infra/k8s/helm-values/peertube.yaml",
+    "visio-meet": "infra/k8s/helm-values/visio-meet.yaml",
+}
+
+
+def check_oidc_coverage(platform: dict) -> list[str]:
+    """Guards against exactly the kind of gap a manual review once found by
+    hand (docs/oidc.md's changelog): a `keycloak_oidc_clients` entry in
+    infra/ansible/roles/keycloak_realm/defaults/main.yml with no matching
+    application-side `client_id` configuration, or with a `client_id` but no
+    secret ever wired (a dangling `secretKeyRef`/`existingSecret` with no
+    matching ExternalSecret, so the Kubernetes Secret it points at would
+    never materialize). Every client_id/secret name involved is read from
+    the repository's own files, never hardcoded here, so a future client
+    added the right way (app file + `*-oidc-secret` ExternalSecret) needs no
+    change to this function - only OIDC_CLIENT_APP_FILES, for the small
+    subset of clients whose app file name doesn't match their client_id.
+    Checked unconditionally (both `sync_platform.py` and `--check`), for the
+    same reason as check_domain_coverage(): this is a structural consistency
+    guarantee, not something to silently "fix" by generating hand-authored
+    application config."""
+    defaults_path = REPO_ROOT / "infra/ansible/roles/keycloak_realm/defaults/main.yml"
+    defaults_text = defaults_path.read_text()
+    client_ids = re.findall(r'client_id:\s*"([^"]+)"', defaults_text)
+
+    secrets_text = (REPO_ROOT / "infra/k8s/manifests/external-secrets.yaml").read_text()
+    declared_secret_names = set(re.findall(r"^\s*name:\s*(\S+-oidc-secret)\s*$", secrets_text, re.MULTILINE))
+
+    problems = []
+    for client_id in client_ids:
+        rel_path = OIDC_CLIENT_APP_FILES.get(client_id)
+        if rel_path is None:
+            problems.append(
+                f"infra/ansible/roles/keycloak_realm/defaults/main.yml declares an OIDC client "
+                f'"{client_id}" but scripts/sync_platform.py\'s OIDC_CLIENT_APP_FILES does not know '
+                "which application file configures it (add it there once the app side exists)"
+            )
+            continue
+
+        app_path = REPO_ROOT / rel_path
+        app_text = app_path.read_text()
+        if f'"{client_id}"' not in app_text:
+            problems.append(
+                f'Keycloak client "{client_id}" has no matching client_id configured in {rel_path} '
+                "(the realm declares the client, but nothing on the application side would ever use it)"
+            )
+
+        app_secret_names = set(re.findall(r"([a-z0-9][a-z0-9-]*-oidc-secret)", app_text))
+        if not app_secret_names:
+            problems.append(
+                f'{rel_path} configures OIDC client "{client_id}" but references no '
+                '"*-oidc-secret" secretKeyRef/existingSecret at all (the client secret would '
+                "never be supplied to the running application)"
+            )
+            continue
+
+        missing = app_secret_names - declared_secret_names
+        for secret_name in sorted(missing):
+            problems.append(
+                f'{rel_path} references secret "{secret_name}" for OIDC client "{client_id}" but no '
+                "matching ExternalSecret exists in infra/k8s/manifests/external-secrets.yaml "
+                "(the Kubernetes Secret would never materialize)"
             )
     return problems
 
@@ -748,6 +835,17 @@ def main() -> int:
     if domain_problems:
         print("Domain coverage problem(s) between platform.yaml and infra/k8s/manifests/caddy.yaml:", file=sys.stderr)
         for problem in domain_problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return 1
+
+    # Same rationale as domain coverage above: a Keycloak OIDC client with
+    # no matching application-side config, or an app referencing a secret
+    # nobody ever declared as an ExternalSecret, isn't drift this script can
+    # fix by generating hand-authored config - only flag it loudly.
+    oidc_problems = check_oidc_coverage(platform)
+    if oidc_problems:
+        print("OIDC coverage problem(s) (see docs/oidc.md):", file=sys.stderr)
+        for problem in oidc_problems:
             print(f"  - {problem}", file=sys.stderr)
         return 1
 

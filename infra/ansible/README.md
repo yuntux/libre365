@@ -12,7 +12,7 @@ pip install ansible
 ansible-galaxy collection install community.general
 ```
 
-The `keycloak-realm.yml`, `matrix.yml`, `seafile.yml` and `onlyoffice.yml`
+The `keycloak-realm.yml`, `seafile.yml` and `onlyoffice.yml`
 playbooks run locally (`connection: local`) because they drive HTTP APIs
 (Keycloak Admin API, `kubectl`) rather than remote hosts over SSH —
 `kubectl` must therefore be configured with a context pointing to the target
@@ -41,7 +41,6 @@ ansible-playbook -i inventory/hosts.ini playbooks/openbao-config.yml
 ansible-playbook -i inventory/hosts.ini playbooks/keycloak-realm.yml
 ansible-playbook -i inventory/hosts.ini playbooks/grommunio.yml
 ansible-playbook -i inventory/hosts.ini playbooks/grommunio-cert.yml
-ansible-playbook -i inventory/hosts.ini playbooks/matrix.yml
 ansible-playbook -i inventory/hosts.ini playbooks/seafile.yml
 ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 ```
@@ -55,9 +54,24 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 | `playbooks/keycloak-realm.yml` | Main realm, TOTP + WebAuthn/FIDO2, per-component OIDC clients (via the `keycloak_realm` role) | 1.7 |
 | `playbooks/grommunio.yml` | `GAL_ENABLED`/`GAL_CACHE_TTL`, disabling the web admin, EWS/EAS/MAPI enabled | 1.1, 2.13 |
 | `playbooks/grommunio-cert.yml` | Fully automates Grommunio's Let's Encrypt certificate — issuance (idempotent) and renewal (`certbot.timer`) via the `grommunio_cert` role, no manual step | not a numbered requirement — closes a gap noted during review |
-| `playbooks/matrix.yml` | `server_name`, Synapse OIDC provider pointing to Keycloak | 1.2, 1.7 |
 | `playbooks/seafile.yml` | `SHARE_LINK_LOGIN_REQUIRED`, per-role share link generation permission, OnlyOffice connector | 2.11, 1.5 |
 | `playbooks/onlyoffice.yml` | `document.permissions.chat: false` by default | 2.6 |
+
+Matrix/Synapse's OIDC config has no dedicated playbook: it's entirely
+chart-native (`infra/k8s/helm-values/synapse.yaml`'s `synapse.oidc` block)
+— a separate Ansible-rendered ConfigMap used to duplicate this with a
+mismatched `client_id`, found and removed during a review pass (see
+`docs/oidc.md`).
+
+## OIDC / SSO (study 1.7)
+
+See `docs/oidc.md` for the full per-component breakdown of which
+components have a Keycloak client, why the ones that don't are excluded
+deliberately, and `scripts/sync_platform.py`'s `check_oidc_coverage()` (run
+as part of `--check`) which now enforces in CI that every
+`keycloak_oidc_clients` entry here has a matching `client_id` reference and
+`ExternalSecret` on the application side — the exact kind of gap a manual
+review previously had to catch by hand.
 
 ## Domain configuration
 
