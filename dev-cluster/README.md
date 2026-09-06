@@ -248,13 +248,15 @@ deploying that exact chart for real can confirm those.
 
 ## Usage
 
-Prerequisites: `k3d`, `kubectl`, `helm`, `docker` on `PATH`.
+Prerequisites: `k3d`, `kubectl`, `helm`, `docker` on `PATH` — `deploy.sh`'s
+own step 1/14 installs whichever of these 4 is missing (Ubuntu/Debian only,
+see its header) before doing anything else, so a fresh machine needs none
+of them pre-installed.
 
 ```bash
-# Start grommunio-dev (not part of the k3d cluster)
-docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
-
-# Bring up the k3d cluster + every other brick (Novu included) + the 5 connectors
+# Starts grommunio-dev (docker-compose, not part of the k3d cluster) AND
+# brings up the k3d cluster + every other brick (Novu included) + the 5
+# connectors, in one run
 ./dev-cluster/deploy.sh
 
 # Verify external-dns reads the Caddy Service's annotation correctly
