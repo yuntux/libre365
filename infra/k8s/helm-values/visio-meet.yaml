@@ -13,7 +13,7 @@
 backend:
   image:
     repository: lasuite/meet-backend
-    tag: "latest" # to be pinned to a versioned tag before going to production
+    tag: "v1.30.0"
   replicaCount: 2
   resources:
     requests:
@@ -28,6 +28,11 @@ backend:
     OIDC_OP_AUTHORIZATION_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/auth"
     OIDC_OP_TOKEN_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/token"
     OIDC_OP_USER_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/userinfo"
+    # Required by suitenumerique/meet's own settings.py (django-configurations
+    # `values.Value`, no default) - missing entirely before this review pass,
+    # which would have made the backend fail at startup the moment OIDC was
+    # actually exercised, not just misconfigured.
+    OIDC_OP_JWKS_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/certs"
     OIDC_RP_CLIENT_ID: "visio-meet"
     # Client secret from visio-meet-oidc-secret (external-secrets.yaml,
     # OpenBao-sourced) - the Keycloak client itself ("visio-meet") didn't
@@ -51,7 +56,7 @@ backend:
 frontend:
   image:
     repository: lasuite/meet-frontend
-    tag: "latest"
+    tag: "v1.30.0"
   replicaCount: 2
   resources:
     requests:

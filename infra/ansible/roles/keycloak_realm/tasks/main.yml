@@ -138,3 +138,22 @@
   loop_control:
     label: "{{ item.item.client_id }}"
   when: item.skipped is not defined
+
+- name: "Create the representative test user (study 4.4, point 2) - OPT-IN, dev/staging only"
+  community.general.keycloak_user:
+    auth_keycloak_url: "{{ keycloak_base_url }}"
+    auth_realm: "{{ keycloak_admin_realm }}"
+    auth_username: "{{ keycloak_admin_user }}"
+    auth_password: "{{ keycloak_admin_password }}"
+    realm: "{{ keycloak_realm_name }}"
+    username: "{{ keycloak_realm_test_user_username }}"
+    email: "{{ keycloak_realm_test_user_email }}"
+    enabled: true
+    email_verified: true
+    credentials:
+      - type: password
+        value: "{{ keycloak_realm_test_user_password }}"
+        temporary: false
+    state: present
+  no_log: true
+  when: keycloak_realm_test_user_enabled | bool

@@ -19,6 +19,18 @@ reuse this same structure rather than an ad hoc pattern per component.
 - `keycloak_oidc_clients` — list of OIDC clients to create (one per
   OIDC-compatible component; Grommunio is deliberately absent from it, see
   the comment in the file)
+- `keycloak_realm_test_user_enabled` (default `false`) — creates the
+  representative test user (study 4.4, point 2) that every scenario in
+  `tests/integration/` and the ephemeral staging workflow log in as.
+  **OFF by default and never turned on by `site.yml`** (the production
+  playbook): a fake "consultant" account has no reason to exist in a real
+  production realm. Only `dev-cluster/provision-keycloak-dev.sh` and
+  `.github/workflows/ephemeral-staging.yml` pass
+  `-e keycloak_realm_test_user_enabled=true` explicitly, alongside
+  `-e keycloak_realm_test_user_password=...` (no default - always supplied
+  explicitly, the same convention as `keycloak_admin_password`).
+  Username/email come from `platform.yaml`'s `test_dataset` (single
+  source, also read by `tests/integration/_platform_defaults.py`).
 
 ## Not covered by this role
 

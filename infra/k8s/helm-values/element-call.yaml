@@ -10,7 +10,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/element-hq/element-call
-  tag: "latest-ce" # to be pinned to a versioned tag before going to production
+  tag: "v0.25.0"
 
 env:
   # 1.3 L.107 — LiveKit backend shared with Visio for the media SFU part.
@@ -28,7 +28,7 @@ authService:
   enabled: true
   image:
     repository: ghcr.io/element-hq/lk-jwt-service
-    tag: "latest"
+    tag: "0.6.0"
   env:
     - name: LIVEKIT_URL
       value: "wss://livekit.libre365.example.org"

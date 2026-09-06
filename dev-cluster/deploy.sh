@@ -17,7 +17,7 @@ CLUSTER_NAME="libre365-dev"
 NAMESPACE="libre365"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
 
-echo "==> 1/10 k3d cluster"
+echo "==> 1/11 k3d cluster"
 if k3d cluster list -o json 2>/dev/null | grep -q "\"name\":\"${CLUSTER_NAME}\""; then
   echo "    cluster '${CLUSTER_NAME}' already exists, skipping creation."
 else
@@ -25,10 +25,10 @@ else
 fi
 kubectl config use-context "k3d-${CLUSTER_NAME}"
 
-echo "==> 2/10 namespace"
+echo "==> 2/11 namespace"
 kubectl apply -f infra/k8s/manifests/namespace.yaml
 
-echo "==> 3/10 Helm repos (see infra/k8s/helm-values/README.md)"
+echo "==> 3/11 Helm repos (see infra/k8s/helm-values/README.md)"
 helm repo add ananace-charts https://ananace.gitlab.io/charts >/dev/null
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null
 helm repo add minio https://charts.min.io/ >/dev/null
@@ -49,7 +49,7 @@ helm repo add external-secrets https://charts.external-secrets.io >/dev/null
 helm repo add oauth2-proxy https://oauth2-proxy.github.io/manifests >/dev/null
 helm repo update >/dev/null
 
-echo "==> 4/10 Secrets: OpenBao + External Secrets Operator (dev mode, study 4.5)"
+echo "==> 4/11 Secrets: OpenBao + External Secrets Operator (dev mode, study 4.5)"
 # Dev-mode OpenBao (fixed root token, in-memory) + ESO, wired together by
 # the DEV-ONLY ClusterSecretStore (static token, not the production
 # Kubernetes-auth one - see infra/k8s/manifests/dev/external-secrets-store.yaml's
@@ -67,7 +67,7 @@ kubectl apply -f infra/k8s/manifests/dev/external-secrets-store.yaml
 kubectl apply -f infra/k8s/manifests/external-secrets.yaml
 ./dev-cluster/seed-openbao-dev-secrets.sh
 
-echo "==> 5/10 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
+echo "==> 5/11 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
 helm upgrade --install keycloak bitnami/keycloak -n "$NAMESPACE" \
   -f infra/k8s/helm-values/keycloak.yaml -f infra/k8s/helm-values/dev/keycloak.yaml
 helm upgrade --install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
@@ -89,7 +89,19 @@ helm upgrade --install novu novu/novu -n "$NAMESPACE" \
 helm upgrade --install external-dns external-dns/external-dns -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-dns.yaml -f infra/k8s/helm-values/dev/external-dns.yaml
 
-echo "==> 6/10 In-house connectors: build + import images, apply manifests"
+echo "==> 6/11 Keycloak realm + OIDC clients + test user (study 1.7/4.4)"
+# Exposes ONLY Keycloak's NodePort now (targeted, not the full
+# expose_all_services below: the connectors/gokapi/caddy-dev Services this
+# script installs later don't exist yet, and expose_service already
+# tolerates a missing Service by skipping with a warning) - needed before
+# provision-keycloak-dev.sh can reach the admin REST API, and before
+# oauth2-proxy (step 9/11 below) starts: it fetches its OIDC client from
+# this realm at startup and would fail if the realm didn't exist yet.
+source "$(dirname "${BASH_SOURCE[0]}")/lib-expose.sh"
+expose_service keycloak 0 8080
+"$(dirname "${BASH_SOURCE[0]}")/provision-keycloak-dev.sh" "$NAMESPACE"
+
+echo "==> 7/11 In-house connectors: build + import images, apply manifests"
 for name in "${CONNECTORS[@]}"; do
   echo "    building libre365/${name}:dev"
   docker build -t "libre365/${name}:dev" "connectors/${name}"
@@ -100,7 +112,7 @@ kubectl apply -f infra/k8s/manifests/gokapi.yaml
 kubectl apply -f infra/k8s/manifests/dev/caddy.yaml
 kubectl rollout status deployment/caddy-dev -n "$NAMESPACE" --timeout=60s
 
-echo "==> 7/10 CoreDNS: resolve every platform.yaml domain to caddy-dev (study 1.7, SSO/OIDC)"
+echo "==> 8/11 CoreDNS: resolve every platform.yaml domain to caddy-dev (study 1.7, SSO/OIDC)"
 # Every OIDC config in this repo (Keycloak's KC_HOSTNAME, each app's
 # issuer/authurl, the two oauth2-proxy gates) uses the real public domain
 # unconditionally - the same value in production and dev, deliberately
@@ -110,17 +122,17 @@ echo "==> 7/10 CoreDNS: resolve every platform.yaml domain to caddy-dev (study 1
 # unverified assumption (k3d's default Corefile layout).
 "$(dirname "${BASH_SOURCE[0]}")/patch-coredns-hosts.sh" "$NAMESPACE"
 
-echo "==> 8/10 oauth2-proxy: Keycloak SSO gates for OnlyOffice/Novu (study 1.7)"
+echo "==> 9/11 oauth2-proxy: Keycloak SSO gates for OnlyOffice/Novu (study 1.7)"
 # Installed only now, not alongside the other Helm releases above: both
 # fetch their OIDC discovery document from the realm's public domain at
 # startup and would otherwise fail before CoreDNS could resolve it (see
-# step 7/10 just above).
+# step 8/11 just above).
 helm upgrade --install oauth2-proxy-onlyoffice oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
   -f infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml
 helm upgrade --install oauth2-proxy-novu oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
   -f infra/k8s/helm-values/oauth2-proxy-novu.yaml
 
-echo "==> 9/10 Production caddy.yaml's Service (for external-dns testing only)"
+echo "==> 10/11 Production caddy.yaml's Service (for external-dns testing only)"
 # Applies the REAL infra/k8s/manifests/caddy.yaml as-is - not to run
 # production Caddy in dev (dev routing is caddy-dev, applied above), but so
 # its Service exists with the exact same external-dns hostname annotation
@@ -133,7 +145,7 @@ echo "==> 9/10 Production caddy.yaml's Service (for external-dns testing only)"
 # balancer still assigns the LoadBalancer Service an IP regardless.
 kubectl apply -f infra/k8s/manifests/caddy.yaml
 
-echo "==> 10/10 Exposing services as NodePort (matching platform.yaml's port numbers)"
+echo "==> 11/11 Exposing services as NodePort (matching platform.yaml's port numbers)"
 source "$(dirname "${BASH_SOURCE[0]}")/lib-expose.sh"
 expose_all_services
 

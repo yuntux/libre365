@@ -449,3 +449,38 @@ def test_compute_dev_caddy_change_regenerates_for_a_different_base_domain(tmp_pa
 
     assert "http://sso.new-base.example.net {" in changes[0].desired
     assert "libre365.example.org" not in changes[0].desired
+
+
+# --- compute_domain_changes() realm name substitution ----------------------
+#
+# Regression test for a duplicated hard-coded value found during review:
+# 7 app files each hand-copied the literal Keycloak realm name
+# ("realms/libre365") independently, with nothing keeping them in sync
+# with infra/ansible/roles/keycloak_realm/defaults/main.yml's
+# keycloak_realm_name - a rename there would have silently broken every
+# one of them. platform.yaml's services.keycloak.realm_name is now the
+# single source, patched into every DOMAIN_TARGET_FILES entry.
+
+def _platform_with_realm(base: str, subdomains: dict[str, str], realm_name: str) -> dict:
+    platform = _platform(base, subdomains)
+    platform["services"] = {"keycloak": {"realm_name": realm_name}}
+    return platform
+
+
+def test_compute_domain_changes_patches_the_realm_name(tmp_path, monkeypatch):
+    target_dir = tmp_path / "infra" / "k8s" / "helm-values"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "vikunja.yaml"
+    target_file.write_text(
+        'AUTHURL: "https://sso.libre365.example.org/realms/libre365"\n'
+    )
+    monkeypatch.setattr(sync_platform, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(sync_platform, "DOMAIN_TARGET_FILES", ["infra/k8s/helm-values/vikunja.yaml"])
+
+    platform = _platform_with_realm("libre365.example.org", {"sso": "sso"}, "acme-corp")
+    changes = sync_platform.compute_domain_changes(platform)
+
+    assert 'realms/acme-corp"' in changes[0].desired
+    assert "realms/libre365" not in changes[0].desired
+    # The domain itself must be untouched by this substitution.
+    assert "sso.libre365.example.org" in changes[0].desired

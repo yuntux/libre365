@@ -170,19 +170,29 @@ resolve and route correctly here too:
    here — dev loses the injected top bar, not the routing) and automatic
    HTTPS (forced to plain `http://` — there is no real public DNS to get a
    certificate for from a local cluster).
-2. `deploy.sh`'s step 7/10 calls `patch-coredns-hosts.sh`, which patches
-   this cluster's CoreDNS with a `hosts` block resolving every
-   `platform.yaml` domain to `caddy-dev`'s in-cluster ClusterIP — so pods
-   (Keycloak, oauth2-proxy, every app doing its own server-side OIDC
-   discovery/token exchange) resolve the real domain to the real dev
-   Caddy, exactly like production DNS resolves it to the real production
-   Caddy. See that script's header for its one unverified assumption
-   (k3d's default Corefile layout) — inspect
-   `kubectl get configmap coredns -n kube-system -o yaml` if it fails.
-3. Step 8/10 installs the two `oauth2-proxy-*` releases only after that DNS
+2. `deploy.sh`'s step 6/11 calls `provision-keycloak-dev.sh` (right after
+   exposing Keycloak's own NodePort), which runs the `keycloak_realm`
+   Ansible role against this cluster's Keycloak with
+   `keycloak_realm_test_user_enabled=true` — creating the realm, every
+   OIDC client, and the representative test user (study 4.4, point 2)
+   that `tests/integration/`'s `test_user` fixture and the ephemeral
+   staging workflow both log in as. This has to happen before the
+   oauth2-proxy releases (step 9/11 below) are installed, since both fetch
+   their OIDC client from this realm at startup and fail if it doesn't
+   exist yet.
+3. Step 8/11 calls `patch-coredns-hosts.sh`, which patches this cluster's
+   CoreDNS with a `hosts` block resolving every `platform.yaml` domain to
+   `caddy-dev`'s in-cluster ClusterIP — so pods (Keycloak, oauth2-proxy,
+   every app doing its own server-side OIDC discovery/token exchange)
+   resolve the real domain to the real dev Caddy, exactly like production
+   DNS resolves it to the real production Caddy. See that script's header
+   for its one unverified assumption (k3d's default Corefile layout) —
+   inspect `kubectl get configmap coredns -n kube-system -o yaml` if it
+   fails.
+4. Step 9/11 installs the two `oauth2-proxy-*` releases only after that DNS
    patch, since both fetch their OIDC discovery document at startup and
    would otherwise fail to resolve the realm's domain at all.
-4. `tests/integration/conftest.py`'s `DomainRoutingAdapter` gives the test
+5. `tests/integration/conftest.py`'s `DomainRoutingAdapter` gives the test
    suite itself (running outside the cluster) the same resolution: it
    rewrites any request to `*.<domains.base>` to actually connect to
    `caddy-dev`'s exposed NodePort (`CADDY_HTTP_PORT`, matching
@@ -287,5 +297,6 @@ instead of docker-compose — see `../tests/integration/README.md`.
   Deployment/Service stay hand-written.
 - `deploy.sh`, `redeploy.sh`, `destroy.sh`, `lib-expose.sh`,
   `check-external-dns.sh`, `seed-openbao-dev-secrets.sh`,
-  `check-external-secrets.sh`, `patch-coredns-hosts.sh` are hand-written
-  orchestration, not generated.
+  `check-external-secrets.sh`, `patch-coredns-hosts.sh`,
+  `provision-keycloak-dev.sh` are hand-written orchestration, not
+  generated.

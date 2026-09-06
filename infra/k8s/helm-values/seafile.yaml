@@ -18,7 +18,7 @@
 
 image:
   repository: seafileltd/seafile-mc
-  tag: "11.0.13"
+  tag: "13.0.25"
 
 replicaCount: 1 # single-node, Community edition (1.4 L.141)
 

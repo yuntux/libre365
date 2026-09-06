@@ -52,3 +52,6 @@ DOMAIN_SUBDOMAINS = {
     "videos": 'videos',
     "visio": 'visio',
 }
+
+TEST_USER_USERNAME = 'test.consultant'
+TEST_USER_EMAIL = 'test.consultant@libre365.test'

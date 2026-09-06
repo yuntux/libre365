@@ -196,6 +196,7 @@ def compute_domain_changes(platform: dict) -> list[Change]:
         return []
     base = domains["base"]
     subdomains = domains["subdomains"].values()
+    realm_name = platform["services"]["keycloak"]["realm_name"]
 
     changes = []
     for rel_path in DOMAIN_TARGET_FILES:
@@ -205,6 +206,15 @@ def compute_domain_changes(platform: dict) -> list[Change]:
             text = sub_domain(text, subdomain, base)
         for bare_pattern in _BARE_DOMAIN_PATTERNS.get(path, []):
             text = re.sub(bare_pattern, rf"\g<1>{base}\g<2>", text)
+        # Every OIDC app config builds its issuer/authorization URL as
+        # ".../realms/<realm_name>" - this used to be a literal "libre365"
+        # independently hand-copied into 7 different files (see
+        # platform.yaml's services.keycloak.realm_name comment for the
+        # full story), with nothing keeping them in sync with the Ansible
+        # role that actually creates the realm. Matched structurally
+        # (any "realms/<segment>"), not against a specific name, so this
+        # keeps working regardless of what the realm is currently called.
+        text = re.sub(r"realms/[a-zA-Z0-9_-]+", f"realms/{realm_name}", text)
         changes.append(Change(path, text, f"{rel_path} (domain names)"))
     return changes
 
@@ -931,6 +941,18 @@ def compute_test_defaults_changes(platform: dict) -> list[Change]:
     for key, subdomain in sorted((domains.get("subdomains") or {}).items()):
         body.append(f'    "{key}": {subdomain!r},')
     body.append("}")
+    body.append("")
+
+    # TEST_USER_USERNAME/TEST_USER_EMAIL: platform.yaml's test_dataset
+    # (study 4.4, point 2) - conftest.py's test_user fixture reads these
+    # instead of a hard-coded literal, matching the same account
+    # infra/ansible/roles/keycloak_realm optionally provisions
+    # (keycloak_realm_test_user_enabled). The password is deliberately NOT
+    # here: it's a secret, never platform.yaml, always an env var/vault
+    # variable - see conftest.py's test_user fixture.
+    test_dataset = platform.get("test_dataset") or {}
+    body.append(f"TEST_USER_USERNAME = {test_dataset.get('username', '')!r}")
+    body.append(f"TEST_USER_EMAIL = {test_dataset.get('email', '')!r}")
     body.append("")
 
     content = "\n".join(body)
