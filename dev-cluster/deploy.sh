@@ -227,8 +227,42 @@ helm upgrade --install external-secrets external-secrets/external-secrets -n "$N
 # `kubectl wait --for=condition=Ready` checks pod readiness directly instead
 # of the rollout mechanism, so it works regardless of the update strategy.
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=openbao -n "$NAMESPACE" --timeout=120s
-kubectl apply -f infra/k8s/manifests/dev/external-secrets-store.yaml
-kubectl apply -f infra/k8s/manifests/external-secrets.yaml
+# [CORRECTED, twice] `helm upgrade --install external-secrets` above
+# returns as soon as its manifests (including its own CRDs) are applied,
+# but the API server can take a few seconds to actually register a
+# brand-new CRD - found by actually running this script: `kubectl apply -f
+# .../external-secrets-store.yaml` (a ClusterSecretStore) failed with "no
+# matches for kind ClusterSecretStore ... ensure CRDs are installed
+# first". A first fix added `kubectl wait --for=condition=Established` on
+# the CRDs, which turned out to be insufficient: `kubectl wait` confirms
+# the CRD server-side, but `kubectl apply` separately relies on `kubectl`'s
+# own LOCAL, on-disk discovery cache (~/.kube/cache/discovery, ~10 minute
+# TTL) to resolve "kind: ClusterSecretStore" to its REST endpoint - a cache
+# populated by earlier `kubectl` calls in this very script, before these
+# CRDs existed, and `condition=Established` becoming true server-side does
+# not invalidate it. A short retry loop is the standard, robust fix for
+# this well-known kubectl gotcha (each attempt is a fresh process, and the
+# cache TTL/staleness resolves itself within a few tries) - simpler and
+# more portable than reaching into kubectl's cache directory by hand.
+apply_with_crd_retry() {
+  local file="$1" attempt
+  for attempt in $(seq 1 10); do
+    if kubectl apply -f "$file" 2>/tmp/kubectl-apply-err; then
+      cat /tmp/kubectl-apply-err >&2
+      return 0
+    fi
+    if ! grep -q "ensure CRDs are installed first" /tmp/kubectl-apply-err; then
+      cat /tmp/kubectl-apply-err >&2
+      return 1
+    fi
+    echo "    kubectl's discovery cache hasn't picked up the new CRD yet (attempt ${attempt}/10), retrying in 3s..."
+    sleep 3
+  done
+  cat /tmp/kubectl-apply-err >&2
+  return 1
+}
+apply_with_crd_retry infra/k8s/manifests/dev/external-secrets-store.yaml
+apply_with_crd_retry infra/k8s/manifests/external-secrets.yaml
 ./dev-cluster/seed-openbao-dev-secrets.sh
 
 echo "==> 8/14 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
