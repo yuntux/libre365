@@ -1,7 +1,22 @@
 # Component: Novu — unified notification center (study 2.1 L.381-382)
-# Chart used: novuhq/helm-charts (official Novu chart)
-#   Helm repo: https://novuhq.github.io/helm-charts
-#   chart    : novu
+#
+# [CORRECTED] Novu has NO official Helm chart at all - this file used to
+# claim "novuhq/helm-charts (official Novu chart)" at
+# "https://novuhq.github.io/helm-charts", which does not exist (found while
+# actually running dev-cluster/deploy.sh: that repo add 404s, and there is
+# no "helm-charts" repository under the novuhq GitHub org at all).
+# Chart used: Nova-Edge/novu-chart, a COMMUNITY chart that explicitly
+# disclaims official Novu support (its own README: "created by the
+# community and is not officially supported by the Novu team"), published
+# as an OCI artifact - no index.yaml-based repo to point Helm at, pinned by
+# version directly at install time instead:
+#   oci://ghcr.io/nova-edge/charts/novu, version 0.2.1 (see
+#   dev-cluster/deploy.sh/redeploy.sh)
+# [UNCERTAIN] this is a low-adoption chart (2 GitHub stars at the time of
+# writing) - schema below (top-level api/worker/ws/web/mongodb/redis/
+# ingress/global) was verified against its real values.yaml (not guessed),
+# but its actual runtime behavior has not been exercised against a live
+# cluster from this sandboxed environment.
 #
 # 2.1 L.382 — Novu chosen for the notification center UI and multi-channel
 # infrastructure; ingestion (Matrix Application Service webhook connectors,
@@ -52,31 +67,43 @@ web:
 
 mongodb:
   enabled: true
+  # [UNCERTAIN] assumes the chart's mongodb dependency is (or behaves like)
+  # the Bitnami mongodb chart, whose `auth.existingSecret` this passes
+  # through to - the community chart's own values.yaml only documents
+  # `mongodb.enabled`/`mongodb.serviceBindings` by default, so this specific
+  # pass-through key was not independently confirmed against its exact
+  # dependency version from this sandboxed environment.
   auth:
     existingSecret: novu-mongodb-secret
 
 redis:
   enabled: true
 
-# 1.7 — account/organization provisioning via Keycloak SSO at the level of the
-# cross-cutting application portal (2.3) rather than via Novu's native auth (Novu is
-# not exposed directly to consultants as a standalone application, but integrated
-# into the top bar, see caddy-injection.yaml).
-env:
-  API_ROOT_URL: "https://notifications.libre365.example.org/api"
-  WS_URL: "wss://notifications.libre365.example.org"
-  FRONT_BASE_URL: "https://notifications.libre365.example.org"
+# [CORRECTED] moved from a bare top-level `env:` (silently ignored by the
+# real chart - its values.yaml has no such key) to `global.env`, the actual
+# location its schema documents for injecting environment variables into
+# every component. 1.7 — account/organization provisioning via Keycloak SSO
+# at the level of the cross-cutting application portal (2.3) rather than
+# via Novu's native auth (Novu is not exposed directly to consultants as a
+# standalone application, but integrated into the top bar, see
+# caddy-injection.yaml).
+global:
+  env:
+    API_ROOT_URL: "https://notifications.libre365.example.org/api"
+    WS_URL: "wss://notifications.libre365.example.org"
+    FRONT_BASE_URL: "https://notifications.libre365.example.org"
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
 # see ../manifests/caddy.yaml's header comment for the full rationale.
+# [CORRECTED] the chart's real `ingress` schema takes a single `host`
+# string, not an ingress-nginx-style `hosts`/`paths` list (the previous
+# version of this file used a shape this chart doesn't define at all) -
+# harmless while `enabled: false`, but wrong for whenever this ever needs
+# turning on.
 ingress:
   enabled: false
   className: ""
-  hosts:
-    - host: notifications.libre365.example.org
-      paths:
-        - path: /
-          pathType: Prefix
+  host: notifications.libre365.example.org
   tls:
     - secretName: novu-tls
       hosts:

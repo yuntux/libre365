@@ -45,13 +45,13 @@ declare -A EXPOSE_MAP=(
   [seaweedfs-s3:0]=8333
   [seaweedfs-admin:0]=23646
   [peertube:0]=9002
-  # The Novu chart's naming convention for its per-component Services
-  # (api/worker/ws/web) is a second unverified assumption on top of the
-  # port-index one described above: "novu-api" follows the common
-  # <release>-<subchart> pattern, not confirmed against a live template of
-  # novuhq/helm-charts from this sandbox. Adjust with
-  # `kubectl get services -n libre365 -l app.kubernetes.io/instance=novu`
-  # if the real name differs.
+  # "novu-api" (release "novu" + component "api") IS verified against the
+  # real chart actually used (Nova-Edge/novu-chart, see
+  # infra/k8s/helm-values/novu.yaml's own header for why it's this chart
+  # and not "novuhq/helm-charts", which doesn't exist) - its
+  # `templates/_helpers.tpl` defines `novu.api.fullname` as
+  # `<release>-api`, confirmed to produce exactly "novu-api" with the
+  # release name used here.
   [novu-api:0]=13000
   [gokapi:0]=53842
   [caddy-dev:0]=10080

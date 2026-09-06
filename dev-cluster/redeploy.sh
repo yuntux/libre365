@@ -57,6 +57,7 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
   base="infra/k8s/helm-values/${target}.yaml"
   dev_overlay="infra/k8s/helm-values/dev/${target}.yaml"
   chart=""
+  chart_version=""
   case "$target" in
     keycloak-postgres) chart="bitnami/postgresql" ;;
     synapse) chart="ananace-charts/matrix-synapse" ;;
@@ -66,12 +67,20 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
     vikunja) chart="vikunja/vikunja" ;;
     seaweedfs) chart="seaweedfs/seaweedfs" ;;
     peertube) chart="peertube-helm/peertube" ;;
-    novu) chart="novu/novu" ;;
+    # No official Novu chart exists at all (see deploy.sh's own comment) -
+    # this is the community OCI chart, pinned by --version since OCI
+    # references aren't resolved through a repo's own index like every
+    # other chart here.
+    novu) chart="oci://ghcr.io/nova-edge/charts/novu"; chart_version="0.2.1" ;;
     external-dns) chart="external-dns/external-dns" ;;
     openbao) chart="openbao/openbao" ;;
     external-secrets) chart="external-secrets/external-secrets" ;;
   esac
-  helm upgrade --install "$target" "$chart" -n "$NAMESPACE" -f "$base" -f "$dev_overlay"
+  if [ -n "$chart_version" ]; then
+    helm upgrade --install "$target" "$chart" --version "$chart_version" -n "$NAMESPACE" -f "$base" -f "$dev_overlay"
+  else
+    helm upgrade --install "$target" "$chart" -n "$NAMESPACE" -f "$base" -f "$dev_overlay"
+  fi
   echo "==> Force-deleting its pod(s) so the new values are picked up immediately"
   kubectl delete pod -n "$NAMESPACE" -l "app.kubernetes.io/instance=${target}" --grace-period=0 --force --ignore-not-found
 
