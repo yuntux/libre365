@@ -34,6 +34,14 @@ keycloak_realm_test_user_enabled: false
 keycloak_realm_test_user_username: "{{ libre365_test_user_username }}"
 keycloak_realm_test_user_email: "{{ libre365_test_user_email }}"
 
+# Cross-cutting app-portal banner groups (study 2.3) - single source is
+# platform.yaml's `portal.groups`, read into group_vars/all.yml as
+# libre365_portal_groups. Each group becomes a real Keycloak Group; the
+# test user (above) is added to whichever one has `default: true`, the
+# same way a real new user would be by whatever provisioning process the
+# firm adopts (out of scope here - see this role's README).
+keycloak_realm_groups: "{{ libre365_portal_groups }}"
+
 # OIDC clients — one per stack component gated by Keycloak SSO (study 1.7,
 # selection criteria: "to be checked service by service; Grommunio,
 # Seafile, Vikunja and OnlyOffice support OIDC; Matrix/Synapse too via an
@@ -142,5 +150,54 @@ keycloak_oidc_clients:
     redirect_uris:
       - "https://{{ notifications_admin_domain }}/oauth2/callback"
     public_client: false
+
+  - client_id: "libre365-portal"
+    name: "libre365 application-portal banner (study 2.3)"
+    root_url: "https://{{ libre365_domain }}"
+    # Public SPA client (no secret, PKCE) used ONLY by banner.js's own
+    # silent-SSO flow (hidden iframe, prompt=none) to obtain a short-lived
+    # access token for connectors/unified-search's `/portal/apps` and
+    # connectors/notification-hub's `/widget/session` - never used for an
+    # interactive login of its own. One redirect URI per app the banner is
+    # injected into (see infra/k8s/manifests/caddy.yaml's `injection`
+    # blocks) - all 4 static callback pages are byte-identical
+    # (caddy-injection.yaml's `sso-silent-callback.html`).
+    redirect_uris:
+      - "https://{{ chat_domain }}/libre365-banner/sso-silent-callback.html"
+      - "https://{{ seafile_domain }}/libre365-banner/sso-silent-callback.html"
+      - "https://{{ vikunja_domain }}/libre365-banner/sso-silent-callback.html"
+      - "https://{{ peertube_domain }}/libre365-banner/sso-silent-callback.html"
+    web_origins:
+      - "https://{{ chat_domain }}"
+      - "https://{{ seafile_domain }}"
+      - "https://{{ vikunja_domain }}"
+      - "https://{{ peertube_domain }}"
+    public_client: true
+    # PKCE (S256) is mandatory for a public client doing an Authorization
+    # Code flow from a browser (no client secret to otherwise prove the
+    # token-exchange request came from the same party that started the
+    # flow) - `attributes` is community.general.keycloak_client's generic
+    # passthrough for any Keycloak client attribute not covered by a
+    # dedicated module parameter.
+    attributes:
+      pkce.code.challenge.method: "S256"
+    # Realm-wide "Group Membership" protocol mapper (Keycloak built-in
+    # `oidc-group-membership-mapper`) so the access token this client
+    # issues carries a `groups` claim (group PATHS, e.g. "/consultants") -
+    # what connectors/unified-search's `/portal/apps` and
+    # connectors/notification-hub's `/widget/session` both read to
+    # identify the caller's group/subscriberId. Only needed on this
+    # client, not the other confidential ones above (those authenticate
+    # applications, not this banner).
+    protocol_mappers:
+      - name: "groups"
+        protocol: "openid-connect"
+        protocolMapper: "oidc-group-membership-mapper"
+        config:
+          "claim.name": "groups"
+          "full.path": "false"
+          "id.token.claim": "true"
+          "access.token.claim": "true"
+          "userinfo.token.claim": "true"
 
 keycloak_client_secrets_output_dir: "{{ playbook_dir }}/../secrets/keycloak-clients"

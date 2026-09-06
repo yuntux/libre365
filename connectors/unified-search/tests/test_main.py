@@ -52,3 +52,58 @@ def test_healthz():
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+_GROUPS = [
+    {"name": "consultants", "default": True, "apps": [{"key": "chat", "url": "https://chat.example.org"}]},
+    {
+        "name": "admin-si",
+        "default": False,
+        "apps": [
+            {"key": "chat", "url": "https://chat.example.org"},
+            {"key": "sso", "url": "https://sso.example.org"},
+        ],
+    },
+]
+
+
+def test_portal_apps_rejects_missing_token():
+    client = TestClient(app)
+    response = client.get("/portal/apps")
+    assert response.status_code == 401
+
+
+def test_portal_apps_returns_the_matching_group_apps():
+    with (
+        patch("app.main.PORTAL_GROUPS", _GROUPS),
+        patch("app.main.verify_token", return_value={"groups": ["/admin-si"]}),
+    ):
+        client = TestClient(app)
+        response = client.get("/portal/apps", headers={"Authorization": "Bearer t"})
+
+    assert response.status_code == 200
+    keys = {a["key"] for a in response.json()["apps"]}
+    assert keys == {"chat", "sso"}
+
+
+def test_portal_apps_falls_back_to_the_default_group_when_ungrouped():
+    with (
+        patch("app.main.PORTAL_GROUPS", _GROUPS),
+        patch("app.main.verify_token", return_value={"groups": []}),
+    ):
+        client = TestClient(app)
+        response = client.get("/portal/apps", headers={"Authorization": "Bearer t"})
+
+    assert response.status_code == 200
+    keys = {a["key"] for a in response.json()["apps"]}
+    assert keys == {"chat"}
+
+
+def test_portal_apps_rejects_an_invalid_token():
+    from app.auth import InvalidToken
+
+    with patch("app.main.verify_token", side_effect=InvalidToken("bad signature")):
+        client = TestClient(app)
+        response = client.get("/portal/apps", headers={"Authorization": "Bearer t"})
+
+    assert response.status_code == 401

@@ -49,6 +49,7 @@ bao_kv_put "libre365/peertube-postgres" password=devonly-changeme-peertube-pg po
 bao_kv_put "libre365/visio-meet-postgres" password=devonly-changeme-visio-pg postgres-password=devonly-changeme-visio-pg-super
 bao_kv_put "libre365/onlyoffice-redis" password=devonly-changeme-onlyoffice-redis
 bao_kv_put "libre365/novu-mongodb" root-password=devonly-changeme-novu-mongo
+bao_kv_put "libre365/novu" api-key=devonly-changeme-novu-api-key
 bao_kv_put "libre365/seaweedfs" s3-access-key=devonly-seaweedfs-access s3-secret-key=devonly-changeme-seaweedfs-secret admin-user=admin admin-password=devonly-changeme-seaweedfs-admin
 bao_kv_put "libre365/seafile-mysql" password=devonly-changeme-seafile-mysql
 

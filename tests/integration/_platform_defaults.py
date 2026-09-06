@@ -44,6 +44,7 @@ DOMAIN_SUBDOMAINS = {
     "notifications_admin": 'notifications-admin',
     "office": 'office',
     "onboarding": 'onboarding',
+    "portal_api": 'api',
     "registry": 'registry',
     "s3": 's3',
     "seaweedfs_admin": 'seaweedfs-admin',
