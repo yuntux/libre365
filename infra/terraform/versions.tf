@@ -17,10 +17,10 @@ terraform {
   # rebuildable from the repository alone, chapter 4.1):
   #
   # backend "s3" {
-  #   endpoints                  = { s3 = "https://minio.example.internal:9000" }
+  #   endpoints                  = { s3 = "https://seaweedfs-s3.example.internal:8333" }
   #   bucket                     = "libre365-terraform-state"
   #   key                        = "proxmox/terraform.tfstate"
-  #   region                     = "us-east-1" # value imposed by the S3 provider, has no effect with MinIO
+  #   region                     = "us-east-1" # value imposed by the S3 provider, has no effect with SeaweedFS
   #   skip_credentials_validation = true
   #   skip_region_validation      = true
   #   skip_metadata_api_check     = true

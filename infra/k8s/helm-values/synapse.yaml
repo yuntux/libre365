@@ -68,7 +68,7 @@ synapse:
     enabled: true
 
   image:
-    tag: v1.114.0
+    tag: v1.160.0
     repository: matrixdotorg/synapse
 
 postgresql:
@@ -84,7 +84,7 @@ persistence:
     storageClass: ""
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
-# see keycloak.yaml's ingress comment for the full rationale. Caddy fronts
+# see ../manifests/caddy.yaml's header comment for the full rationale. Caddy fronts
 # both the client API (matrix.libre365.example.org) and federation
 # (matrix.libre365.example.org:8448) for this chart.
 ingress:

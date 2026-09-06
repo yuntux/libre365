@@ -64,7 +64,7 @@ RELEASE_FEEDS = {
     "onlyoffice": "https://github.com/ONLYOFFICE/DocumentServer/releases.atom",
     "vikunja": "https://github.com/go-vikunja/vikunja/releases.atom",
     "gokapi": "https://github.com/Forceu/Gokapi/releases.atom",
-    "minio": "https://github.com/minio/minio/releases.atom",
+    "seaweedfs": "https://github.com/seaweedfs/seaweedfs/releases.atom",
     "peertube": "https://github.com/Chocobozzz/PeerTube/releases.atom",
     "caddy": "https://github.com/caddyserver/caddy/releases.atom",
 }

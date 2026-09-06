@@ -26,7 +26,11 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 NAMESPACE="libre365"
 CLUSTER_NAME="libre365-dev"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
-HELM_CHARTS=(keycloak synapse element-web seafile onlyoffice vikunja minio peertube novu external-dns openbao external-secrets)
+# Keycloak itself is NOT in this list: it's an Operator CR now, not a Helm
+# release (see infra/k8s/manifests/keycloak.yaml) - iterate on it with
+# `kubectl apply -f infra/k8s/manifests/keycloak.yaml`, the same way as
+# gokapi/caddy's raw manifests (also not covered by this script).
+HELM_CHARTS=(keycloak-postgres synapse element-web seafile onlyoffice vikunja seaweedfs peertube novu external-dns openbao external-secrets)
 
 usage() {
   echo "Usage: $0 <connector-name|helm-release-name>"
@@ -53,13 +57,13 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
   dev_overlay="infra/k8s/helm-values/dev/${target}.yaml"
   chart=""
   case "$target" in
-    keycloak) chart="bitnami/keycloak" ;;
+    keycloak-postgres) chart="bitnami/postgresql" ;;
     synapse) chart="ananace-charts/matrix-synapse" ;;
     element-web) chart="ananace-charts/matrix-element-web" ;;
     seafile) chart="seafile-charts/seafile-ce" ;;
     onlyoffice) chart="onlyoffice/docs-cloud" ;;
     vikunja) chart="vikunja/vikunja" ;;
-    minio) chart="minio/minio" ;;
+    seaweedfs) chart="seaweedfs/seaweedfs" ;;
     peertube) chart="peertube-helm/peertube" ;;
     novu) chart="novu/novu" ;;
     external-dns) chart="external-dns/external-dns" ;;

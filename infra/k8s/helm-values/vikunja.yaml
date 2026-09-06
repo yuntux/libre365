@@ -1,7 +1,8 @@
 # Component: Vikunja — task management (study 1.6 L.228-229)
-# Chart used: community chart `vikunja/helm-charts` (https://vikunja.io, GitHub repo
-#   `go-vikunja/helm-charts`)
-#   Helm repo: https://vikunja.github.io/helm-charts
+# Chart: no Vikunja-dedicated Helm chart is published upstream. Values
+# below are written in the repository's own "chart-like" convention, to be
+# adapted to a generic app-template chart (e.g. `bjw-s-labs/helm-charts`)
+# or a raw manifest at deployment time.
 #
 # 1.6 L.229 — 2-4 cores / 4 GB RAM sizing sufficient for both 100 and 2000 users
 # (barring massive API/automation usage): no dedicated 100/2000 variant, a single
@@ -12,7 +13,7 @@ replicaCount: 2
 
 image:
   repository: vikunja/vikunja
-  tag: "0.24.3"
+  tag: "2.6.0"
 
 resources:
   requests:
@@ -22,15 +23,28 @@ resources:
     cpu: "4"
     memory: "4Gi"
 
+# [UNCERTAIN]: Vikunja's OpenID provider config is a map keyed by an
+# arbitrary provider key (`PROVIDERS_<key>_...`, "libre365" below), not a
+# numeric index. Vikunja's generated config docs state that a provider key
+# must also be declared in a mounted `config.yml` for its environment-
+# variable overrides to be recognized at all - a pure-env-var setup (as
+# below, no config file) may not be sufficient on its own. Since no real
+# Helm chart for Vikunja exists to confirm a field name for mounting a
+# config.yml stub through, this is flagged rather than guessed: whichever
+# raw manifest/generic chart is adopted at deployment time must mount a
+# `config.yml` containing at least
+# `auth: {openid: {providers: {libre365: {}}}}` alongside these env vars.
+
 env:
   VIKUNJA_SERVICE_PUBLICURL: "https://taches.libre365.example.org"
   VIKUNJA_SERVICE_ENABLECALDAV: "true" # 1.6 table — native calendar integration
-  # 1.7 — Keycloak SSO (native Vikunja OIDC)
+  # 1.7 — Keycloak SSO (native Vikunja OIDC). Provider key "libre365" must
+  # match the config.yml stub mounted per the comment above.
   VIKUNJA_AUTH_OPENID_ENABLED: "true"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_0_NAME: "Libre365 SSO"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_0_AUTHURL: "https://sso.libre365.example.org/realms/libre365"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTID: "vikunja"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTSECRET:
+  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_NAME: "Libre365 SSO"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_AUTHURL: "https://sso.libre365.example.org/realms/libre365"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_CLIENTID: "vikunja"
+  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_CLIENTSECRET:
     valueFrom:
       secretKeyRef:
         name: vikunja-oidc-secret
@@ -49,7 +63,7 @@ persistence:
     storageClass: ""
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
-# see keycloak.yaml's ingress comment for the full rationale.
+# see ../manifests/caddy.yaml's header comment for the full rationale.
 ingress:
   enabled: false
   className: ""

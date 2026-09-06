@@ -169,7 +169,7 @@ _BARE_DOMAIN_PATTERNS = {
 # `*.libre365.svc.cluster.local` (in-cluster Service DNS, e.g. the k3d dev
 # manifests) are a different, unrelated namespace and are not listed here.
 DOMAIN_TARGET_FILES = [
-    "infra/k8s/helm-values/keycloak.yaml",
+    "infra/k8s/manifests/keycloak.yaml",
     "infra/k8s/helm-values/synapse.yaml",
     "infra/k8s/helm-values/element-web.yaml",
     "infra/k8s/helm-values/element-call.yaml",
@@ -177,7 +177,7 @@ DOMAIN_TARGET_FILES = [
     "infra/k8s/helm-values/seafile.yaml",
     "infra/k8s/helm-values/onlyoffice.yaml",
     "infra/k8s/helm-values/vikunja.yaml",
-    "infra/k8s/helm-values/minio.yaml",
+    "infra/k8s/helm-values/seaweedfs.yaml",
     "infra/k8s/helm-values/peertube.yaml",
     "infra/k8s/helm-values/novu.yaml",
     "infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml",
@@ -196,6 +196,7 @@ def compute_domain_changes(platform: dict) -> list[Change]:
         return []
     base = domains["base"]
     subdomains = domains["subdomains"].values()
+    realm_name = platform["services"]["keycloak"]["realm_name"]
 
     changes = []
     for rel_path in DOMAIN_TARGET_FILES:
@@ -205,6 +206,15 @@ def compute_domain_changes(platform: dict) -> list[Change]:
             text = sub_domain(text, subdomain, base)
         for bare_pattern in _BARE_DOMAIN_PATTERNS.get(path, []):
             text = re.sub(bare_pattern, rf"\g<1>{base}\g<2>", text)
+        # Every OIDC app config builds its issuer/authorization URL as
+        # ".../realms/<realm_name>" - this used to be a literal "libre365"
+        # independently hand-copied into 7 different files (see
+        # platform.yaml's services.keycloak.realm_name comment for the
+        # full story), with nothing keeping them in sync with the Ansible
+        # role that actually creates the realm. Matched structurally
+        # (any "realms/<segment>"), not against a specific name, so this
+        # keeps working regardless of what the realm is currently called.
+        text = re.sub(r"realms/[a-zA-Z0-9_-]+", f"realms/{realm_name}", text)
         changes.append(Change(path, text, f"{rel_path} (domain names)"))
     return changes
 
@@ -411,8 +421,8 @@ def compute_dockerfile_changes(platform: dict) -> list[Change]:
 
 def set_nested(data, dot_path: str, value: str) -> None:
     """`.image.tag` -> data['image']['tag'] = value, creating any missing
-    levels (e.g. minio.yaml currently has no explicit `image:` block — this
-    creates one rather than leaving the chart on its default, silent, and
+    levels (a values file with no explicit `image:` block yet gets one
+    created, rather than being left on the chart's default, silent, and
     therefore drift-prone tag)."""
     from ruamel.yaml.comments import CommentedMap
 
@@ -827,7 +837,7 @@ def _dev_caddyfile_from_production(caddyfile_text: str) -> str:
     hostname stay byte-for-byte the same values used in production
     (nothing new is hard-coded for "dev" here):
 
-    - `html_inject` directives and the `order html_inject before respond`
+    - `injection` directives and the `order injection after encode`
       global option: both need the custom xcaddy-built HTML-injection
       plugin baked into production's Caddy image, which cannot be built
       or pulled from this sandboxed/local dev environment (see this
@@ -846,12 +856,12 @@ def _dev_caddyfile_from_production(caddyfile_text: str) -> str:
     (see tests/integration/conftest.py's `DomainRoutingAdapter`).
     """
     text = re.sub(
-        r"\{\s*#[^\n]*\n\s*order html_inject before respond\s*\n\}\s*\n*",
+        r"\{\s*#[^\n]*\n\s*order injection after encode\s*\n\}\s*\n*",
         "",
         caddyfile_text,
         count=1,
     )
-    text = re.sub(r"\n[ \t]*html_inject\s*\{[^}]*\}", "", text)
+    text = re.sub(r"\n[ \t]*injection\s*\{[^}]*\}", "", text)
     # A line that is ONLY "<hostname[:port]> {" - matched structurally (not
     # against any specific domain name, so this keeps working regardless of
     # platform.yaml's domains.base) - excludes snippet definitions like
@@ -931,6 +941,18 @@ def compute_test_defaults_changes(platform: dict) -> list[Change]:
     for key, subdomain in sorted((domains.get("subdomains") or {}).items()):
         body.append(f'    "{key}": {subdomain!r},')
     body.append("}")
+    body.append("")
+
+    # TEST_USER_USERNAME/TEST_USER_EMAIL: platform.yaml's test_dataset
+    # (study 4.4, point 2) - conftest.py's test_user fixture reads these
+    # instead of a hard-coded literal, matching the same account
+    # infra/ansible/roles/keycloak_realm optionally provisions
+    # (keycloak_realm_test_user_enabled). The password is deliberately NOT
+    # here: it's a secret, never platform.yaml, always an env var/vault
+    # variable - see conftest.py's test_user fixture.
+    test_dataset = platform.get("test_dataset") or {}
+    body.append(f"TEST_USER_USERNAME = {test_dataset.get('username', '')!r}")
+    body.append(f"TEST_USER_EMAIL = {test_dataset.get('email', '')!r}")
     body.append("")
 
     content = "\n".join(body)

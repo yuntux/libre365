@@ -53,6 +53,21 @@ locale:
   default: "fr"
   available: ["fr", "en"]
 
+# Study 4.4, point 2: "a representative test dataset" — the ONE test user
+# every integration test (tests/integration/) and staging validation run
+# against. Non-secret identity only (username/email); the password is
+# NEVER here - it comes from Ansible (vault_keycloak_test_user_password,
+# same convention as vault_keycloak_admin_password) or, in the k3d dev
+# cluster, a fixed "devonly-changeme-*" value passed by
+# dev-cluster/provision-keycloak-dev.sh - see
+# infra/ansible/roles/keycloak_realm/README.md. Provisioning this account
+# in a real Keycloak realm is OPT-IN (keycloak_realm_test_user_enabled,
+# defaults to false) - a fake consultant account must never appear in a
+# real production realm by default.
+test_dataset:
+  username: "test.consultant"
+  email: "test.consultant@libre365.test"
+
 # -----------------------------------------------------------------------------
 # Generic images reused by several services in docker-compose (avoids
 # repeating/letting the same Postgres/Redis/MariaDB tag drift apart in
@@ -80,22 +95,46 @@ shared:
 # `ports`: dictionary {EXACT_VARIABLE_NAME: value}, used verbatim in
 # docker-compose.yml and .env.example — declared explicitly rather than
 # derived by convention, because the historical names don't all follow the
-# same scheme (SYNAPSE_CLIENT_PORT, MINIO_API_PORT, CADDY_HTTP_PORT...). This
+# same scheme (SYNAPSE_CLIENT_PORT, SEAWEEDFS_S3_PORT, CADDY_HTTP_PORT...). This
 # guarantees that renaming a variable in platform.yaml shows up immediately in
 # the diff instead of being silently inferred.
 services:
   keycloak:
-    version: "26.0.7" # study 1.7
+    # study 1.7 - deployed via the official Keycloak Operator
+    # (infra/k8s/manifests/keycloak.yaml), not the `bitnami/keycloak` Helm
+    # chart previously used here: Bitnami moved that image behind a paid
+    # "Bitnami Secure Images" subscription, freezing its free history into
+    # `bitnamilegacy/keycloak` at 26.3.3. The Operator uses the real,
+    # official `quay.io/keycloak/keycloak` image directly (same one the
+    # docker-compose dev tier already used), so this value now tracks the
+    # real latest Keycloak release with no third-party packaging ceiling.
+    version: "26.7.3"
+    # Every OIDC app config in this repo builds its issuer/authorization
+    # URL as "https://<sso_domain>/realms/<realm_name>" - this used to be
+    # a literal "libre365" hand-copied into 7 different files (Vikunja,
+    # Synapse, PeerTube, Gokapi, Visio, both oauth2-proxy gates) with
+    # nothing keeping them in sync with
+    # infra/ansible/roles/keycloak_realm/defaults/main.yml's
+    # keycloak_realm_name - a rename there would have silently broken
+    # every one of them. scripts/sync_platform.py now patches all 7 from
+    # this single value the same way it already does for domains.
+    realm_name: "libre365"
     ports: { KEYCLOAK_PORT: 8080 }
     compose:
       image: quay.io/keycloak/keycloak
     helm:
-      file: infra/k8s/helm-values/keycloak.yaml
-      image_repository: bitnami/keycloak
-      tag_path: .image.tag
+      # Not a Helm values file: the Keycloak Operator CR is a raw manifest
+      # (infra/k8s/manifests/keycloak.yaml, see that file's header for why
+      # - no Helm chart exists for the Operator's own workload, only for
+      # the cluster-scoped controller install, which this `version` value
+      # does NOT drive - see that file's comment on keeping the operator
+      # install URL's {VERSION} in sync by hand).
+      file: infra/k8s/manifests/keycloak.yaml
+      image_repository: quay.io/keycloak/keycloak
+      raw_image_line: true
 
   synapse:
-    version: "v1.114.0" # study 1.2
+    version: "v1.160.0" # study 1.2
     ports: { SYNAPSE_CLIENT_PORT: 8008, SYNAPSE_FEDERATION_PORT: 8448 }
     compose:
       image: matrixdotorg/synapse
@@ -109,7 +148,7 @@ services:
       tag_path: synapse.image.tag
 
   element_web:
-    version: "v1.11.86" # study 1.2
+    version: "v1.12.27" # study 1.2
     ports: { ELEMENT_PORT: 8081 }
     compose:
       image: vectorim/element-web
@@ -119,10 +158,9 @@ services:
       tag_path: .image.tag
 
   element_call:
-    # study 1.3 - not yet pinned on the chart side (see the TODO already
-    # present in the values file): this field documents the intent, the value
-    # stays "latest-ce" until the "pin before prod" work item is done.
-    version: "latest-ce"
+    # study 1.3 - matches the real tag published at
+    # ghcr.io/element-hq/element-call.
+    version: "v0.25.0"
     compose: null # no dedicated docker-compose service: Element Call is
       # exercised via the MatrixRTC widget embedded in Element Web (1.3), not
       # as a standalone service in the dev/test tier.
@@ -131,12 +169,25 @@ services:
       image_repository: ghcr.io/element-hq/element-call
       tag_path: .image.tag
 
+  element_call_auth:
+    # ghcr.io/element-hq/lk-jwt-service - Element Call's own dedicated
+    # LiveKit JWT auth service (element-call.yaml's authService.image), a
+    # separate upstream repo/image from element-call itself, versioned
+    # independently.
+    version: "0.6.0"
+    compose: null
+    helm:
+      file: infra/k8s/helm-values/element-call.yaml
+      image_repository: ghcr.io/element-hq/lk-jwt-service
+      tag_path: authService.image.tag
+
   visio:
     # study 1.3 - LaSuite Meet (Django backend + frontend), no dedicated
     # docker-compose service at this stage (not yet wired into the dev tier:
     # to add if the Matrix<->Visio widget connector, 2.4, needs local
-    # testing). `version` applies to both images, published together.
-    version: "latest" # to pin to a versioned tag before going to production
+    # testing). `version` applies to both images, published together on
+    # Docker Hub (lasuite/meet-backend + lasuite/meet-frontend).
+    version: "v1.30.0"
     compose: null
     helm_images:
       - file: infra/k8s/helm-values/visio-meet.yaml
@@ -147,7 +198,14 @@ services:
         tag_path: frontend.image.tag
 
   seafile:
-    version: "11.0.13" # study 1.4
+    # study 1.4. This repo provisions FRESH deployments, not in-place
+    # upgrades of an already-running instance: on an already-running
+    # instance, Seafile's own upgrade scripts
+    # (scripts/upgrade/upgrade_11.0_12.0.sh, upgrade_12.0_13.0.sh) require
+    # going through each major version in sequence (no combined jump) -
+    # keep that in mind if this value is ever bumped on a live deployment
+    # rather than a fresh one.
+    version: "13.0.25"
     ports: { SEAFILE_PORT: 8082 }
     compose:
       image: seafileltd/seafile-mc
@@ -171,7 +229,11 @@ services:
       tag_path: .image.tag
 
   vikunja:
-    version: "0.24.3" # study 1.6
+    # study 1.6 - matches the real vikunja/vikunja Docker Hub tag (no "v"
+    # prefix). Since 1.0.0-rc0, the OpenID provider config uses a map keyed
+    # by an arbitrary provider name rather than a numeric index - see
+    # vikunja.yaml's own comments for what that means for this deployment.
+    version: "2.6.0"
     ports: { VIKUNJA_PORT: 3456 }
     compose:
       image: vikunja/vikunja
@@ -181,14 +243,11 @@ services:
       tag_path: .image.tag
 
   gokapi:
-    # v2.2.4 (latest stable) - bumped from v1.9.6 after a review pass found
-    # the older version had no native theming mechanism and, more
-    # importantly, no way to configure OIDC non-interactively (v2.0.0
-    # replaced GOKAPI_OAUTH_* env vars with a one-time setup wizard) -
-    # automated instead via infra/k8s/manifests/gokapi.yaml's
-    # gokapi-setup-bootstrap initContainer, verified against a locally
-    # built v2.2.4 binary. See that file's header and docs/oidc.md.
-    version: "v2.2.4" # study 1.8
+    # study 1.8 - OIDC is configured non-interactively via
+    # infra/k8s/manifests/gokapi.yaml's gokapi-setup-bootstrap
+    # initContainer (Gokapi's one-time setup wizard writes config.json, no
+    # GOKAPI_OAUTH_* env vars). See that file's header and docs/oidc.md.
+    version: "v2.2.4"
     ports: { GOKAPI_PORT: 53842 }
     compose:
       image: f0rc3/gokapi
@@ -200,18 +259,32 @@ services:
       image_repository: f0rc3/gokapi
       raw_image_line: true
 
-  minio:
-    version: "RELEASE.2024-10-13T13-34-11Z" # study 2.12
-    ports: { MINIO_API_PORT: 9000, MINIO_CONSOLE_PORT: 9001 }
+  seaweedfs:
+    # study 2.12 - replaces MinIO: the minio/minio project is no longer
+    # maintained upstream (moved to source-only distribution, no new
+    # community-edition images published since ~Sept 2025). SeaweedFS was
+    # chosen over Garage (the other actively-maintained candidate) because
+    # Garage has no bucket event notification support at all, which this
+    # stack's PeerTube handoff connector (connectors/peertube-ingest)
+    # depends on - see infra/k8s/helm-values/seaweedfs.yaml's header for
+    # the full comparison.
+    version: "4.45"
+    # SeaweedFS's own default ports (chart values `s3.port`/`admin.port`,
+    # not MinIO's 9000/9001 this replaces).
+    ports: { SEAWEEDFS_S3_PORT: 8333, SEAWEEDFS_ADMIN_PORT: 23646 }
     compose:
-      image: minio/minio
+      image: chrislusf/seaweedfs
     helm:
-      file: infra/k8s/helm-values/minio.yaml
-      image_repository: minio/minio
+      file: infra/k8s/helm-values/seaweedfs.yaml
+      image_repository: chrislusf/seaweedfs
       tag_path: .image.tag
 
   peertube:
-    version: "v6.3.2-bookworm" # study 2.12
+    # study 2.12 - matches the real chocobozzz/peertube Docker Hub
+    # "-bookworm" tag. PeerTube plugin settings (including the OpenID
+    # Connect plugin) are DB-backed, not static config - see
+    # peertube.yaml's own comment.
+    version: "v8.2.4-bookworm"
     ports: { PEERTUBE_PORT: 9002 }
     compose:
       image: chocobozzz/peertube
@@ -221,7 +294,10 @@ services:
       tag_path: .image.tag
 
   caddy:
-    version: "2.8.4-alpine" # study 2.3
+    # study 2.3 - land on 2.11.2 or later: GHSA-7r4p-vjf4-gxv4 (identity-
+    # header injection via forward_auth) is fixed there, and this repo's
+    # OnlyOffice/Novu SSO gates rely on forward_auth (study 1.7).
+    version: "2.11.4-alpine"
     ports: { CADDY_HTTP_PORT: 10080, CADDY_HTTPS_PORT: 10443 }
     compose:
       image: caddy
@@ -360,8 +436,8 @@ domains:
     depot: depot # Gokapi, via Caddy (study 1.8/2.3)
     onboarding: onboarding # Static onboarding portal, no injection (study 2.5)
     videos: videos # PeerTube, via Caddy (study 2.12/2.3)
-    s3: s3 # MinIO API (study 2.12)
-    minio_console: minio-console # MinIO console (study 2.12)
+    s3: s3 # SeaweedFS S3 API (study 2.12)
+    seaweedfs_admin: seaweedfs-admin # SeaweedFS Admin UI (study 2.12)
     notifications: notifications # Novu (study 2.1)
     notifications_admin: notifications-admin # Novu admin dashboard (study 1.7/2.1)
       # - Novu's own `web` UI (template/workflow management), gated by

@@ -1,5 +1,5 @@
 # Component: peertube-ingest — in-house connector, uploads meeting recordings
-# from MinIO to PeerTube (study, chapter 2.12). No Helm chart: small in-house
+# from SeaweedFS to PeerTube (study, chapter 2.12). No Helm chart: small in-house
 # Python/FastAPI service (connectors/peertube-ingest), built locally by k3d's
 # dev workflow rather than published to a registry — raw Deployment + Service,
 # following the same style as infra/k8s/manifests/gokapi.yaml.
@@ -35,13 +35,34 @@ spec:
           env:
             - name: PORT
               value: "4005"
-            # PeerTube and MinIO are Helm releases in this namespace —
+            # PeerTube and SeaweedFS are Helm releases in this namespace —
             # in-cluster Service DNS names, same as used by
-            # infra/k8s/manifests/caddy.yaml.
-            - name: PEERTUBE_URL
+            # infra/k8s/manifests/caddy.yaml. "PEERTUBE_BASE_URL" (not
+            # "PEERTUBE_URL", the app's own env var - see
+            # app/peertube_client.py) - a review pass found the previous
+            # name didn't match anything the code reads, silently falling
+            # back to its placeholder default.
+            - name: PEERTUBE_BASE_URL
               value: "http://peertube.libre365.svc.cluster.local:9000"
-            - name: MINIO_URL
-              value: "http://minio.libre365.svc.cluster.local:9000"
+            # [UNCERTAIN, not wired]: app/peertube_client.py also reads
+            # PEERTUBE_ACCESS_TOKEN, PEERTUBE_CHANNEL_ID - PeerTube issues
+            # API tokens via its own OAuth2 password-grant flow (client_id/
+            # client_secret + a user account), not a simple static token;
+            # provisioning that wasn't scoped here - needs a real
+            # ExternalSecret once PeerTube's OAuth client setup for this
+            # connector is decided.
+            - name: S3_ENDPOINT
+              value: "http://seaweedfs-s3.libre365.svc.cluster.local:8333"
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-s3-credentials
+                  key: access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-s3-credentials
+                  key: secret-key
           resources:
             requests:
               cpu: "50m"

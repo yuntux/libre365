@@ -20,6 +20,7 @@
 _platform: "{{ lookup('file', playbook_dir + '/../../../platform.yaml') | from_yaml }}"
 
 libre365_domain: "{{ _platform.domains.base }}"
+libre365_keycloak_realm_name: "{{ _platform.services.keycloak.realm_name }}"
 
 # Study: default/available UI languages (fr default, en available) - see
 # platform.yaml's own `locale` section and docs/i18n.md for which
@@ -28,9 +29,22 @@ libre365_domain: "{{ _platform.domains.base }}"
 libre365_locale_default: "{{ _platform.locale.default }}"
 libre365_locale_available: "{{ _platform.locale.available }}"
 
+# Study 4.4 point 2 - see platform.yaml's test_dataset comment for the full
+# rationale (identity only, password never here).
+libre365_test_user_username: "{{ _platform.test_dataset.username }}"
+libre365_test_user_email: "{{ _platform.test_dataset.email }}"
+
 keycloak_base_url: "https://{{ _platform.domains.subdomains.sso }}.{{ libre365_domain }}"
+# "master" is Keycloak's own built-in bootstrap realm - every Keycloak
+# instance ships exactly one, used only to authenticate admin REST API
+# calls (never for end-user login). A Keycloak platform constant, not a
+# project choice, so it stays a literal here - unlike the actual target
+# realm this stack creates (libre365_keycloak_realm_name above, sourced
+# from platform.yaml, since renaming that IS a project-specific decision
+# that used to be duplicated as a second hardcoded "libre365" literal in
+# this same file, `keycloak_target_realm` - removed; every template now
+# reads libre365_keycloak_realm_name instead).
 keycloak_admin_realm: "master"
-keycloak_target_realm: "libre365"
 # To be supplied via `--extra-vars` or a vault file, never in plaintext here:
 keycloak_admin_user: "{{ vault_keycloak_admin_user | default('admin') }}"
 keycloak_admin_password: "{{ vault_keycloak_admin_password | default(omit) }}"

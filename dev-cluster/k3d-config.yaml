@@ -45,11 +45,11 @@ ports:
   # GOKAPI_PORT
   - port: 53842:53842
     nodeFilters: ["loadbalancer"]
-  # MINIO_API_PORT
-  - port: 9000:9000
+  # SEAWEEDFS_S3_PORT
+  - port: 8333:8333
     nodeFilters: ["loadbalancer"]
-  # MINIO_CONSOLE_PORT
-  - port: 9001:9001
+  # SEAWEEDFS_ADMIN_PORT
+  - port: 23646:23646
     nodeFilters: ["loadbalancer"]
   # PEERTUBE_PORT
   - port: 9002:9002

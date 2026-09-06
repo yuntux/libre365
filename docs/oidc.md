@@ -62,7 +62,7 @@ all fixed on this branch:
 - **Element Web / Element Call**: no client — both are Matrix clients that
   authenticate against Synapse (already OIDC-wired above), never against
   Keycloak directly.
-- **MinIO**: no end-user login surface in this architecture (internal S3
+- **SeaweedFS**: no end-user login surface in this architecture (internal S3
   backend only) — no client needed.
 
 ## OnlyOffice and Novu: gated by proxy, not by the app itself

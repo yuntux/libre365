@@ -7,12 +7,12 @@
 # 2.12 L.581-582 — basic configuration: organization by channels/playlists (one
 # channel per team or meeting type), ActivityPub federation disabled (strictly
 # internal use, federation is not an expressed need, see 2.12 L.583).
-# Fed by the MinIO -> PeerTube handoff connector (daily batch, see 2.12
+# Fed by the SeaweedFS -> PeerTube handoff connector (daily batch, see 2.12
 # L.589, development out of scope for this k8s repository, see connectors/).
 
 image:
   repository: chocobozzz/peertube
-  tag: "v6.3.2-bookworm"
+  tag: "v8.2.4-bookworm"
 
 replicaCount: 1
 
@@ -31,36 +31,34 @@ config:
   federation:
     videos:
       federate_unlisted: false
-    prevent_search_indexation:
-      enabled: true
 
-  # 2.12 L.581-582 — default "internal" visibility (not publicly listed, but visible
-  # to any authenticated user of the instance), rather than "public" or "unlisted".
+  # 2.12 L.581-582 — default "internal" visibility (not publicly listed,
+  # but visible to any authenticated user of the instance): PeerTube's
+  # privacy enum is 1=public, 2=unlisted, 3=private (owner only),
+  # 4=internal (any authenticated instance user), 5=password-protected.
   defaults:
     publish:
-      privacy: 3 # 1=public, 2=unlisted, 3=private (internal depending on instance config), 4=password-protected — to be confirmed against the exact PeerTube version
+      privacy: 4
 
-  # 1.7 — Keycloak SSO (official PeerTube OpenID Connect plugin). Client
-  # secret from peertube-oidc-secret (external-secrets.yaml, OpenBao-
-  # sourced) - client_id was set with no client_secret at all found during
-  # a review pass. [UNCERTAIN]: this community chart's exact field shape
-  # for injecting a Kubernetes Secret into a plugin setting isn't
-  # independently confirmed (PeerTube plugin settings are normally
-  # persisted via its own admin API/database rather than a static config
-  # file - the whole `plugins:` block here was already flagged
-  # unconfirmed against the actual chart, see this file's header) -
-  # mirrors the existingSecret/existingSecretKey pattern this same file
-  # already uses for postgresql/redis as the most consistent guess given
-  # that pre-existing uncertainty; verify against the real chart at
-  # deployment time.
-  plugins:
-    openid_connect:
-      enabled: true
-      discover_url: "https://sso.libre365.example.org/realms/libre365/.well-known/openid-configuration"
-      client_id: "peertube"
-      client_secret:
-        existingSecret: peertube-oidc-secret
-        existingSecretKey: client-secret
+  # 1.7 — Keycloak SSO (official PeerTube OpenID Connect plugin,
+  # `peertube-plugin-auth-openidconnect`). [UNCERTAIN]: PeerTube plugin
+  # settings are stored in its database, set through the admin UI or `PUT
+  # /api/v1/plugins/{npmName}/settings` - not through a config file/env
+  # var, and no real community Helm chart exposes a `plugins:` values
+  # block. This block is therefore NON-FUNCTIONAL as static Helm values.
+  # Making it work needs the same shape as Gokapi's bootstrap
+  # (infra/k8s/manifests/gokapi.yaml's initContainer): a Job/initContainer
+  # that (1) installs `peertube-plugin-auth-openidconnect` via `POST
+  # /api/v1/plugins/install` and (2) PUTs its settings, both authenticated
+  # as the root account - tracked as follow-up work. The client secret is
+  # already generated as peertube-oidc-secret (external-secrets.yaml,
+  # OpenBao-sourced), ready to be consumed by that future bootstrap Job.
+  # plugins:
+  #   openid_connect:
+  #     enabled: true
+  #     discover_url: "https://sso.libre365.example.org/realms/libre365/.well-known/openid-configuration"
+  #     client_id: "peertube"
+  #     client_secret: (from peertube-oidc-secret)
 
   signup:
     enabled: false # accounts provisioned via Keycloak SSO only
@@ -81,7 +79,7 @@ persistence:
     storageClass: ""
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
-# see keycloak.yaml's ingress comment for the full rationale.
+# see ../manifests/caddy.yaml's header comment for the full rationale.
 ingress:
   enabled: false
   className: ""

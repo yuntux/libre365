@@ -1,0 +1,17 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values.
+#
+# Usage:
+#   helm upgrade --install keycloak-postgres bitnami/postgresql -n libre365-dev \
+#     -f keycloak-postgres.yaml -f dev/keycloak-postgres.yaml
+
+primary:
+  persistence:
+    size: 2Gi
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "250m"
+      memory: "512Mi"

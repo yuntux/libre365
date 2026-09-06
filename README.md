@@ -132,7 +132,7 @@ flowchart LR
         A_OO["OnlyOffice Document Server"]
         A_VIKUNJA["Vikunja"]
         A_GOKAPI["Gokapi"]
-        A_PEERTUBE["PeerTube + MinIO"]
+        A_PEERTUBE["PeerTube + SeaweedFS"]
         A_KC["Keycloak"]
         A_CADDY["Caddy (injected top bar)"]
         A_NOVU["Novu"]
@@ -203,11 +203,11 @@ flowchart TB
         K3["API key"]
     end
 
-    subgraph PEERTUBE["PeerTube + MinIO"]
+    subgraph PEERTUBE["PeerTube + SeaweedFS"]
         P1["Channel"]
         P2["Video"]
         P3["Playlist"]
-        P4["S3 bucket (MinIO)"]
+        P4["S3 bucket (SeaweedFS)"]
     end
 
     subgraph KEYCLOAK["Keycloak"]

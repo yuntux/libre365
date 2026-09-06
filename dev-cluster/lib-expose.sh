@@ -18,9 +18,9 @@
 #
 # Assumption to verify on first real run (not verifiable from this sandbox,
 # no live cluster available here): each release's Service exposes its main
-# HTTP port at array index 0, except the two 2-port bricks (synapse,
-# minio) which are assumed to list their two ports in the same order as
-# EXPOSE_MAP below. If a chart's Service instead nests the HTTP port at a
+# HTTP port at array index 0, except the 2-port brick (synapse) which is
+# assumed to list its two ports in the same order as EXPOSE_MAP below.
+# If a chart's Service instead nests the HTTP port at a
 # different index (a different port comes first, e.g. a metrics port), the
 # `replace` patch below will target the wrong port - inspect
 # `kubectl get service <name> -n libre365 -o yaml` and adjust the index in
@@ -28,15 +28,22 @@
 
 # key: "<service-name>:<port-array-index>", value: nodePort (== platform.yaml port).
 declare -A EXPOSE_MAP=(
-  [keycloak:0]=8080
+  # "keycloak-service" (not "keycloak"): the Keycloak Operator's own
+  # auto-created Service name - see infra/k8s/manifests/keycloak.yaml's
+  # comment.
+  [keycloak-service:0]=8080
   [synapse:0]=8008
   [synapse:1]=8448
   [element-web:0]=8081
   [seafile:0]=8082
   [onlyoffice:0]=8083
   [vikunja:0]=3456
-  [minio:0]=9000
-  [minio:1]=9001
+  # "seaweedfs-s3"/"seaweedfs-admin" (not "minio"): replaces MinIO, see
+  # infra/k8s/helm-values/seaweedfs.yaml's header - Service names verified
+  # against the real chart's fullname template (release name "seaweedfs"
+  # collapses with the chart name, see seaweedfs.yaml's caddy.yaml comment).
+  [seaweedfs-s3:0]=8333
+  [seaweedfs-admin:0]=23646
   [peertube:0]=9002
   # The Novu chart's naming convention for its per-component Services
   # (api/worker/ws/web) is a second unverified assumption on top of the

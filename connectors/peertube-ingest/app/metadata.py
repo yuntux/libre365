@@ -1,4 +1,4 @@
-"""Extracts meeting metadata (title, date, participants) from the MinIO object name
+"""Extracts meeting metadata (title, date, participants) from the S3 object name
 (study 2.12 line 589: "meeting metadata association -- title, date,
 participants -- extracted from the object name or S3 tags"). Pure functions,
 testable without network access or an S3 SDK.

@@ -1,0 +1,114 @@
+# Component: Keycloak — central SSO/IAM (study 1.7 L.270-271)
+#
+# Deployed via the OFFICIAL Keycloak Operator (github.com/keycloak/keycloak,
+# `operator/` directory - the old separate `keycloak-operator` repository was
+# folded into the main one years ago), NOT the `bitnami/keycloak` Helm chart
+# previously used here: Bitnami moved its application images (including
+# `bitnami/keycloak`) behind a paid "Bitnami Secure Images" subscription,
+# freezing the free image's history into `bitnamilegacy/keycloak`, which
+# stops at 26.3.3 - real Keycloak releases keep going well past that. The
+# Operator uses the real, official `quay.io/keycloak/keycloak` image
+# directly, so this component is no longer capped by a third party's
+# packaging/distribution decision.
+#
+# Operator installation (cluster-scoped: CRDs + controller Deployment/RBAC,
+# applied once per cluster, not per-namespace) - no official Helm chart
+# exists for the Operator controller itself (verified: only a raw-manifest
+# / OLM install path is documented). Applied by dev-cluster/deploy.sh (dev)
+# and infra/ansible (production) via:
+#   kubectl apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/{VERSION}/kubernetes/keycloaks.k8s.keycloak.org-v1.yml
+#   kubectl apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/{VERSION}/kubernetes/keycloakrealmimports.k8s.keycloak.org-v1.yml
+#   kubectl apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/{VERSION}/kubernetes/kubernetes.yml
+# where {VERSION} MUST match `spec.image`'s tag below (the operator image
+# baked into that last manifest is `quay.io/keycloak/keycloak-operator:
+# {VERSION}`, kept 1:1 with the Keycloak version it manages) - not
+# automated by scripts/sync_platform.py (that script patches values FILES,
+# not remote URLs baked into shell/Ansible tasks): keep both in sync by
+# hand when bumping platform.yaml's `services.keycloak.version`.
+#
+# Realm/OIDC-client/test-user provisioning stays exactly as it already was
+# (infra/ansible/roles/keycloak_realm/, hitting the real Admin REST API,
+# unaffected by this deployment-layer change) - deliberately NOT switched
+# to the Operator's own `KeycloakRealmImport` CRD, which imports a single,
+# static realm-export JSON blob as a one-shot Job rather than converging
+# incremental changes idempotently the way the existing Ansible role does.
+#
+# PostgreSQL: the Operator does NOT provision a database itself ("The
+# Operator does not manage the database and you need to provision it
+# yourself" - keycloak/keycloak docs/guides/operator/
+# basic-deployment.adoc), unlike the Bitnami chart's bundled subchart -
+# see ../helm-values/keycloak-postgres.yaml for the now-standalone release.
+#
+# TLS/hostname: Caddy (../manifests/caddy.yaml) remains the sole public
+# entry point (see that file's header) - `http.httpEnabled: true` +
+# `proxy.headers: xforwarded` tell Keycloak to trust Caddy's forwarded
+# headers over plain HTTP internally, the Operator equivalent of the
+# Bitnami chart's `proxy: edge`.
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: libre365
+spec:
+  image: quay.io/keycloak/keycloak:26.7.3
+  # 1.7 L.271 — HA from the initial target: 2 instances at the 100-user
+  # scale, same reasoning as the retired keycloak-100.yaml/keycloak-2000.yaml
+  # Helm overlays (sizing driven by connections/second, not total users -
+  # bump to 4 at the ~2000-user growth target, same range of per-pod
+  # resources below per that study line). No cascade-file mechanism for a
+  # raw manifest CR (that was a Helm `-f a -f b` convention) - this single
+  # field is the whole "overlay" now.
+  instances: 2
+  http:
+    httpEnabled: true
+  hostname:
+    hostname: sso.libre365.example.org
+  proxy:
+    headers: xforwarded
+  # Keys `username`/`password` (Operator convention - see
+  # controllers/KeycloakAdminSecretDependentResource in keycloak/keycloak's
+  # operator source) - infra/k8s/manifests/external-secrets.yaml's
+  # keycloak-admin-secret was updated to match.
+  bootstrapAdmin:
+    user:
+      secret: keycloak-admin-secret
+  db:
+    vendor: postgres
+    # [UNCERTAIN, not verified against a live `helm install` from this
+    # sandboxed environment]: exact Service hostname the standalone
+    # `keycloak-postgres` bitnami/postgresql release's fullname template
+    # produces - see ../helm-values/keycloak-postgres.yaml's own comment;
+    # confirm with `kubectl get svc -n libre365 -l
+    # app.kubernetes.io/instance=keycloak-postgres` and adjust if it
+    # differs.
+    host: keycloak-postgres-postgresql.libre365.svc.cluster.local
+    database: keycloak
+    usernameSecret:
+      name: keycloak-postgres-secret
+      key: username
+    passwordSecret:
+      name: keycloak-postgres-secret
+      key: password
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  # 1.7 — Native MFA: TOTP + WebAuthn/FIDO2 enabled in Keycloak's standard
+  # authentication flows (realm configuration, not an Operator/CR field) —
+  # set via Ansible/realm import (see infra/ansible/, out of scope here).
+  # SMS and email OTP: not natively covered, require a custom Keycloak SPI
+  # (1.7 L.266-268) — a development project, out of scope for this k8s repo.
+
+# No `ingress:`/native Service override needed: the Operator creates its
+# own Service automatically, named "<CR name>-service" on port 8080
+# (verified in keycloak/keycloak's operator source,
+# KeycloakServiceDependentResource.getServiceName() /
+# Constants.KEYCLOAK_HTTP_PORT) - i.e. `keycloak-service` here. Caddy
+# (../manifests/caddy.yaml) reverse-proxies to
+# `keycloak-service.libre365.svc.cluster.local:8080` accordingly - no
+# Ingress object involved, same rationale as every other component (see
+# keycloak-100.yaml's retired ingress comment / helm-values/README.md's
+# "Public entry point: Caddy" section).

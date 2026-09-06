@@ -94,6 +94,16 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
+      - name: Install Ansible (dev-cluster/deploy.sh's Keycloak provisioning step)
+        run: |
+          # dev-cluster/deploy.sh's step 8/12 (provision-keycloak-dev.sh) runs
+          # the infra/ansible/roles/keycloak_realm role against the k3d
+          # cluster's Keycloak - needed here for the exact same reason
+          # lint-and-test.yml's ansible-lint job needs it, just to execute
+          # the playbook instead of lint it.
+          pip install "ansible-core>=2.15,<2.17"
+          ansible-galaxy collection install -r infra/ansible/requirements.yml
+
       - name: Start every other brick (k3d, dev-cluster/deploy.sh)
         run: ./dev-cluster/deploy.sh
 
@@ -116,7 +126,7 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Replay the critical scenarios (pytest -m smoke)
+      - name: Replay every scenario (pytest, no marker filter)
         id: pytest
         working-directory: tests/integration
         env:
@@ -129,7 +139,18 @@ jobs:
           # want to publish the report even if a scenario fails, the
           # promotion decision remaining human/automated downstream of
           # this workflow.
-          pytest -m smoke --html=report.html --self-contained-html
+          #
+          # Deliberately NOT `-m smoke`: only test_mail_grommunio.py
+          # carries that marker, so that filter silently ran a single
+          # test file and never exercised the SSO/OIDC scenarios
+          # (test_sso_e2e.py) or any of the other component tests
+          # (test_file_sync_seafile.py, test_coedition_onlyoffice.py,
+          # test_matrix_visio.py, test_task_vikunja.py,
+          # test_connectors.py) - none of which declare a `smoke`/`slow`/
+          # `sso` marker of their own. Run the whole suite instead; use
+          # `-m` again once specific scenarios are deliberately tiered by
+          # marker (see tests/integration/pytest.ini).
+          pytest --html=report.html --self-contained-html
         continue-on-error: true
 
       - name: Publish the staging report as an artifact
@@ -145,10 +166,10 @@ jobs:
         if: always()
         run: |
           if [ "${{ steps.pytest.outcome }}" = "failure" ]; then
-            echo "::error::At least one smoke scenario failed - promotion to production is NOT recommended (study 5.5). See the HTML report artifact."
+            echo "::error::At least one scenario failed - promotion to production is NOT recommended (study 5.5). See the HTML report artifact."
             exit 1
           fi
-          echo "All smoke scenarios passed - report attached as an artifact for the promotion decision."
+          echo "All scenarios passed - report attached as an artifact for the promotion decision."
 
       - name: Stop the environment (ephemeral staging cleanup)
         if: always()

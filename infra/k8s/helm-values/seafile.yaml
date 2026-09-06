@@ -18,7 +18,7 @@
 
 image:
   repository: seafileltd/seafile-mc
-  tag: "11.0.13"
+  tag: "13.0.25"
 
 replicaCount: 1 # single-node, Community edition (1.4 L.141)
 
@@ -50,9 +50,7 @@ env:
 
   # 1.7 — Keycloak SSO (native Seafile OIDC). Client secret from
   # seafile-oidc-secret (infra/k8s/manifests/external-secrets.yaml,
-  # OpenBao-sourced) - found missing during a review pass (OAUTH_CLIENT_ID
-  # was set with no matching OAUTH_CLIENT_SECRET anywhere, so the OAuth
-  # token exchange could never actually complete).
+  # OpenBao-sourced).
   ENABLE_OAUTH: "true"
   OAUTH_PROVIDER_DOMAIN: "sso.libre365.example.org"
   OAUTH_CLIENT_ID: "seafile"
@@ -81,7 +79,7 @@ memcached:
   enabled: true
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
-# see keycloak.yaml's ingress comment for the full rationale.
+# see ../manifests/caddy.yaml's header comment for the full rationale.
 ingress:
   enabled: false
   className: ""

@@ -1,4 +1,4 @@
-"""Uploads a MinIO object to PeerTube. Isolated from network SDKs (injected via
+"""Uploads an object storage object to PeerTube. Isolated from network SDKs (injected via
 `IngestDeps`) to stay unit-testable -- used by both the real-time webhook and the
 batch (study 2.12 line 589: both modes share this same logic).
 """
@@ -52,7 +52,7 @@ async def ingest_object(candidate: IngestCandidate, deps: IngestDeps) -> IngestR
 
 async def ingest_all(candidates: List[IngestCandidate], deps: IngestDeps) -> List[IngestResult]:
     """Ingests a list of candidates sequentially (avoids saturating the
-    MinIO->PeerTube bandwidth by uploading N large videos in parallel)."""
+    S3->PeerTube bandwidth by uploading N large videos in parallel)."""
     results: List[IngestResult] = []
     for candidate in candidates:
         results.append(await ingest_object(candidate, deps))

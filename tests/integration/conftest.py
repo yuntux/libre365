@@ -37,7 +37,7 @@ import pytest
 import requests
 from bs4 import BeautifulSoup
 
-from _platform_defaults import DEFAULT_PORTS, DOMAIN_BASE, DOMAIN_SUBDOMAINS
+from _platform_defaults import DEFAULT_PORTS, DOMAIN_BASE, DOMAIN_SUBDOMAINS, TEST_USER_EMAIL, TEST_USER_USERNAME
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ class BaseUrls:
     element: str
     vikunja: str
     gokapi: str
-    minio: str
+    seaweedfs: str
     peertube: str
     caddy: str
     notification_hub: str
@@ -103,7 +103,7 @@ def base_urls() -> BaseUrls:
         element=_env_url("ELEMENT_URL", _default_url("ELEMENT_PORT")),
         vikunja=_env_url("VIKUNJA_URL", _default_url("VIKUNJA_PORT")),
         gokapi=_env_url("GOKAPI_URL", _default_url("GOKAPI_PORT")),
-        minio=_env_url("MINIO_URL", _default_url("MINIO_API_PORT")),
+        seaweedfs=_env_url("SEAWEEDFS_URL", _default_url("SEAWEEDFS_S3_PORT")),
         peertube=_env_url("PEERTUBE_URL", _default_url("PEERTUBE_PORT")),
         caddy=_env_url("CADDY_URL", _default_url("CADDY_HTTP_PORT")),
         notification_hub=_env_url("NOTIFICATION_HUB_URL", _default_url("NOTIFICATION_HUB_PORT")),
@@ -233,14 +233,22 @@ class TestUser:
 @pytest.fixture(scope="session")
 def test_user() -> TestUser:
     """
-    Test user provisioned in the representative dataset of the staging
-    environment (section 4.4, point 2) or in the test realm of the local
-    docker-compose. NEVER point this at a real production account.
+    Test user provisioned in the representative dataset (study 4.4, point
+    2) - platform.yaml's `test_dataset` (generated into
+    TEST_USER_USERNAME/TEST_USER_EMAIL here, same convention as
+    DOMAIN_BASE), the same account
+    infra/ansible/roles/keycloak_realm optionally provisions
+    (`keycloak_realm_test_user_enabled` - see
+    dev-cluster/provision-keycloak-dev.sh for the k3d dev cluster).
+    NEVER point this at a real production account. The password has no
+    default from platform.yaml (it's a secret, never committed) - only an
+    env var override, matching dev-cluster/provision-keycloak-dev.sh's own
+    fixed dev-only value.
     """
     return TestUser(
-        username=os.environ.get("TEST_USER_USERNAME", "test.consultant"),
-        password=os.environ.get("TEST_USER_PASSWORD", "ChangeMe123!"),
-        email=os.environ.get("TEST_USER_EMAIL", "test.consultant@libre365.test"),
+        username=os.environ.get("TEST_USER_USERNAME", TEST_USER_USERNAME),
+        password=os.environ.get("TEST_USER_PASSWORD", "devonly-changeme-test-user"),
+        email=os.environ.get("TEST_USER_EMAIL", TEST_USER_EMAIL),
     )
 
 
