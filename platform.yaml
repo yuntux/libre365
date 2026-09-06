@@ -33,6 +33,27 @@
 # See docs/mapping.md for the link to the study office365-exit-study.md.
 
 # -----------------------------------------------------------------------------
+# UI language, single source of truth for every component that supports a
+# server-side default and/or a supported-locale list (Keycloak's realm
+# internationalization, currently the only one actually wired to this -
+# see infra/ansible/roles/keycloak_realm/). `default` is what a user sees
+# with no browser-language preference or before auto-detection kicks in;
+# `available` is the full list a user can switch to.
+#
+# NOT a claim that every component in this stack actually reads these
+# values yet: several (Element Web, Vikunja - both confirmed via their own
+# docs/config schemas) already auto-detect the browser's language on their
+# own with no server-side setting needed, and several others could not be
+# verified against a real config mechanism from this sandboxed environment
+# (no live instance, and vendor docs were not conclusive) - see
+# docs/i18n.md for the full per-component breakdown and what's actually
+# wired versus still open.
+# -----------------------------------------------------------------------------
+locale:
+  default: "fr"
+  available: ["fr", "en"]
+
+# -----------------------------------------------------------------------------
 # Generic images reused by several services in docker-compose (avoids
 # repeating/letting the same Postgres/Redis/MariaDB tag drift apart in
 # 3-5 different places in the file).

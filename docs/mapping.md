@@ -13,6 +13,7 @@ block/connector.
 | OnlyOffice Document Server | 1.5 | `infra/k8s/helm-values/onlyoffice.yaml` |
 | Vikunja | 1.6 | `infra/k8s/helm-values/vikunja.yaml` |
 | Keycloak (SSO/MFA) | 1.7 | `infra/k8s/helm-values/keycloak.yaml`, `infra/ansible/playbooks/keycloak-realm.yml`, `connectors/keycloak-otp-spi/` |
+| UI language (fr default, en available) | not a numbered study requirement — added on request | `platform.yaml`'s `locale` section (single source), `infra/ansible/roles/keycloak_realm/` (only component actually wired so far — see `docs/i18n.md` for the full per-component breakdown, most still open) |
 | Gokapi | 1.8 | `infra/k8s/manifests/gokapi.yaml` (no official Helm chart, see that file's header; Tasmane branding via its `gokapi-custom` ConfigMap, `custom.css`) |
 | Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code); autoconfig/Autodiscover: `platform.yaml` (`autoconfig`/`autodiscover` subdomains), `infra/k8s/manifests/caddy.yaml` (`caddy-autoconfig` ConfigMap, Caddy-fronted) |
 | Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/` |

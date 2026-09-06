@@ -37,6 +37,20 @@
     reset_password_allowed: true
     remember_me: true
     verify_email: true
+    # UI language (platform.yaml's `locale` section, single source of
+    # truth - see docs/i18n.md): internationalization_enabled/
+    # supported_locales/default_locale map to Keycloak's own
+    # internationalizationEnabled/supportedLocales/defaultLocale realm
+    # attributes, following this module's own snake_case<->camelCase
+    # convention already used for e.g. display_name above - inferred from
+    # that convention and Keycloak's own long-stable REST API field names,
+    # not directly verified against this module's source from this
+    # sandboxed environment (community.general isn't installed offline
+    # here, see this repo's CI job for where it actually gets installed
+    # and could confirm this).
+    internationalization_enabled: true
+    supported_locales: "{{ libre365_locale_available }}"
+    default_locale: "{{ libre365_locale_default }}"
     # OTP policy — TOTP natively enabled (study 1.7, line ~264).
     otp_policy_type: "{{ keycloak_realm_otp_policy_type }}"
     otp_policy_algorithm: "{{ keycloak_realm_otp_policy_algorithm }}"

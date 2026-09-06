@@ -21,6 +21,13 @@ _platform: "{{ lookup('file', playbook_dir + '/../../../platform.yaml') | from_y
 
 libre365_domain: "{{ _platform.domains.base }}"
 
+# Study: default/available UI languages (fr default, en available) - see
+# platform.yaml's own `locale` section and docs/i18n.md for which
+# components actually consume this today (currently just Keycloak's realm
+# internationalization, in roles/keycloak_realm/).
+libre365_locale_default: "{{ _platform.locale.default }}"
+libre365_locale_available: "{{ _platform.locale.available }}"
+
 keycloak_base_url: "https://{{ _platform.domains.subdomains.sso }}.{{ libre365_domain }}"
 keycloak_admin_realm: "master"
 keycloak_target_realm: "libre365"
