@@ -11,7 +11,7 @@ Grommunio deployed as a Proxmox appliance VM (chapter 4.3).
 As of the migration to the local k3d Kubernetes dev cluster, this
 docker-compose file no longer hosts the whole dev/test tier. Every service
 backed by a production Helm chart worth reusing - Keycloak, Synapse +
-Element, Seafile, OnlyOffice Document Server, Vikunja, Gokapi, MinIO,
+Element, Seafile, OnlyOffice Document Server, Vikunja, Gokapi, SeaweedFS,
 PeerTube, Novu, Caddy, and the 5 in-house connectors (`notification-hub`,
 `unified-search`, `presence-aggregator`, `onlyoffice-mentions`,
 `peertube-ingest`) - now runs on a local k3d cluster that reuses the very
@@ -71,7 +71,7 @@ local development / CI.** See `.env.example` for the complete list and the
 explicit "dev only" reminder on each secret.
 
 Every other service listed in the study (Keycloak, Synapse/Element,
-Seafile, OnlyOffice, Vikunja, Gokapi, MinIO, PeerTube, Novu, Caddy, and the
+Seafile, OnlyOffice, Vikunja, Gokapi, SeaweedFS, PeerTube, Novu, Caddy, and the
 5 in-house connectors) is deployed and reachable through the k3d dev
 cluster instead - see `../dev-cluster/README.md` for its own port mapping.
 

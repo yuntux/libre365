@@ -1,0 +1,150 @@
+# Component: SeaweedFS — S3-compatible object storage (study 2.12 L.587)
+# Chart used: seaweedfs/seaweedfs (official, maintained in-tree at
+#   github.com/seaweedfs/seaweedfs, k8s/charts/seaweedfs)
+#   Helm repo: https://seaweedfs.github.io/seaweedfs/helm
+#   chart    : seaweedfs
+#
+# Replaces MinIO (previously here): the minio/minio project is no longer
+# maintained upstream (source-only distribution since ~2025, no new
+# community-edition images published) - see platform.yaml's history for
+# that finding. SeaweedFS was chosen over Garage (the other actively-
+# maintained self-hosted S3-compatible candidate considered) specifically
+# because Garage has NO bucket event notification support at all
+# (`PutBucketNotificationConfiguration` is explicitly unimplemented in its
+# own S3-compatibility matrix and source) - this stack's PeerTube handoff
+# connector (connectors/peertube-ingest) depends on that mechanism for its
+# real-time webhook mode. SeaweedFS's filer has a real notification
+# pipeline (webhook/Kafka/SQS/PubSub sinks off create/update/delete/rename
+# events, path-prefix filterable) that plays the same role.
+#
+# 2.12 L.587 — self-hosted object storage chosen as the S3 destination for
+# LiveKit Egress rather than a filesystem share (NFS) between pods: one
+# more self-hosted component, not a cloud dependency. Retention on this
+# bucket is set by the firm itself (generic lifecycle rule or the absence
+# of one), rather than imposed on it (see 2.12 L.587).
+
+image:
+  registry: ""
+  repository: chrislusf/seaweedfs
+  tag: "4.45"
+
+global:
+  seaweedfs:
+    image:
+      name: chrislusf/seaweedfs
+
+master:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+volume:
+  enabled: true
+  replicas: 1
+  dataDirs:
+    - name: data1
+      type: "persistentVolumeClaim"
+      size: "500Gi"
+      storageClass: ""
+      maxVolumes: 0
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+
+filer:
+  enabled: true
+  replicas: 1
+  # study 2.12 L.589 — ObjectCreated-equivalent notifications exposed via
+  # webhook, consumed by the handoff connector to PeerTube (daily batch or
+  # real-time, see peertube.yaml and connectors/peertube-ingest). Real
+  # config keys confirmed against SeaweedFS's own
+  # weed/notification/webhook/types.go and weed/command/scaffold/
+  # notification.toml (not general knowledge - this connector's real-time
+  # mode depends on this being correct).
+  notificationConfig: |-
+    [notification.webhook]
+    enabled = true
+    endpoint = "http://peertube-ingest.libre365.svc.cluster.local:4005/webhooks/seaweedfs"
+    # study 2.12 — only the staging bucket needs real-time notification;
+    # visio-recordings is picked up by the same connector's periodic batch
+    # mode instead (see connectors/peertube-ingest/README.md), no urgency
+    # for that one (2.12 L.589: "no time constraint... periodic task").
+    path_prefixes = ["/buckets/peertube-staging/"]
+    event_types = ["create"]
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+s3:
+  enabled: true
+  replicas: 1
+  # 2.12 L.585-589 — bucket dedicated to meeting recordings (LiveKit Egress
+  # destination) + bucket dedicated to the staging area before pickup by
+  # PeerTube. SeaweedFS creates these via the Helm chart's post-install/
+  # upgrade hook Job (s3.createBuckets), unlike MinIO's declarative
+  # `buckets:` values block this replaces.
+  createBuckets:
+    - name: visio-recordings
+      anonymousRead: false
+    - name: peertube-staging
+      anonymousRead: false
+  # Root S3 credentials sourced from a Kubernetes Secret rather than
+  # auto-generated, same convention as MinIO's `existingSecret` this
+  # replaces.
+  credentials:
+    admin:
+      existingSecret: seaweedfs-s3-credentials
+      accessKeyKey: access-key
+      secretKeyKey: secret-key
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry
+  # point - see that file's header comment for the full rationale. Kept as
+  # documentation of where this component expects to be reached, synced
+  # by scripts/sync_platform.py the same way every other file here is.
+  ingress:
+    enabled: false
+    className: ""
+    host: s3.libre365.example.org
+
+# Real Admin UI component (weed admin) - the closest SeaweedFS equivalent
+# to MinIO's web console this replaces (infra/k8s/manifests/caddy.yaml's
+# retired `minio-console.libre365.example.org` site block).
+admin:
+  enabled: true
+  replicas: 1
+  secret:
+    existingSecret: seaweedfs-admin-credentials
+    userKey: admin-user
+    pwKey: admin-password
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  # Disabled: same rationale as s3.ingress above.
+  ingress:
+    enabled: false
+    className: ""
+    host: seaweedfs-admin.libre365.example.org

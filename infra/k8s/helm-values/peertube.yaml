@@ -7,7 +7,7 @@
 # 2.12 L.581-582 — basic configuration: organization by channels/playlists (one
 # channel per team or meeting type), ActivityPub federation disabled (strictly
 # internal use, federation is not an expressed need, see 2.12 L.583).
-# Fed by the MinIO -> PeerTube handoff connector (daily batch, see 2.12
+# Fed by the SeaweedFS -> PeerTube handoff connector (daily batch, see 2.12
 # L.589, development out of scope for this k8s repository, see connectors/).
 
 image:
@@ -79,7 +79,7 @@ persistence:
     storageClass: ""
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
-# see keycloak.yaml's ingress comment for the full rationale.
+# see ../manifests/caddy.yaml's header comment for the full rationale.
 ingress:
   enabled: false
   className: ""

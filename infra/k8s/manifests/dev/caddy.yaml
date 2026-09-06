@@ -114,7 +114,7 @@ data:
         reverse_proxy gokapi.libre365.svc.cluster.local:80
     }
 
-    # Visio, Element Call, OnlyOffice, Keycloak, MinIO console: direct reverse proxy,
+    # Visio, Element Call, OnlyOffice, Keycloak, SeaweedFS Admin UI: direct reverse proxy,
     # no injection (applications embedded as a targeted widget/iframe, see 2.3 L.414,
     # or not concerned by the cross-cutting top bar).
     http://visio.libre365.example.org {
@@ -149,7 +149,11 @@ data:
     }
 
     http://sso.libre365.example.org {
-        reverse_proxy keycloak.libre365.svc.cluster.local:80
+        # Keycloak Operator's auto-created Service (see
+        # ../manifests/keycloak.yaml's own comment) - "keycloak-service" on
+        # port 8080, not "keycloak" on port 80 the way the retired Bitnami
+        # chart's Service was named.
+        reverse_proxy keycloak-service.libre365.svc.cluster.local:8080
     }
 
     # Matrix client API (study 1.2) — same domain as the chart's own
@@ -171,16 +175,19 @@ data:
         reverse_proxy synapse.libre365.svc.cluster.local:8448
     }
 
-    # MinIO S3 API (study 2.12) — no injection (API traffic, not a browsed
-    # application).
+    # SeaweedFS S3 API (study 2.12) — no injection (API traffic, not a
+    # browsed application). Release name "seaweedfs" (chart name
+    # "seaweedfs" too, so the chart's fullname template collapses to just
+    # the release name - verified in seaweedfs/seaweedfs's
+    # templates/shared/_helpers.tpl) -> Service "seaweedfs-s3".
     http://s3.libre365.example.org {
-        reverse_proxy minio.libre365.svc.cluster.local:9000
+        reverse_proxy seaweedfs-s3.libre365.svc.cluster.local:8333
     }
 
-    # MinIO web console (study 2.12) — no injection (administration UI, not
-    # part of the cross-cutting application bar's audience).
-    http://minio-console.libre365.example.org {
-        reverse_proxy minio.libre365.svc.cluster.local:9001
+    # SeaweedFS Admin UI (study 2.12) — no injection (administration UI,
+    # not part of the cross-cutting application bar's audience).
+    http://seaweedfs-admin.libre365.example.org {
+        reverse_proxy seaweedfs-admin.libre365.example.org:23646
     }
 
     # Novu notification center (study 2.1) — no injection (consumed by the

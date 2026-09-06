@@ -1,14 +1,18 @@
-"""MinIO/S3 client.
+"""S3-compatible object storage client (SeaweedFS's S3 gateway, study 2.12).
 
 Uses `boto3` (synchronous) rather than `aioboto3`: S3 calls here are infrequent
 relative to the connector's overall throughput -- one `ListObjectsV2`/tagging/
 GetObject sequence per ingested recording, and recordings are large video files
-where the upload to PeerTube (not the MinIO read) dominates latency. `aioboto3`
-also pins to a specific `aiobotocore`/`botocore` combination, which adds
-maintenance overhead disproportionate to the benefit here. Every blocking boto3
-call is wrapped in `asyncio.to_thread` so the FastAPI event loop (webhook mode)
-is never blocked; the batch script runs boto3 directly since it has no event
-loop to protect.
+where the upload to PeerTube (not the object-storage read) dominates latency.
+`aioboto3` also pins to a specific `aiobotocore`/`botocore` combination, which
+adds maintenance overhead disproportionate to the benefit here. Every blocking
+boto3 call is wrapped in `asyncio.to_thread` so the FastAPI event loop (webhook
+mode) is never blocked; the batch script runs boto3 directly since it has no
+event loop to protect.
+
+Generic S3 API only (ListObjectsV2, GetObject, Get/PutObjectTagging) - nothing
+here is specific to SeaweedFS, confirmed against its own S3 gateway source
+(weed/s3api/) supporting all three, the same way MinIO (previously here) did.
 """
 
 from __future__ import annotations
@@ -22,11 +26,11 @@ import boto3
 
 from .types import IngestCandidate
 
-MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "https://minio.example.org")
-MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "")
-MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "")
-MINIO_BUCKET = os.environ.get("MINIO_RECORDINGS_BUCKET", "visio-recordings")
-MINIO_REGION = os.environ.get("MINIO_REGION", "us-east-1")
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "https://s3.example.org")
+S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "")
+S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY", "")
+S3_BUCKET = os.environ.get("S3_RECORDINGS_BUCKET", "visio-recordings")
+S3_REGION = os.environ.get("S3_REGION", "us-east-1")
 
 _client = None
 
@@ -36,11 +40,11 @@ def _get_client():
     if _client is None:
         _client = boto3.client(
             "s3",
-            endpoint_url=MINIO_ENDPOINT,
-            region_name=MINIO_REGION,
-            aws_access_key_id=MINIO_ACCESS_KEY,
-            aws_secret_access_key=MINIO_SECRET_KEY,
-            # required for MinIO (study 1.3/2.12: self-hosted MinIO, not AWS S3)
+            endpoint_url=S3_ENDPOINT,
+            region_name=S3_REGION,
+            aws_access_key_id=S3_ACCESS_KEY,
+            aws_secret_access_key=S3_SECRET_KEY,
+            # required for SeaweedFS/self-hosted S3-compatible stores, not AWS S3
             config=boto3.session.Config(s3={"addressing_style": "path"}),
         )
     return _client
@@ -54,7 +58,7 @@ def _parse_iso(value: str) -> datetime:
 
 
 def list_recent_objects_sync(since_iso: str) -> List[IngestCandidate]:
-    """Lists recent objects in the MinIO bucket for batch mode (study 2.12 line 589:
+    """Lists recent objects in the bucket for batch mode (study 2.12 line 589:
     "this upload can be done as a periodic task -- daily batch"). `since_iso` filters
     client-side on `LastModified` (the S3 API does not offer a server-side date filter).
     """
@@ -64,7 +68,7 @@ def list_recent_objects_sync(since_iso: str) -> List[IngestCandidate]:
     continuation_token: Optional[str] = None
 
     while True:
-        kwargs = {"Bucket": MINIO_BUCKET}
+        kwargs = {"Bucket": S3_BUCKET}
         if continuation_token:
             kwargs["ContinuationToken"] = continuation_token
         page = s3.list_objects_v2(**kwargs)
@@ -73,7 +77,7 @@ def list_recent_objects_sync(since_iso: str) -> List[IngestCandidate]:
             if obj.get("Key") and last_modified and last_modified >= since:
                 candidates.append(
                     IngestCandidate(
-                        bucket=MINIO_BUCKET,
+                        bucket=S3_BUCKET,
                         key=obj["Key"],
                         size=obj.get("Size", 0),
                         last_modified=last_modified.isoformat(),

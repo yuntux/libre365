@@ -55,15 +55,15 @@ Service's exact name not being verifiable from this sandboxed environment.
 
 Reusing production charts as-is would mean provisioning production-shaped
 HA topologies (multi-replica Keycloak with Infinispan clustering, Synapse
-worker fleets, distributed MinIO) on a laptop, for every `helm upgrade`.
-Two mechanisms keep the loop fast instead:
+worker fleets, distributed SeaweedFS master/volume/filer) on a laptop, for
+every `helm upgrade`. Two mechanisms keep the loop fast instead:
 
 1. **`../infra/k8s/helm-values/dev/*.yaml`** — one overlay per brick,
    layered on top of the base `<component>.yaml` file (never on top of the
    `-100`/`-2000` production sizing overlays — the dev overlay replaces
    those, it isn't stacked with them). Each overlay sets `replicaCount: 1`
    (or the chart's clustering-off equivalent — e.g. Synapse's
-   `synapse.workers.enabled: false`, MinIO's `mode: standalone`) and shrinks
+   `synapse.workers.enabled: false`) and shrinks
    `resources.requests/limits` to whatever a laptop can boot quickly. See
    the header comment of each overlay file for exactly what was changed and
    why some keys (probe timing, autoscaling, PodDisruptionBudget) were
@@ -104,8 +104,10 @@ nodes, so the two must match exactly).
 
 The mapping of service name → port array index → desired nodePort lives in
 `lib-expose.sh`'s `EXPOSE_MAP` and currently assumes each chart's HTTP port
-is at array index 0 (index 1 for the two 2-port bricks: Synapse's
-federation port, MinIO's console port). **This assumption has not been
+is at array index 0 (index 1 for Synapse's federation port, the one
+2-port-on-a-single-Service brick left - SeaweedFS's S3 API and Admin UI
+are each their own single-port Service, `seaweedfs-s3`/`seaweedfs-admin`).
+**This assumption has not been
 verified against a live cluster** (no Docker daemon was available in the
 sandboxed environment this migration was authored in) — if a chart's
 Service instead lists a different port first (e.g. a metrics port), adjust
@@ -170,17 +172,17 @@ resolve and route correctly here too:
    here — dev loses the injected top bar, not the routing) and automatic
    HTTPS (forced to plain `http://` — there is no real public DNS to get a
    certificate for from a local cluster).
-2. `deploy.sh`'s step 6/11 calls `provision-keycloak-dev.sh` (right after
+2. `deploy.sh`'s step 8/12 calls `provision-keycloak-dev.sh` (right after
    exposing Keycloak's own NodePort), which runs the `keycloak_realm`
    Ansible role against this cluster's Keycloak with
    `keycloak_realm_test_user_enabled=true` — creating the realm, every
    OIDC client, and the representative test user (study 4.4, point 2)
    that `tests/integration/`'s `test_user` fixture and the ephemeral
    staging workflow both log in as. This has to happen before the
-   oauth2-proxy releases (step 9/11 below) are installed, since both fetch
+   oauth2-proxy releases (step 11/12 below) are installed, since both fetch
    their OIDC client from this realm at startup and fail if it doesn't
    exist yet.
-3. Step 8/11 calls `patch-coredns-hosts.sh`, which patches this cluster's
+3. Step 10/12 calls `patch-coredns-hosts.sh`, which patches this cluster's
    CoreDNS with a `hosts` block resolving every `platform.yaml` domain to
    `caddy-dev`'s in-cluster ClusterIP — so pods (Keycloak, oauth2-proxy,
    every app doing its own server-side OIDC discovery/token exchange)
@@ -189,7 +191,7 @@ resolve and route correctly here too:
    for its one unverified assumption (k3d's default Corefile layout) —
    inspect `kubectl get configmap coredns -n kube-system -o yaml` if it
    fails.
-4. Step 9/11 installs the two `oauth2-proxy-*` releases only after that DNS
+4. Step 11/12 installs the two `oauth2-proxy-*` releases only after that DNS
    patch, since both fetch their OIDC discovery document at startup and
    would otherwise fail to resolve the realm's domain at all.
 5. `tests/integration/conftest.py`'s `DomainRoutingAdapter` gives the test
@@ -269,7 +271,10 @@ docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
 ./dev-cluster/redeploy.sh unified-search
 
 # Fast inner loop after editing a Helm values file
-./dev-cluster/redeploy.sh keycloak
+./dev-cluster/redeploy.sh seaweedfs
+
+# Keycloak itself is an Operator CR, not a Helm release - re-apply directly
+kubectl apply -f infra/k8s/manifests/keycloak.yaml
 
 # Tear the cluster down entirely
 ./dev-cluster/destroy.sh

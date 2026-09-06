@@ -16,8 +16,13 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 CLUSTER_NAME="libre365-dev"
 NAMESPACE="libre365"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
+# Keep in sync by hand with platform.yaml's services.keycloak.version -
+# scripts/sync_platform.py patches infra/k8s/manifests/keycloak.yaml's
+# `spec.image` tag, but not this shell variable (see that file's header
+# comment on why the operator install isn't automated the same way).
+KEYCLOAK_VERSION="26.7.3"
 
-echo "==> 1/11 k3d cluster"
+echo "==> 1/12 k3d cluster"
 if k3d cluster list -o json 2>/dev/null | grep -q "\"name\":\"${CLUSTER_NAME}\""; then
   echo "    cluster '${CLUSTER_NAME}' already exists, skipping creation."
 else
@@ -25,13 +30,13 @@ else
 fi
 kubectl config use-context "k3d-${CLUSTER_NAME}"
 
-echo "==> 2/11 namespace"
+echo "==> 2/12 namespace"
 kubectl apply -f infra/k8s/manifests/namespace.yaml
 
-echo "==> 3/11 Helm repos (see infra/k8s/helm-values/README.md)"
+echo "==> 3/12 Helm repos (see infra/k8s/helm-values/README.md)"
 helm repo add ananace-charts https://ananace.gitlab.io/charts >/dev/null
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null
-helm repo add minio https://charts.min.io/ >/dev/null
+helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm >/dev/null
 helm repo add novu https://novuhq.github.io/helm-charts >/dev/null
 # seafile-charts/onlyoffice/peertube-helm repos are marked "to be confirmed"
 # in infra/k8s/helm-values/README.md (no single identified official chart at
@@ -49,7 +54,22 @@ helm repo add external-secrets https://charts.external-secrets.io >/dev/null
 helm repo add oauth2-proxy https://oauth2-proxy.github.io/manifests >/dev/null
 helm repo update >/dev/null
 
-echo "==> 4/11 Secrets: OpenBao + External Secrets Operator (dev mode, study 4.5)"
+echo "==> 4/12 Keycloak Operator (cluster-scoped CRDs + controller, study 1.7)"
+# No Helm chart for the Operator controller itself (see
+# infra/k8s/manifests/keycloak.yaml's header) - raw kubectl apply of the
+# official pinned manifests, $KEYCLOAK_VERSION set at the top of this
+# script. Cluster-scoped (not namespaced), safe to re-run.
+kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/keycloaks.k8s.keycloak.org-v1.yml"
+kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/keycloakrealmimports.k8s.keycloak.org-v1.yml"
+kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/kubernetes.yml"
+# Real manifest (verified for 26.3.3): the "keycloak-operator" Deployment
+# declares no namespace of its own, so `kubectl apply` lands it in
+# whatever namespace the current context defaults to ("default" here,
+# k3d's own default - this script never changes it) - NOT "$NAMESPACE".
+kubectl rollout status deployment/keycloak-operator -n default --timeout=120s 2>/dev/null || \
+  echo "    ! could not confirm the operator controller's Deployment - inspect \`kubectl get deploy -A -l app.kubernetes.io/name=keycloak-operator\` if the next step fails."
+
+echo "==> 5/12 Secrets: OpenBao + External Secrets Operator (dev mode, study 4.5)"
 # Dev-mode OpenBao (fixed root token, in-memory) + ESO, wired together by
 # the DEV-ONLY ClusterSecretStore (static token, not the production
 # Kubernetes-auth one - see infra/k8s/manifests/dev/external-secrets-store.yaml's
@@ -67,9 +87,9 @@ kubectl apply -f infra/k8s/manifests/dev/external-secrets-store.yaml
 kubectl apply -f infra/k8s/manifests/external-secrets.yaml
 ./dev-cluster/seed-openbao-dev-secrets.sh
 
-echo "==> 5/11 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
-helm upgrade --install keycloak bitnami/keycloak -n "$NAMESPACE" \
-  -f infra/k8s/helm-values/keycloak.yaml -f infra/k8s/helm-values/dev/keycloak.yaml
+echo "==> 6/12 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
+helm upgrade --install keycloak-postgres bitnami/postgresql -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/keycloak-postgres.yaml -f infra/k8s/helm-values/dev/keycloak-postgres.yaml
 helm upgrade --install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
   -f infra/k8s/helm-values/synapse.yaml -f infra/k8s/helm-values/dev/synapse.yaml
 helm upgrade --install element-web ananace-charts/matrix-element-web -n "$NAMESPACE" \
@@ -80,8 +100,8 @@ helm upgrade --install onlyoffice onlyoffice/docs-cloud -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice.yaml -f infra/k8s/helm-values/dev/onlyoffice.yaml
 helm upgrade --install vikunja vikunja/vikunja -n "$NAMESPACE" \
   -f infra/k8s/helm-values/vikunja.yaml -f infra/k8s/helm-values/dev/vikunja.yaml
-helm upgrade --install minio minio/minio -n "$NAMESPACE" \
-  -f infra/k8s/helm-values/minio.yaml -f infra/k8s/helm-values/dev/minio.yaml
+helm upgrade --install seaweedfs seaweedfs/seaweedfs -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/seaweedfs.yaml -f infra/k8s/helm-values/dev/seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n "$NAMESPACE" \
   -f infra/k8s/helm-values/peertube.yaml -f infra/k8s/helm-values/dev/peertube.yaml
 helm upgrade --install novu novu/novu -n "$NAMESPACE" \
@@ -89,19 +109,29 @@ helm upgrade --install novu novu/novu -n "$NAMESPACE" \
 helm upgrade --install external-dns external-dns/external-dns -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-dns.yaml -f infra/k8s/helm-values/dev/external-dns.yaml
 
-echo "==> 6/11 Keycloak realm + OIDC clients + test user (study 1.7/4.4)"
+echo "==> 7/12 Keycloak instance (Operator CR, not a Helm release)"
+# Applied after the operator (step 4/12) and keycloak-postgres (step
+# 6/12) above, since it references both - see
+# infra/k8s/manifests/keycloak.yaml's header for why this isn't a Helm
+# release like everything else in step 6/12.
+kubectl apply -f infra/k8s/manifests/keycloak.yaml
+kubectl wait --for=condition=Ready keycloak/keycloak -n "$NAMESPACE" --timeout=180s
+
+echo "==> 8/12 Keycloak realm + OIDC clients + test user (study 1.7/4.4)"
 # Exposes ONLY Keycloak's NodePort now (targeted, not the full
 # expose_all_services below: the connectors/gokapi/caddy-dev Services this
 # script installs later don't exist yet, and expose_service already
 # tolerates a missing Service by skipping with a warning) - needed before
 # provision-keycloak-dev.sh can reach the admin REST API, and before
-# oauth2-proxy (step 9/11 below) starts: it fetches its OIDC client from
+# oauth2-proxy (step 10/12 below) starts: it fetches its OIDC client from
 # this realm at startup and would fail if the realm didn't exist yet.
+# "keycloak-service" (not "keycloak"): the Operator's own auto-created
+# Service name - see infra/k8s/manifests/keycloak.yaml's comment.
 source "$(dirname "${BASH_SOURCE[0]}")/lib-expose.sh"
-expose_service keycloak 0 8080
+expose_service keycloak-service 0 8080
 "$(dirname "${BASH_SOURCE[0]}")/provision-keycloak-dev.sh" "$NAMESPACE"
 
-echo "==> 7/11 In-house connectors: build + import images, apply manifests"
+echo "==> 9/12 In-house connectors: build + import images, apply manifests"
 for name in "${CONNECTORS[@]}"; do
   echo "    building libre365/${name}:dev"
   docker build -t "libre365/${name}:dev" "connectors/${name}"
@@ -112,7 +142,7 @@ kubectl apply -f infra/k8s/manifests/gokapi.yaml
 kubectl apply -f infra/k8s/manifests/dev/caddy.yaml
 kubectl rollout status deployment/caddy-dev -n "$NAMESPACE" --timeout=60s
 
-echo "==> 8/11 CoreDNS: resolve every platform.yaml domain to caddy-dev (study 1.7, SSO/OIDC)"
+echo "==> 10/12 CoreDNS: resolve every platform.yaml domain to caddy-dev (study 1.7, SSO/OIDC)"
 # Every OIDC config in this repo (Keycloak's KC_HOSTNAME, each app's
 # issuer/authurl, the two oauth2-proxy gates) uses the real public domain
 # unconditionally - the same value in production and dev, deliberately
@@ -122,17 +152,17 @@ echo "==> 8/11 CoreDNS: resolve every platform.yaml domain to caddy-dev (study 1
 # unverified assumption (k3d's default Corefile layout).
 "$(dirname "${BASH_SOURCE[0]}")/patch-coredns-hosts.sh" "$NAMESPACE"
 
-echo "==> 9/11 oauth2-proxy: Keycloak SSO gates for OnlyOffice/Novu (study 1.7)"
+echo "==> 11/12 oauth2-proxy: Keycloak SSO gates for OnlyOffice/Novu (study 1.7)"
 # Installed only now, not alongside the other Helm releases above: both
 # fetch their OIDC discovery document from the realm's public domain at
 # startup and would otherwise fail before CoreDNS could resolve it (see
-# step 8/11 just above).
+# step 10/12 just above).
 helm upgrade --install oauth2-proxy-onlyoffice oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
   -f infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml
 helm upgrade --install oauth2-proxy-novu oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
   -f infra/k8s/helm-values/oauth2-proxy-novu.yaml
 
-echo "==> 10/11 Production caddy.yaml's Service (for external-dns testing only)"
+echo "==> 12/12 Production caddy.yaml's Service + exposing services as NodePort"
 # Applies the REAL infra/k8s/manifests/caddy.yaml as-is - not to run
 # production Caddy in dev (dev routing is caddy-dev, applied above), but so
 # its Service exists with the exact same external-dns hostname annotation
@@ -144,8 +174,6 @@ echo "==> 10/11 Production caddy.yaml's Service (for external-dns testing only)"
 # Service+annotation matters for this test. k3d's built-in Klipper load
 # balancer still assigns the LoadBalancer Service an IP regardless.
 kubectl apply -f infra/k8s/manifests/caddy.yaml
-
-echo "==> 11/11 Exposing services as NodePort (matching platform.yaml's port numbers)"
 source "$(dirname "${BASH_SOURCE[0]}")/lib-expose.sh"
 expose_all_services
 

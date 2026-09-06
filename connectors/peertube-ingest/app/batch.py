@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Sequence
 import httpx
 
 from .ingest import IngestDeps, filter_video_objects, ingest_all
-from .minio_client import get_object_stream, get_object_tags, list_recent_objects
+from .s3_client import get_object_stream, get_object_tags, list_recent_objects
 from .peertube_client import upload_to_peertube
 
 

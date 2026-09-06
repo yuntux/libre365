@@ -1,6 +1,16 @@
-"""Real-time webhook endpoint (study 2.12 line 589): MinIO can be configured to
-publish its `s3:ObjectCreated:*` notifications to a webhook ("webhook"-type bucket
-notification target, see `mc admin config set myminio notify_webhook`).
+"""Real-time webhook endpoint (study 2.12 line 589): SeaweedFS's filer can be
+configured to publish `create`/`update`/`delete`/`rename` events to a webhook
+(`[notification.webhook]` in its notification.toml, see
+infra/k8s/helm-values/seaweedfs.yaml's `filer.notificationConfig`).
+
+Payload shape confirmed against SeaweedFS's own source
+(weed/notification/webhook/types.go's `webhookMessage` struct,
+weed/pb/filer_pb/filer.pb.go's generated json tags): top-level
+`{"key": "<full filer path>", "event_type": "create|update|delete|rename",
+"message_data": {"new_entry": {"name", "attributes": {"file_size", "mtime"}}}}`.
+`key` is the full path including the bucket prefix
+(`/buckets/<bucket>/<object-key>`, confirmed in weed/filer/filer_notify.go) -
+not a separate bucket field the way MinIO's `Records[].s3.bucket.name` was.
 """
 
 from __future__ import annotations
@@ -16,7 +26,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from .ingest import IngestDeps, filter_video_objects, ingest_all
-from .minio_client import get_object_stream, get_object_tags
+from .s3_client import get_object_stream, get_object_tags
 from .peertube_client import upload_to_peertube
 from .types import IngestCandidate
 
@@ -46,25 +56,34 @@ def _build_deps(http_client: httpx.AsyncClient) -> IngestDeps:
     )
 
 
-@app.post("/webhooks/minio")
-async def handle_minio_webhook(request: Request) -> JSONResponse:
+def _split_bucket_and_key(filer_path: str) -> tuple[str, str]:
+    """"/buckets/<bucket>/<object-key...>" -> ("<bucket>", "<object-key...>")."""
+    parts = filer_path.lstrip("/").split("/", 2)
+    if len(parts) < 3 or parts[0] != "buckets":
+        return "", ""
+    return parts[1], parts[2]
+
+
+@app.post("/webhooks/seaweedfs")
+async def handle_seaweedfs_webhook(request: Request) -> JSONResponse:
     event = await request.json()
-    records = event.get("Records") or []
 
     now_iso = datetime.now(timezone.utc).isoformat()
     candidates: List[IngestCandidate] = []
-    for record in records:
-        if not (record.get("eventName") or "").startswith("s3:ObjectCreated"):
-            continue
-        s3_info = record.get("s3") or {}
-        bucket = (s3_info.get("bucket") or {}).get("name") or ""
-        obj = s3_info.get("object") or {}
-        key = obj.get("key") or ""
-        if not bucket or not key:
-            continue
-        candidates.append(
-            IngestCandidate(bucket=bucket, key=key, size=obj.get("size", 0), last_modified=now_iso)
-        )
+
+    if event.get("event_type") == "create":
+        bucket, key = _split_bucket_and_key(event.get("key") or "")
+        new_entry = (event.get("message_data") or {}).get("new_entry") or {}
+        attributes = new_entry.get("attributes") or {}
+        if bucket and key:
+            candidates.append(
+                IngestCandidate(
+                    bucket=bucket,
+                    key=key,
+                    size=attributes.get("file_size", 0),
+                    last_modified=now_iso,
+                )
+            )
 
     video_candidates = filter_video_objects(candidates)
     results = await ingest_all(video_candidates, _build_deps(request.app.state.http_client))

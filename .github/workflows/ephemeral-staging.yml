@@ -96,7 +96,7 @@ jobs:
 
       - name: Install Ansible (dev-cluster/deploy.sh's Keycloak provisioning step)
         run: |
-          # dev-cluster/deploy.sh's step 6/11 (provision-keycloak-dev.sh) runs
+          # dev-cluster/deploy.sh's step 8/12 (provision-keycloak-dev.sh) runs
           # the infra/ansible/roles/keycloak_realm role against the k3d
           # cluster's Keycloak - needed here for the exact same reason
           # lint-and-test.yml's ansible-lint job needs it, just to execute

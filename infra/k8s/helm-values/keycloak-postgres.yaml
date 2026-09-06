@@ -1,0 +1,50 @@
+# Component: PostgreSQL for Keycloak — standalone release (study 1.7)
+# Chart used: bitnami/postgresql
+#   Helm repo: https://charts.bitnami.com/bitnami
+#   chart    : postgresql
+#
+# The Keycloak Operator (../manifests/keycloak.yaml) does not provision a
+# database itself ("The Operator does not manage the database and you need
+# to provision it yourself" - keycloak/keycloak docs/guides/operator/
+# basic-deployment.adoc), unlike the retired `bitnami/keycloak` chart, which
+# bundled Postgres as a nested subchart - this file is that same chart,
+# promoted to its own top-level release (`keycloak-postgres`, see
+# dev-cluster/deploy.sh / infra/ansible for the exact `helm upgrade
+# --install` invocation).
+#
+# [UNCERTAIN, not verified against a live `helm install` from this
+# sandboxed environment]: the exact Service hostname this chart's fullname
+# template produces for the `keycloak-postgres` release name -
+# ../manifests/keycloak.yaml's `spec.db.host` assumes
+# `keycloak-postgres-postgresql`; confirm with `kubectl get svc -n libre365
+# -l app.kubernetes.io/instance=keycloak-postgres` at deployment time and
+# update both files together if it differs.
+#
+# Bitnami's image-distribution paywall that forced this whole migration
+# (see keycloak.yaml's header) affected `bitnami/keycloak` specifically;
+# `bitnami/postgresql` was independently confirmed still freely published
+# at the time of writing - but the same risk could resurface here later,
+# worth rechecking whenever this value is next touched.
+
+auth:
+  database: keycloak
+  username: keycloak
+  existingSecret: keycloak-postgres-secret
+  # Bitnami postgresql chart's default existingSecret key names (same
+  # convention this repo's other Postgres-backed components already rely
+  # on) - "password" for the `username` user above, "postgres-password"
+  # for the superuser.
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1"
+    memory: "2Gi"
+
+primary:
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""

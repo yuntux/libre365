@@ -18,9 +18,9 @@
 #
 # Caddy is the SOLE public HTTP(S) entry point for every service in
 # platform.yaml's `domains` list (this Caddyfile now covers all of them,
-# Synapse/MinIO/Novu included — see the bottom of this file). This is a
+# Synapse/SeaweedFS/Novu included — see the bottom of this file). This is a
 # deliberate simplification: every Helm chart in infra/k8s/helm-values/ also
-# ships its own native Kubernetes `ingress:`/`consoleIngress:` block, but no
+# ships its own native Kubernetes `ingress:` block, but no
 # Ingress Controller (nginx-ingress, Traefik...) is deployed anywhere in
 # this repository to satisfy those objects, and cert-manager is unnecessary
 # here — Caddy obtains and renews TLS certificates automatically for any
@@ -137,7 +137,7 @@ data:
         }
     }
 
-    # Visio, Element Call, OnlyOffice, Keycloak, MinIO console: direct reverse proxy,
+    # Visio, Element Call, OnlyOffice, Keycloak, SeaweedFS Admin UI: direct reverse proxy,
     # no injection (applications embedded as a targeted widget/iframe, see 2.3 L.414,
     # or not concerned by the cross-cutting top bar).
     visio.libre365.example.org {
@@ -172,7 +172,11 @@ data:
     }
 
     sso.libre365.example.org {
-        reverse_proxy keycloak.libre365.svc.cluster.local:80
+        # Keycloak Operator's auto-created Service (see
+        # ../manifests/keycloak.yaml's own comment) - "keycloak-service" on
+        # port 8080, not "keycloak" on port 80 the way the retired Bitnami
+        # chart's Service was named.
+        reverse_proxy keycloak-service.libre365.svc.cluster.local:8080
     }
 
     # Matrix client API (study 1.2) — same domain as the chart's own
@@ -194,16 +198,19 @@ data:
         reverse_proxy synapse.libre365.svc.cluster.local:8448
     }
 
-    # MinIO S3 API (study 2.12) — no injection (API traffic, not a browsed
-    # application).
+    # SeaweedFS S3 API (study 2.12) — no injection (API traffic, not a
+    # browsed application). Release name "seaweedfs" (chart name
+    # "seaweedfs" too, so the chart's fullname template collapses to just
+    # the release name - verified in seaweedfs/seaweedfs's
+    # templates/shared/_helpers.tpl) -> Service "seaweedfs-s3".
     s3.libre365.example.org {
-        reverse_proxy minio.libre365.svc.cluster.local:9000
+        reverse_proxy seaweedfs-s3.libre365.svc.cluster.local:8333
     }
 
-    # MinIO web console (study 2.12) — no injection (administration UI, not
-    # part of the cross-cutting application bar's audience).
-    minio-console.libre365.example.org {
-        reverse_proxy minio.libre365.svc.cluster.local:9001
+    # SeaweedFS Admin UI (study 2.12) — no injection (administration UI,
+    # not part of the cross-cutting application bar's audience).
+    seaweedfs-admin.libre365.example.org {
+        reverse_proxy seaweedfs-admin.libre365.example.org:23646
     }
 
     # Novu notification center (study 2.1) — no injection (consumed by the
@@ -398,7 +405,7 @@ metadata:
     # Single line, no spaces after the commas: external-dns splits this
     # value on "," without necessarily trimming whitespace, so a folded
     # multi-line scalar here would risk a leading-space-prefixed hostname.
-    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,autoconfig.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org,notifications-admin.libre365.example.org"
+    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,autoconfig.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,seaweedfs-admin.libre365.example.org,notifications.libre365.example.org,notifications-admin.libre365.example.org"
 spec:
   selector:
     app.kubernetes.io/name: caddy

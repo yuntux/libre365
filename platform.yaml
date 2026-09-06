@@ -95,21 +95,20 @@ shared:
 # `ports`: dictionary {EXACT_VARIABLE_NAME: value}, used verbatim in
 # docker-compose.yml and .env.example — declared explicitly rather than
 # derived by convention, because the historical names don't all follow the
-# same scheme (SYNAPSE_CLIENT_PORT, MINIO_API_PORT, CADDY_HTTP_PORT...). This
+# same scheme (SYNAPSE_CLIENT_PORT, SEAWEEDFS_S3_PORT, CADDY_HTTP_PORT...). This
 # guarantees that renaming a variable in platform.yaml shows up immediately in
 # the diff instead of being silently inferred.
 services:
   keycloak:
-    # study 1.7 - Bitnami stopped publishing free `bitnami/keycloak` image
-    # tags (moved to a paid "Bitnami Secure Images" subscription); its
-    # historical tags were frozen into `bitnamilegacy/keycloak`, which
-    # stops at 26.3.3 - the real Keycloak project has released well past
-    # that (26.7.3 at last check), but nothing newer is pullable for free
-    # under this chart's image path without either paying Bitnami or
-    # migrating off the `bitnami/keycloak` chart to the official image
-    # (`quay.io/keycloak/keycloak`, already used by the docker-compose dev
-    # tier below) - tracked as follow-up work, not done here.
-    version: "26.3.3"
+    # study 1.7 - deployed via the official Keycloak Operator
+    # (infra/k8s/manifests/keycloak.yaml), not the `bitnami/keycloak` Helm
+    # chart previously used here: Bitnami moved that image behind a paid
+    # "Bitnami Secure Images" subscription, freezing its free history into
+    # `bitnamilegacy/keycloak` at 26.3.3. The Operator uses the real,
+    # official `quay.io/keycloak/keycloak` image directly (same one the
+    # docker-compose dev tier already used), so this value now tracks the
+    # real latest Keycloak release with no third-party packaging ceiling.
+    version: "26.7.3"
     # Every OIDC app config in this repo builds its issuer/authorization
     # URL as "https://<sso_domain>/realms/<realm_name>" - this used to be
     # a literal "libre365" hand-copied into 7 different files (Vikunja,
@@ -124,9 +123,15 @@ services:
     compose:
       image: quay.io/keycloak/keycloak
     helm:
-      file: infra/k8s/helm-values/keycloak.yaml
-      image_repository: bitnamilegacy/keycloak
-      tag_path: .image.tag
+      # Not a Helm values file: the Keycloak Operator CR is a raw manifest
+      # (infra/k8s/manifests/keycloak.yaml, see that file's header for why
+      # - no Helm chart exists for the Operator's own workload, only for
+      # the cluster-scoped controller install, which this `version` value
+      # does NOT drive - see that file's comment on keeping the operator
+      # install URL's {VERSION} in sync by hand).
+      file: infra/k8s/manifests/keycloak.yaml
+      image_repository: quay.io/keycloak/keycloak
+      raw_image_line: true
 
   synapse:
     version: "v1.160.0" # study 1.2
@@ -254,21 +259,24 @@ services:
       image_repository: f0rc3/gokapi
       raw_image_line: true
 
-  minio:
-    # study 2.12 - the minio/minio repository is no longer maintained
-    # upstream (README: "THIS REPOSITORY IS NO LONGER MAINTAINED", source-
-    # only distribution going forward, no more pre-built binaries/images
-    # for the community edition); Docker Hub stopped publishing new
-    # `minio/minio` RELEASE tags around September 2025. Pinned to the last
-    # tag actually published there - going further requires building from
-    # source or moving to MinIO AIStor (the maintained successor).
-    version: "RELEASE.2025-09-07T16-13-09Z"
-    ports: { MINIO_API_PORT: 9000, MINIO_CONSOLE_PORT: 9001 }
+  seaweedfs:
+    # study 2.12 - replaces MinIO: the minio/minio project is no longer
+    # maintained upstream (moved to source-only distribution, no new
+    # community-edition images published since ~Sept 2025). SeaweedFS was
+    # chosen over Garage (the other actively-maintained candidate) because
+    # Garage has no bucket event notification support at all, which this
+    # stack's PeerTube handoff connector (connectors/peertube-ingest)
+    # depends on - see infra/k8s/helm-values/seaweedfs.yaml's header for
+    # the full comparison.
+    version: "4.45"
+    # SeaweedFS's own default ports (chart values `s3.port`/`admin.port`,
+    # not MinIO's 9000/9001 this replaces).
+    ports: { SEAWEEDFS_S3_PORT: 8333, SEAWEEDFS_ADMIN_PORT: 23646 }
     compose:
-      image: minio/minio
+      image: chrislusf/seaweedfs
     helm:
-      file: infra/k8s/helm-values/minio.yaml
-      image_repository: minio/minio
+      file: infra/k8s/helm-values/seaweedfs.yaml
+      image_repository: chrislusf/seaweedfs
       tag_path: .image.tag
 
   peertube:
@@ -428,8 +436,8 @@ domains:
     depot: depot # Gokapi, via Caddy (study 1.8/2.3)
     onboarding: onboarding # Static onboarding portal, no injection (study 2.5)
     videos: videos # PeerTube, via Caddy (study 2.12/2.3)
-    s3: s3 # MinIO API (study 2.12)
-    minio_console: minio-console # MinIO console (study 2.12)
+    s3: s3 # SeaweedFS S3 API (study 2.12)
+    seaweedfs_admin: seaweedfs-admin # SeaweedFS Admin UI (study 2.12)
     notifications: notifications # Novu (study 2.1)
     notifications_admin: notifications-admin # Novu admin dashboard (study 1.7/2.1)
       # - Novu's own `web` UI (template/workflow management), gated by

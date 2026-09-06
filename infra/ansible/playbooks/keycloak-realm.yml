@@ -1,7 +1,7 @@
 ---
 # Main Keycloak realm + OIDC clients — study 1.7. Queries the Keycloak REST
-# API (already deployed via Helm in the Kubernetes cluster, see
-# infra/k8s/helm-values/keycloak.yaml, out of scope for this task) — no SSH
+# API (already deployed via the Keycloak Operator in the Kubernetes cluster,
+# see infra/k8s/manifests/keycloak.yaml, out of scope for this task) — no SSH
 # connection needed, hence running against the control_apis group.
 
 - name: "Provision the Keycloak realm and the stack's OIDC clients"

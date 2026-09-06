@@ -7,8 +7,8 @@ directory: deployed as a Proxmox appliance VM, see chapter 4.3 and
 
 ## Public entry point: Caddy, not each chart's own Ingress
 
-Every chart below ships its own native Kubernetes `ingress:` (and, for
-MinIO, `consoleIngress:`) block — but each one is set to **`enabled: false`**
+Every chart below ships its own native Kubernetes `ingress:` block — but
+each one is set to **`enabled: false`**
 here. No Ingress Controller (nginx-ingress, Traefik...) is deployed anywhere
 in this repository to satisfy those objects, and running one just to
 duplicate routing that already exists elsewhere would add an unused
@@ -19,7 +19,7 @@ cert-manager either: Caddy obtains and renews TLS certificates
 automatically for any bare-domain site address, a built-in feature
 ("Automatic HTTPS"). See `../manifests/caddy.yaml`'s header comment for the
 full rationale, including how Matrix federation (a separate port, 8448) and
-the two MinIO endpoints (S3 API + console) are covered too.
+the two SeaweedFS endpoints (S3 API + Admin UI) are covered too.
 
 The `hosts`/`hostname`/`tls` fields in each disabled `ingress:` block are
 kept as documentation of where that chart expects to be reached (and stay
@@ -73,8 +73,8 @@ placeholder), edit `platform.yaml`'s `domains.base` and re-run
 
 ## Naming convention: `-100` / `-2000` overlays
 
-For components whose sizing really varies with scale (Synapse, OnlyOffice,
-Keycloak — see the study), the convention adopted is:
+For components whose sizing really varies with scale (Synapse, OnlyOffice —
+see the study), the convention adopted is:
 
 - `<component>.yaml`: common values, independent of scale (image, OIDC
   integrations, feature toggles, functional options). Contains **no**
@@ -95,6 +95,12 @@ but on another factor (data volume for Seafile, API usage for Vikunja — see
 study 1.4 L.136 and 1.6 L.229), a single `<component>.yaml` file suffices;
 the choice is documented at the top of each file concerned.
 
+Keycloak used to follow the `-100`/`-2000` Helm-overlay convention too, but
+is no longer a Helm release at all (see `../manifests/keycloak.yaml`'s
+header) — its `instances`/`resources` sizing now lives directly in that one
+manifest, with a comment on what to change for the ~2000-user target
+instead of a separate cascade file.
+
 ## Helm charts used
 
 | Component | Chart | Helm repo |
@@ -105,10 +111,10 @@ the choice is documented at the top of each file concerned.
 | Visio (LaSuite Meet) | `suitenumerique/meet` if published, otherwise raw manifest | https://github.com/suitenumerique/meet |
 | Seafile | community chart `seafile-ce` | https://seafile-charts.github.io/seafile-charts (to be confirmed) |
 | OnlyOffice Document Server | community chart `docs-cloud` | https://onlyoffice.github.io/docs-cloud-chart (to be confirmed) |
-| Vikunja | `vikunja` (go-vikunja/helm-charts) | https://vikunja.github.io/helm-charts |
-| Keycloak | `keycloak` (Bitnami) | https://charts.bitnami.com/bitnami |
+| Vikunja | no official chart confirmed to exist (see `vikunja.yaml`'s header) — "chart-like" values manifest, to be adapted to a generic app-template chart or a raw manifest | — |
+| Keycloak | no Helm chart — official Keycloak Operator CR (`../manifests/keycloak.yaml`), `bitnami/postgresql` for its now-standalone database | Operator: raw kubectl apply (see that file's header); Postgres: https://charts.bitnami.com/bitnami |
 | Gokapi | no official chart — raw manifest (`../manifests/gokapi.yaml`) | — |
-| MinIO | `minio` (official MinIO chart) | https://charts.min.io/ |
+| SeaweedFS | `seaweedfs` (official, in-tree chart) | https://seaweedfs.github.io/seaweedfs/helm |
 | PeerTube | community chart `peertube` | https://peertube-helm.github.io/charts (to be confirmed) |
 | Caddy | no dedicated chart — raw manifest (`../manifests/caddy.yaml`), custom xcaddy image with an HTML injection plugin | — |
 | Novu | `novu` (official Novu chart) | https://novuhq.github.io/helm-charts |
@@ -129,9 +135,8 @@ image carries the same caveat — see that file's header comment.
 # Add the Helm repos (once)
 helm repo add ananace-charts https://ananace.gitlab.io/charts
 helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo add minio https://charts.min.io/
+helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm
 helm repo add novu https://novuhq.github.io/helm-charts
-helm repo add vikunja https://vikunja.github.io/helm-charts
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 helm repo update
 
@@ -139,17 +144,20 @@ helm repo update
 kubectl apply -f ../manifests/namespace.yaml
 
 # Component with no scale overlay
-helm upgrade --install vikunja vikunja/vikunja -n libre365 -f vikunja.yaml
 helm upgrade --install seafile seafile-charts/seafile-ce -n libre365 -f seafile.yaml
-helm upgrade --install minio minio/minio -n libre365 -f minio.yaml
+helm upgrade --install seaweedfs seaweedfs/seaweedfs -n libre365 -f seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n libre365 -f peertube.yaml
 helm upgrade --install novu novu/novu -n libre365 -f novu.yaml
 helm upgrade --install element-web ananace-charts/matrix-element-web -n libre365 -f element-web.yaml
+helm upgrade --install keycloak-postgres bitnami/postgresql -n libre365 -f keycloak-postgres.yaml
 
 # Component with a scale overlay (example: 100-user target)
 helm upgrade --install synapse ananace-charts/matrix-synapse -n libre365 -f synapse.yaml -f synapse-100.yaml
 helm upgrade --install onlyoffice onlyoffice/docs-cloud -n libre365 -f onlyoffice.yaml -f onlyoffice-100.yaml
-helm upgrade --install keycloak bitnami/keycloak -n libre365 -f keycloak.yaml -f keycloak-100.yaml
+
+# Keycloak: Operator CR, not a Helm release - see ../manifests/keycloak.yaml's
+# header for the operator install command (kubectl apply, cluster-scoped)
+kubectl apply -f ../manifests/keycloak.yaml
 
 # Raw manifests (no chart)
 kubectl apply -f ../manifests/gokapi.yaml

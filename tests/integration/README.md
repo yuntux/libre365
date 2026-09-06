@@ -89,7 +89,7 @@ directly.
 | `ELEMENT_URL`                  | `http://localhost:8081`     | Element (web client)            |
 | `VIKUNJA_URL`                  | `http://localhost:3456`     | Vikunja                         |
 | `GOKAPI_URL`                   | `http://localhost:53842`    | Gokapi                          |
-| `MINIO_URL`                    | `http://localhost:9000`     | MinIO                           |
+| `SEAWEEDFS_URL`                | `http://localhost:8333`     | SeaweedFS S3 API                |
 | `PEERTUBE_URL`                 | `http://localhost:9002`     | PeerTube                        |
 | `CADDY_URL`                    | `http://localhost:10080`    | Caddy (reverse proxy)           |
 | `NOTIFICATION_HUB_URL`         | `http://localhost:4001`     | notification-hub connector     |

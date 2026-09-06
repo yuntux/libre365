@@ -12,7 +12,7 @@ block/connector.
 | Seafile | 1.4 | `infra/k8s/helm-values/seafile.yaml` |
 | OnlyOffice Document Server | 1.5 | `infra/k8s/helm-values/onlyoffice.yaml`; SSO gate: `infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml` (see `docs/oidc.md`) |
 | Vikunja | 1.6 | `infra/k8s/helm-values/vikunja.yaml` |
-| Keycloak (SSO/MFA) | 1.7 | `infra/k8s/helm-values/keycloak.yaml`, `infra/ansible/playbooks/keycloak-realm.yml`, `connectors/keycloak-otp-spi/` |
+| Keycloak (SSO/MFA) | 1.7 | `infra/k8s/manifests/keycloak.yaml` (Operator CR), `infra/k8s/helm-values/keycloak-postgres.yaml`, `infra/ansible/playbooks/keycloak-realm.yml`, `connectors/keycloak-otp-spi/` |
 | UI language (fr default, en available) | not a numbered study requirement — added on request | `platform.yaml`'s `locale` section (single source), `infra/ansible/roles/keycloak_realm/` (only component actually wired so far — see `docs/i18n.md` for the full per-component breakdown, most still open) |
 | Gokapi | 1.8 | `infra/k8s/manifests/gokapi.yaml` (no official Helm chart, see that file's header; `v2.2.4`, OIDC/encryption configured non-interactively by the `gokapi-setup-bootstrap` initContainer — see `docs/oidc.md`; Tasmane branding via Caddy's `injection` directive — `infra/k8s/manifests/caddy-injection.yaml`'s `gokapi-branding.html`, not a Gokapi-side file, see that file's comment for why) |
 | Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code); autoconfig/Autodiscover: `platform.yaml` (`autoconfig`/`autodiscover` subdomains), `infra/k8s/manifests/caddy.yaml` (`caddy-autoconfig` ConfigMap, Caddy-fronted) |
@@ -27,7 +27,7 @@ block/connector.
 | Video conferencing button from Grommunio | 2.9 | `docs/visio-invite.md` (reusable link, no connector at this stage) |
 | Seafile ↔ Vikunja link | 2.10 | No code — documented usage (`docs/vikunja-seafile.md`) |
 | Gokapi Filelink (Thunderbird) | 2.11 | `connectors/thunderbird-filelink-gokapi/` (fleet-wide deployment: `policies.json`, see its README) |
-| Video platform (PeerTube + MinIO) | 2.12 | `infra/k8s/helm-values/peertube.yaml`, `infra/k8s/helm-values/minio.yaml`, `connectors/peertube-ingest/` |
+| Video platform (PeerTube + SeaweedFS) | 2.12 | `infra/k8s/helm-values/peertube.yaml`, `infra/k8s/helm-values/seaweedfs.yaml`, `connectors/peertube-ingest/` |
 | GAL over CardDAV | 2.13 | `infra/ansible/playbooks/grommunio.yml` (`GAL_ENABLED`) |
 | Room booking | 2.14 | No code — native Grommunio behavior, documented (`docs/room-booking.md`) |
 | Proxmox / Kubernetes infrastructure | 4.1–4.7 | `infra/terraform/`, `infra/k8s/` |

@@ -39,8 +39,8 @@ reuse this same structure rather than an ad hoc pattern per component.
   custom Keycloak SPI, treated as a development project of its own, not an
   option of this role.
 - **High availability of the Keycloak cluster** (nodes, distributed cache):
-  handled by the Helm manifests (`infra/k8s/helm-values/keycloak.yaml`, out
-  of scope for this task), not by this application configuration role.
+  handled by the Keycloak Operator CR (`infra/k8s/manifests/keycloak.yaml`,
+  out of scope for this task), not by this application configuration role.
 
 ## Secrets
 

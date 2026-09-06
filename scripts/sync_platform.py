@@ -169,7 +169,7 @@ _BARE_DOMAIN_PATTERNS = {
 # `*.libre365.svc.cluster.local` (in-cluster Service DNS, e.g. the k3d dev
 # manifests) are a different, unrelated namespace and are not listed here.
 DOMAIN_TARGET_FILES = [
-    "infra/k8s/helm-values/keycloak.yaml",
+    "infra/k8s/manifests/keycloak.yaml",
     "infra/k8s/helm-values/synapse.yaml",
     "infra/k8s/helm-values/element-web.yaml",
     "infra/k8s/helm-values/element-call.yaml",
@@ -177,7 +177,7 @@ DOMAIN_TARGET_FILES = [
     "infra/k8s/helm-values/seafile.yaml",
     "infra/k8s/helm-values/onlyoffice.yaml",
     "infra/k8s/helm-values/vikunja.yaml",
-    "infra/k8s/helm-values/minio.yaml",
+    "infra/k8s/helm-values/seaweedfs.yaml",
     "infra/k8s/helm-values/peertube.yaml",
     "infra/k8s/helm-values/novu.yaml",
     "infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml",
@@ -421,8 +421,8 @@ def compute_dockerfile_changes(platform: dict) -> list[Change]:
 
 def set_nested(data, dot_path: str, value: str) -> None:
     """`.image.tag` -> data['image']['tag'] = value, creating any missing
-    levels (e.g. minio.yaml currently has no explicit `image:` block — this
-    creates one rather than leaving the chart on its default, silent, and
+    levels (a values file with no explicit `image:` block yet gets one
+    created, rather than being left on the chart's default, silent, and
     therefore drift-prone tag)."""
     from ruamel.yaml.comments import CommentedMap
 

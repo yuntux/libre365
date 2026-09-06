@@ -41,15 +41,15 @@ bao_kv_put "libre365/external-dns-ovh" \
   application-key=devonly-changeme-ovh-app-key \
   application-secret=devonly-changeme-ovh-app-secret \
   consumer-key=devonly-changeme-ovh-consumer-key
-bao_kv_put "libre365/keycloak" admin-password=devonly-changeme-keycloak-admin
-bao_kv_put "libre365/keycloak-postgres" password=devonly-changeme-kc-pg postgres-password=devonly-changeme-kc-pg-super
+bao_kv_put "libre365/keycloak" admin-username=admin admin-password=devonly-changeme-keycloak-admin
+bao_kv_put "libre365/keycloak-postgres" username=keycloak password=devonly-changeme-kc-pg postgres-password=devonly-changeme-kc-pg-super
 bao_kv_put "libre365/synapse-postgres" password=devonly-changeme-synapse-pg postgres-password=devonly-changeme-synapse-pg-super
 bao_kv_put "libre365/vikunja-postgres" password=devonly-changeme-vikunja-pg postgres-password=devonly-changeme-vikunja-pg-super
 bao_kv_put "libre365/peertube-postgres" password=devonly-changeme-peertube-pg postgres-password=devonly-changeme-peertube-pg-super
 bao_kv_put "libre365/visio-meet-postgres" password=devonly-changeme-visio-pg postgres-password=devonly-changeme-visio-pg-super
 bao_kv_put "libre365/onlyoffice-redis" password=devonly-changeme-onlyoffice-redis
 bao_kv_put "libre365/novu-mongodb" root-password=devonly-changeme-novu-mongo
-bao_kv_put "libre365/minio" root-user=devonly-minio-admin root-password=devonly-changeme-minio-root
+bao_kv_put "libre365/seaweedfs" s3-access-key=devonly-seaweedfs-access s3-secret-key=devonly-changeme-seaweedfs-secret admin-user=admin admin-password=devonly-changeme-seaweedfs-admin
 bao_kv_put "libre365/seafile-mysql" password=devonly-changeme-seafile-mysql
 
 echo "==> Done. External Secrets Operator should sync these into real Secrets within its next poll interval."

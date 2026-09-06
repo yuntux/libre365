@@ -70,7 +70,7 @@ class BaseUrls:
     element: str
     vikunja: str
     gokapi: str
-    minio: str
+    seaweedfs: str
     peertube: str
     caddy: str
     notification_hub: str
@@ -103,7 +103,7 @@ def base_urls() -> BaseUrls:
         element=_env_url("ELEMENT_URL", _default_url("ELEMENT_PORT")),
         vikunja=_env_url("VIKUNJA_URL", _default_url("VIKUNJA_PORT")),
         gokapi=_env_url("GOKAPI_URL", _default_url("GOKAPI_PORT")),
-        minio=_env_url("MINIO_URL", _default_url("MINIO_API_PORT")),
+        seaweedfs=_env_url("SEAWEEDFS_URL", _default_url("SEAWEEDFS_S3_PORT")),
         peertube=_env_url("PEERTUBE_URL", _default_url("PEERTUBE_PORT")),
         caddy=_env_url("CADDY_URL", _default_url("CADDY_HTTP_PORT")),
         notification_hub=_env_url("NOTIFICATION_HUB_URL", _default_url("NOTIFICATION_HUB_PORT")),

@@ -1,0 +1,63 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values.
+#
+# Usage:
+#   helm upgrade --install seaweedfs seaweedfs/seaweedfs -n libre365-dev \
+#     -f seaweedfs.yaml -f dev/seaweedfs.yaml
+#
+# master/volume/filer/s3/admin are each already single-replica in the base
+# file (no HA topology to "collapse" for dev, unlike MinIO's `mode:
+# distributed` this replaced) - this overlay only trims resource requests
+# and the volume server's PVC size, the same role every other dev/*.yaml
+# overlay in this directory plays.
+
+master:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+volume:
+  dataDirs:
+    - name: data1
+      type: "persistentVolumeClaim"
+      size: "10Gi"
+      storageClass: ""
+      maxVolumes: 0
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+filer:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "250m"
+      memory: "512Mi"
+
+s3:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+admin:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"

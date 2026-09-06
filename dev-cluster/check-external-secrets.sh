@@ -25,7 +25,9 @@ onlyoffice-jwt-secret:secret
 external-dns-ovh-credentials:application-key
 external-dns-ovh-credentials:application-secret
 external-dns-ovh-credentials:consumer-key
-keycloak-admin-secret:admin-password
+keycloak-admin-secret:username
+keycloak-admin-secret:password
+keycloak-postgres-secret:username
 keycloak-postgres-secret:password
 keycloak-postgres-secret:postgres-password
 synapse-postgres-secret:password
@@ -38,8 +40,10 @@ visio-meet-postgres-secret:password
 visio-meet-postgres-secret:postgres-password
 onlyoffice-redis-secret:redis-password
 novu-mongodb-secret:mongodb-root-password
-minio-root-credentials:rootUser
-minio-root-credentials:rootPassword
+seaweedfs-s3-credentials:access-key
+seaweedfs-s3-credentials:secret-key
+seaweedfs-admin-credentials:admin-user
+seaweedfs-admin-credentials:admin-password
 seafile-mysql-secret:password
 "
 

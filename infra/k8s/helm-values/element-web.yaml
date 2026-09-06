@@ -53,7 +53,7 @@ resources:
     memory: "256Mi"
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
-# see keycloak.yaml's ingress comment for the full rationale.
+# see ../manifests/caddy.yaml's header comment for the full rationale.
 ingress:
   enabled: false
   className: ""

@@ -10,7 +10,7 @@ Python/FastAPI services and one browser extension (Thunderbird).
 | [`unified-search`](./unified-search) | 2.2 | `4002` | `SEARCH_TIMEOUT_MS` |
 | [`presence-aggregator`](./presence-aggregator) | 2.8 | `4003` | `LIVEKIT_URL` |
 | [`onlyoffice-mentions`](./onlyoffice-mentions) | 2.7 | `4004` | `NOTIFICATION_HUB_URL` |
-| [`peertube-ingest`](./peertube-ingest) | 2.12 | `4005` | `MINIO_ENDPOINT` |
+| [`peertube-ingest`](./peertube-ingest) | 2.12 | `4005` | `S3_ENDPOINT` |
 | [`thunderbird-filelink-gokapi`](./thunderbird-filelink-gokapi) | 2.11 | n/a (WebExtension) | n/a |
 
 ## Quick description
@@ -26,7 +26,7 @@ Python/FastAPI services and one browser extension (Thunderbird).
   application portal's status bar (2.3).
 - **onlyoffice-mentions** — implements `onRequestUsers` (directory via the Keycloak Admin API)
   and relays `onRequestSendNotify` to `notification-hub`.
-- **peertube-ingest** — pushes MinIO meeting recordings (LiveKit Egress output)
+- **peertube-ingest** — pushes SeaweedFS meeting recordings (LiveKit Egress output)
   to PeerTube, either via real-time webhook or a daily batch cron job.
 - **thunderbird-filelink-gokapi** — Thunderbird WebExtension (not a backend service)
   implementing the `cloudFile` API for Gokapi.

@@ -13,7 +13,7 @@ infrastructure is associated with it, and **no credentials are committed**.
 
 | File | Role |
 |---|---|
-| `versions.tf` | `bpg/proxmox` provider, backend (local by default, S3/MinIO example in a comment) |
+| `versions.tf` | `bpg/proxmox` provider, backend (local by default, S3/SeaweedFS example in a comment) |
 | `variables.tf` | All input variables, including `deployment_scale` (`"100"` / `"2000"`) |
 | `locals.tf` | Sizing table by scale (`sizing_by_scale`), reusing the study's figures (1.1, 1.2, 1.7) |
 | `grommunio.tf` | Grommunio appliance VM (ISO), sized via `local.sizing.grommunio` |
@@ -80,7 +80,7 @@ workstation or a CI runner.
 
 The local backend (default, `versions.tf`) is suitable for a single-operator
 use case. For a team or a CI/CD pipeline (chapter 5), enable the S3 backend
-commented out in `versions.tf`, pointing to a self-hosted **MinIO**
+commented out in `versions.tf`, pointing to a self-hosted **SeaweedFS**
 instance — consistent with the choice already made for the enterprise video
 platform (study 2.12) rather than introducing an additional third-party
 cloud service for Terraform state alone.

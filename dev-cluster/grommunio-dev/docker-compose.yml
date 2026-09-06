@@ -5,7 +5,7 @@
 # As of the k3d dev cluster migration, this file no longer hosts the whole
 # dev/test tier. Every service that has a production Helm chart worth
 # reusing (Keycloak, Synapse/Element, Seafile, OnlyOffice, Vikunja, Gokapi,
-# MinIO, PeerTube, Novu, Caddy, and the 5 in-house connectors) now runs on
+# SeaweedFS, PeerTube, Novu, Caddy, and the 5 in-house connectors) now runs on
 # the local k3d Kubernetes cluster instead, so that dev/test stays as close
 # as possible to the production deployment model (chapter 4.4) - see
 # dev-cluster/README.md for the full rationale and startup instructions.
