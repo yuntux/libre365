@@ -18,6 +18,7 @@ Files touched:
     - infra/k8s/manifests/caddy.yaml      (domain names)
     - connectors/*/Dockerfile             (Python base tag, patched in place)
     - connectors/thunderbird-filelink-gokapi/manifest.json  (domain name)
+    - connectors/thunderbird-filelink-gokapi/policies.json  (domain name)
     - tests/integration/_platform_defaults.py  (generated file, do not edit)
 
 Never writes to platform.yaml itself.
@@ -158,6 +159,7 @@ DOMAIN_TARGET_FILES = [
     "infra/k8s/manifests/gokapi.yaml",
     "infra/k8s/helm-values/external-dns.yaml",
     "connectors/thunderbird-filelink-gokapi/manifest.json",
+    "connectors/thunderbird-filelink-gokapi/policies.json",
 ]
 
 
