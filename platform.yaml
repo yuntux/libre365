@@ -305,6 +305,11 @@ dev_cluster:
 domains:
   base: "libre365.example.org"
   subdomains:
+    mail: mail # Grommunio (study 1.1/4.3) - NOT Caddy-fronted (Proxmox VM
+      # appliance, not a Kubernetes Service) - consumed directly by
+      # infra/ansible/group_vars/all.yml, not by anything under
+      # infra/k8s/. Listed in scripts/sync_platform.py's
+      # DOMAINS_WITHOUT_CADDY_SITE for that reason, same as `registry`.
     sso: sso # Keycloak (study 1.7)
     matrix: matrix # Synapse client/federation (study 1.2)
     chat: chat # Element Web, via Caddy (study 1.2/2.3)

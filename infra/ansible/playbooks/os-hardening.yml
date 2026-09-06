@@ -7,5 +7,7 @@
 - name: "Baseline OS hardening (fail2ban, SSH)"
   hosts: grommunio:k8s_control_plane:k8s_workers
   become: true
+  vars_files:
+    - ../group_vars/all.yml
   roles:
     - os_hardening

@@ -57,6 +57,32 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 | `playbooks/seafile.yml` | `SHARE_LINK_LOGIN_REQUIRED`, per-role share link generation permission, OnlyOffice connector | 2.11, 1.5 |
 | `playbooks/onlyoffice.yml` | `document.permissions.chat: false` by default | 2.6 |
 
+## Domain configuration
+
+Every domain variable used across these playbooks and roles
+(`libre365_domain`, `onlyoffice_domain`, `seafile_domain`,
+`vikunja_domain`, `gokapi_domain`, `novu_domain`, `peertube_domain`,
+`grommunio_domain`, `matrix_domain`, `keycloak_base_url`) is defined
+exactly once, in `group_vars/all.yml`, which reads them live from
+`../../platform.yaml`'s `domains` section — the same single source of
+truth `scripts/sync_platform.py` patches into `infra/k8s/`. Never
+hardcode a subdomain in a playbook, a role default, or a template:
+add it to `platform.yaml` and reference the corresponding
+`group_vars/all.yml` variable instead, or Ansible's configuration will
+silently drift from the Caddy/Ingress/DNS configuration actually
+serving the domain (this happened once — see git history on
+`group_vars/all.yml` — and produced a broken Keycloak OIDC
+`redirect_uri` for OnlyOffice, Vikunja, Gokapi and PeerTube).
+
+**Every playbook must declare `vars_files: [../group_vars/all.yml]`
+explicitly.** Ansible's implicit directory-based `group_vars/`
+auto-loading does not trigger for this repository's layout, in either
+invocation pattern (a single `playbooks/*.yml` run directly, or via
+`site.yml`'s `import_playbook`) — verified empirically. Omitting the
+explicit `vars_files:` from a new playbook will leave every domain
+variable undefined at runtime rather than raising an error at
+`--syntax-check` time, so this is easy to miss.
+
 ## Roles
 
 `roles/keycloak_realm/` is the reference role: the

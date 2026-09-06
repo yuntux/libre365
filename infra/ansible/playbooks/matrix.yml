@@ -13,6 +13,8 @@
   hosts: matrix
   connection: local
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
   vars:
     synapse_server_name: "{{ matrix_domain }}"
     synapse_config_configmap: "synapse-homeserver-config"
