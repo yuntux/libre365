@@ -35,8 +35,8 @@
       "schedule": ["before 6am on monday"]
     },
     {
-      "description": "npm dependencies of each in-house connector (chapter 2), grouped per connector to keep a 1:1 correspondence with the unit tests of the connector concerned (see lint-and-test.yml).",
-      "matchManagers": ["npm"],
+      "description": "Python dependencies (requirements*.txt) of each in-house connector (chapter 2, migrated from Node/TypeScript to Python/FastAPI), grouped per connector to keep a 1:1 correspondence with the unit tests of the connector concerned (see lint-and-test.yml).",
+      "matchManagers": ["pip_requirements"],
       "matchFileNames": ["connectors/**"],
       "groupName": "connector {{parentDir}}",
       "groupSlug": "connector-{{parentDir}}",
@@ -50,8 +50,8 @@
       "automerge": false
     },
     {
-      "description": "Security fixes (CVE) on connector npm dependencies: higher priority, no automerge (validation via lint-and-test.yml required).",
-      "matchManagers": ["npm"],
+      "description": "Security fixes (CVE) on connector Python dependencies: higher priority, no automerge (validation via lint-and-test.yml required).",
+      "matchManagers": ["pip_requirements"],
       "vulnerabilityAlerts": true,
       "prPriority": 10,
       "automerge": false
