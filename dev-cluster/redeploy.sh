@@ -76,10 +76,16 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
     openbao) chart="openbao/openbao" ;;
     external-secrets) chart="external-secrets/external-secrets" ;;
   esac
+  # --skip-schema-validation for novu only - see deploy.sh's own comment on
+  # its `helm upgrade --install novu` line: every published version of this
+  # community chart ships a values.schema.json with a real authoring bug
+  # that fails schema validation unconditionally, regardless of values.
+  extra_args=()
+  [ "$target" = "novu" ] && extra_args=(--skip-schema-validation)
   if [ -n "$chart_version" ]; then
-    helm upgrade --install "$target" "$chart" --version "$chart_version" -n "$NAMESPACE" -f "$base" -f "$dev_overlay"
+    helm upgrade --install "$target" "$chart" --version "$chart_version" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
   else
-    helm upgrade --install "$target" "$chart" -n "$NAMESPACE" -f "$base" -f "$dev_overlay"
+    helm upgrade --install "$target" "$chart" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
   fi
   echo "==> Force-deleting its pod(s) so the new values are picked up immediately"
   kubectl delete pod -n "$NAMESPACE" -l "app.kubernetes.io/instance=${target}" --grace-period=0 --force --ignore-not-found

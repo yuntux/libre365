@@ -53,6 +53,8 @@ resources:
     cpu: "200m"
     memory: "128Mi"
 
+# [CORRECTED] see oauth2-proxy-onlyoffice.yaml's own comment: `service.port`
+# no longer exists in the official chart, renamed to `service.portNumber`.
 service:
   type: ClusterIP
-  port: 4180
+  portNumber: 4180
