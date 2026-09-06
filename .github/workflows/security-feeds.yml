@@ -1,0 +1,38 @@
+name: Security feeds monitoring
+
+# Implements the second half of study 5.2 "Monitoring for vulnerabilities
+# (CVE)" (lines 775-779): "Subscribing to each component's official
+# security feeds [...] to be alerted independently of the automated scan
+# cycle" -- the scan cycle itself is cve-scan.yml (Trivy against container
+# images). Polls each component's official Atom/RSS feed
+# (scripts/security_feeds.py) and opens a GitHub Issue for each new entry
+# not already reported, labeled "security" so it surfaces next to the
+# Trivy findings already routed there by cve-scan.yml.
+
+on:
+  schedule:
+    # Independent cadence from the daily Trivy scan (5.2: "independently
+    # of the automated scan cycle"), off-peak.
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  poll-feeds:
+    name: Poll official security feeds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Poll feeds and open an issue for each new entry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/security_feeds.py
