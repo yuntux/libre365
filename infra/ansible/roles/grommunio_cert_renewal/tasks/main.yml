@@ -1,0 +1,15 @@
+---
+# grommunio_cert_renewal role — see README.md for the full rationale
+# (verified against grommunio's own documentation: certbot, not acme.sh,
+# is the underlying ACME client the appliance's Let's Encrypt option
+# uses). Initial certificate issuance stays a manual/semi-interactive
+# step (same convention as the rest of Grommunio's installation, see
+# infra/terraform/grommunio.tf) — this role only guarantees the ongoing
+# renewal timer is actually enabled.
+
+- name: "Ensure certbot's systemd timer is enabled and running"
+  ansible.builtin.systemd:
+    name: certbot.timer
+    enabled: true
+    state: started
+  when: grommunio_cert_renewal_enabled

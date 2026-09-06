@@ -1,0 +1,15 @@
+---
+# Keeps Let's Encrypt renewal running on the Grommunio VM - see
+# ../roles/grommunio_cert_renewal/README.md for the full rationale
+# (Grommunio is deliberately not Caddy-fronted, so it doesn't get Caddy's
+# own Automatic HTTPS, and needs its own certificate lifecycle - only the
+# ongoing renewal is automated here, initial issuance stays a manual step,
+# same convention as the rest of Grommunio's semi-interactive
+# installation).
+- name: "Keep Grommunio's Let's Encrypt renewal (certbot.timer) enabled"
+  hosts: grommunio
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+  roles:
+    - grommunio_cert_renewal

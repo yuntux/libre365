@@ -40,6 +40,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/os-hardening.yml
 ansible-playbook -i inventory/hosts.ini playbooks/openbao-config.yml
 ansible-playbook -i inventory/hosts.ini playbooks/keycloak-realm.yml
 ansible-playbook -i inventory/hosts.ini playbooks/grommunio.yml
+ansible-playbook -i inventory/hosts.ini playbooks/grommunio-cert-renewal.yml
 ansible-playbook -i inventory/hosts.ini playbooks/matrix.yml
 ansible-playbook -i inventory/hosts.ini playbooks/seafile.yml
 ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
@@ -53,6 +54,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 | `playbooks/openbao-config.yml` | OpenBao Kubernetes auth method + `external-secrets` policy/role for External Secrets Operator (via the `openbao_config` role) — **read its role's README for prerequisites (OpenBao must already be initialized/unsealed)** | 4.5 |
 | `playbooks/keycloak-realm.yml` | Main realm, TOTP + WebAuthn/FIDO2, per-component OIDC clients (via the `keycloak_realm` role) | 1.7 |
 | `playbooks/grommunio.yml` | `GAL_ENABLED`/`GAL_CACHE_TTL`, disabling the web admin, EWS/EAS/MAPI enabled | 1.1, 2.13 |
+| `playbooks/grommunio-cert-renewal.yml` | Keeps `certbot.timer` enabled for Grommunio's Let's Encrypt certificate (via the `grommunio_cert_renewal` role) — **read its role's README for the manual initial-issuance step this doesn't automate** | not a numbered requirement — closes a gap noted during review |
 | `playbooks/matrix.yml` | `server_name`, Synapse OIDC provider pointing to Keycloak | 1.2, 1.7 |
 | `playbooks/seafile.yml` | `SHARE_LINK_LOGIN_REQUIRED`, per-role share link generation permission, OnlyOffice connector | 2.11, 1.5 |
 | `playbooks/onlyoffice.yml` | `document.permissions.chat: false` by default | 2.6 |
