@@ -61,7 +61,7 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
   case "$target" in
     keycloak-postgres) chart="bitnami/postgresql" ;;
     synapse) chart="ananace-charts/matrix-synapse" ;;
-    element-web) chart="ananace-charts/matrix-element-web" ;;
+    element-web) chart="ananace-charts/element-web" ;;
     seafile) chart="seafile-charts/ce" ;;
     onlyoffice) chart="onlyoffice/docs" ;;
     vikunja) chart="vikunja/vikunja" ;;
