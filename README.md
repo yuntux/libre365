@@ -330,16 +330,11 @@ Most of the stack now runs on a local [k3d](https://k3d.io/) Kubernetes
 cluster that reuses the production Helm charts (chapter 4.4), hardened for
 dev speed — see [`dev-cluster/README.md`](./dev-cluster/README.md) for the
 full rationale. Only `grommunio-dev` remains on docker-compose (no
-production Kubernetes counterpart worth reusing — see that same README):
+production Kubernetes counterpart worth reusing — see that same README).
+A single command brings up both, installing `docker`/`kubectl`/`helm`/`k3d`
+first if any is missing (Ubuntu/Debian only — see the script's own header):
 
 ```bash
-# grommunio-dev (docker-compose)
-cd dev-cluster/grommunio-dev
-cp .env.example .env
-docker compose up -d
-cd ../..
-
-# everything else (k3d, reusing infra/k8s/)
 ./dev-cluster/deploy.sh
 ```
 
