@@ -113,8 +113,14 @@ echo "==> 7/12 Keycloak instance (Operator CR, not a Helm release)"
 # Applied after the operator (step 4/12) and keycloak-postgres (step
 # 6/12) above, since it references both - see
 # infra/k8s/manifests/keycloak.yaml's header for why this isn't a Helm
-# release like everything else in step 6/12.
-kubectl apply -f infra/k8s/manifests/keycloak.yaml
+# release like everything else in step 6/12. The dev/ variant (not the
+# production manifest) is applied here: unlike every Helm-backed brick,
+# Keycloak has no `-f base -f dev/` overlay to shrink it, so
+# infra/k8s/manifests/dev/keycloak.yaml is a full second CR instead -
+# single instance, dev-sized resources (see its own header for why
+# applying the production 2-instance/2Gi-request sizing here used to eat
+# most of a modest dev machine's RAM before anything else even started).
+kubectl apply -f infra/k8s/manifests/dev/keycloak.yaml
 kubectl wait --for=condition=Ready keycloak/keycloak -n "$NAMESPACE" --timeout=180s
 
 echo "==> 8/12 Keycloak realm + OIDC clients + test user (study 1.7/4.4)"

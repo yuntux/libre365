@@ -28,7 +28,8 @@ CLUSTER_NAME="libre365-dev"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
 # Keycloak itself is NOT in this list: it's an Operator CR now, not a Helm
 # release (see infra/k8s/manifests/keycloak.yaml) - iterate on it with
-# `kubectl apply -f infra/k8s/manifests/keycloak.yaml`, the same way as
+# `kubectl apply -f infra/k8s/manifests/dev/keycloak.yaml` (the dev-sized
+# CR deploy.sh itself applies, not the production one), the same way as
 # gokapi/caddy's raw manifests (also not covered by this script).
 HELM_CHARTS=(keycloak-postgres synapse element-web seafile onlyoffice vikunja seaweedfs peertube novu external-dns openbao external-secrets)
 

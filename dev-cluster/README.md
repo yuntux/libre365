@@ -273,8 +273,10 @@ docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
 # Fast inner loop after editing a Helm values file
 ./dev-cluster/redeploy.sh seaweedfs
 
-# Keycloak itself is an Operator CR, not a Helm release - re-apply directly
-kubectl apply -f infra/k8s/manifests/keycloak.yaml
+# Keycloak itself is an Operator CR, not a Helm release - re-apply the
+# dev-sized CR directly (never the production infra/k8s/manifests/keycloak.yaml
+# here - see infra/k8s/manifests/dev/keycloak.yaml's own header)
+kubectl apply -f infra/k8s/manifests/dev/keycloak.yaml
 
 # Tear the cluster down entirely
 ./dev-cluster/destroy.sh
@@ -300,6 +302,11 @@ instead of docker-compose — see `../tests/integration/README.md`.
   from the real, production `../infra/k8s/manifests/caddy.yaml` — see
   "Testing Keycloak SSO/OIDC end-to-end" above. That file's
   Deployment/Service stay hand-written.
+- `../infra/k8s/manifests/dev/keycloak.yaml` is hand-written, NOT generated:
+  unlike every Helm-backed brick, Keycloak has no `-f base -f dev/` overlay
+  to shrink production sizing, so this is a full second CR (single
+  instance, dev-sized resources) applied instead of the production one —
+  see its own header for why.
 - `deploy.sh`, `redeploy.sh`, `destroy.sh`, `lib-expose.sh`,
   `check-external-dns.sh`, `seed-openbao-dev-secrets.sh`,
   `check-external-secrets.sh`, `patch-coredns-hosts.sh`,
