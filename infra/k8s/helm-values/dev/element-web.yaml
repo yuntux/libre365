@@ -5,7 +5,7 @@
 # the same "applied second, on top" role for the dev tier.
 #
 # Usage:
-#   helm upgrade --install element-web ananace-charts/matrix-element-web \
+#   helm upgrade --install element-web ananace-charts/element-web \
 #     -n libre365-dev -f element-web.yaml -f dev/element-web.yaml
 #
 # Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are

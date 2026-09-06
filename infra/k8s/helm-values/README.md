@@ -106,7 +106,7 @@ instead of a separate cascade file.
 | Component | Chart | Helm repo |
 |---|---|---|
 | Synapse (Matrix) | `matrix-synapse` (ananace-chart) | https://ananace.gitlab.io/charts |
-| Element Web | `matrix-element-web` (ananace-chart) | https://ananace.gitlab.io/charts |
+| Element Web | `element-web` (ananace-chart) | https://ananace.gitlab.io/charts |
 | Element Call | no official chart — "chart-like" values manifest, to be adapted as raw | — |
 | Visio (LaSuite Meet) | `suitenumerique/meet` if published, otherwise raw manifest | https://github.com/suitenumerique/meet |
 | Seafile | chart `ce` published by `haiwen` (Seafile's own GitHub org) | https://haiwen.github.io/seafile-helm-chart/repo ([UNCERTAIN]: found via that org's own README, but this sandboxed environment's egress proxy blocks `*.github.io` outright, so the index.yaml itself was never independently fetched - the previous URL here, `seafile-charts.github.io/seafile-charts`, was fabricated and 404s) |
@@ -156,7 +156,7 @@ helm upgrade --install seafile seafile-charts/ce -n libre365 -f seafile.yaml
 helm upgrade --install seaweedfs seaweedfs/seaweedfs -n libre365 -f seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n libre365 -f peertube.yaml
 helm upgrade --install novu oci://ghcr.io/nova-edge/charts/novu --version 0.2.1 -n libre365 -f novu.yaml
-helm upgrade --install element-web ananace-charts/matrix-element-web -n libre365 -f element-web.yaml
+helm upgrade --install element-web ananace-charts/element-web -n libre365 -f element-web.yaml
 helm upgrade --install keycloak-postgres bitnami/postgresql -n libre365 -f keycloak-postgres.yaml
 
 # Component with a scale overlay (example: 100-user target)

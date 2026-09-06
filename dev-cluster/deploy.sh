@@ -270,7 +270,7 @@ helm upgrade --install keycloak-postgres bitnami/postgresql -n "$NAMESPACE" \
   -f infra/k8s/helm-values/keycloak-postgres.yaml -f infra/k8s/helm-values/dev/keycloak-postgres.yaml
 helm upgrade --install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
   -f infra/k8s/helm-values/synapse.yaml -f infra/k8s/helm-values/dev/synapse.yaml
-helm upgrade --install element-web ananace-charts/matrix-element-web -n "$NAMESPACE" \
+helm upgrade --install element-web ananace-charts/element-web -n "$NAMESPACE" \
   -f infra/k8s/helm-values/element-web.yaml -f infra/k8s/helm-values/dev/element-web.yaml
 helm upgrade --install seafile seafile-charts/ce -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seafile.yaml -f infra/k8s/helm-values/dev/seafile.yaml
