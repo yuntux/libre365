@@ -325,10 +325,31 @@ services:
     helm: null
 
   grommunio_dev:
-    version: "core-c9" # dev/test image only, see study 4.3
-    ports: { GROMMUNIO_DEV_HTTP_PORT: 8443 }
+    # [CORRECTED] the image/tag below used to be "grommunio/gromox-container:
+    # core-c9" - that repository does not exist on Docker Hub at all (a real
+    # `docker compose up` fails immediately with "pull access denied...
+    # repository does not exist"), found while actually running this stack.
+    # The real image, verified against grommunio/gromox-container's own
+    # docker-compose.yml (github.com/grommunio/gromox-container) and Docker
+    # Hub's tag list API for grommunio/gromox-core, is "grommunio/gromox-core"
+    # - version below is the most recent tag that repository has ever
+    # published (verified via the Docker Hub API, not guessed); grommunio only
+    # publishes early/experimental tags for this image (0.1 through 0.3, all
+    # against openSUSE Leap 15.x base images) - [UNCERTAIN] whether a more
+    # current one exists that Docker Hub's public tag-list API doesn't
+    # surface, not otherwise verifiable from this sandboxed environment.
+    version: "0.3-opensuse-leap-15-4" # dev/test image only, see study 4.3
+    ports:
+      GROMMUNIO_DEV_HTTP_PORT: 8443
+      # Added because the test suite (tests/integration/test_mail_grommunio.py)
+      # actually needs SMTP/IMAP reachable on localhost for its send/receive
+      # scenario (study 5.5) - the previous version of this file only ever
+      # exposed the admin port, so that test could never have passed against
+      # this compose stack even once the image name above is fixed.
+      GROMMUNIO_DEV_SMTP_PORT: 587
+      GROMMUNIO_DEV_IMAP_PORT: 993
     compose:
-      image: grommunio/gromox-container
+      image: grommunio/gromox-core
     helm: null # study 4.3: Proxmox VM appliance in production, never a
       # Kubernetes container - no equivalent Helm file to synchronize.
 

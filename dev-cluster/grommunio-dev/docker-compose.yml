@@ -33,6 +33,7 @@ networks:
 
 volumes:
   grommunio-dev-data:
+  grommunio-dev-mysql-data:
 
 services:
 
@@ -41,23 +42,102 @@ services:
   # ---------------------------------------------------------------------
   # The study (4.3) explicitly selects Grommunio as a Proxmox VM appliance
   # for PRODUCTION, not as a container: the official container packaging
-  # (grommunio/gromox-container) is presented by the vendor itself as a
+  # (grommunio/gromox-core) is presented by the vendor itself as a
   # solution for special needs, not production-ready (bundles
   # nginx/Postfix/gromox/Redis/PHP-FPM under a single supervisord).
   # It is included HERE only so integration tests (send/receive mail,
   # study 5.5) can run in CI without a Proxmox VM.
   # DO NOT reproduce this service as-is in a staging/production environment.
-  grommunio-dev:
-    image: grommunio/gromox-container:core-c9
+  #
+  # [CORRECTED] this service used to reference "grommunio/gromox-container"
+  # (a repository that does not exist on Docker Hub at all - `docker compose
+  # up` failed immediately with "pull access denied ... repository does not
+  # exist") and a handful of invented environment variables
+  # (GROMMUNIO_ADMIN_PASSWORD alone, no database wiring at all). Found while
+  # actually running this stack, then rebuilt against the real
+  # grommunio/gromox-container project's own docker-compose.yml/var.env
+  # (github.com/grommunio/gromox-container): the real image needs its own
+  # MariaDB (grommunio-dev-db below) and a different, larger set of env vars
+  # (FQDN/DOMAIN/ADMIN_PASS/MYSQL_*), which is why this service is
+  # considerably more filled in than before.
+  grommunio-dev-db:
+    # Same pinned version as every other MariaDB usage in this repo
+    # (platform.yaml's `shared.mariadb`) - kept in sync by
+    # scripts/sync_platform.py's existing generic `sub_image_tag(text,
+    # "mariadb", ...)` call, no dedicated platform.yaml entry needed for
+    # this one.
+    image: mariadb:10.11
     restart: unless-stopped
     environment:
-      TZ: ${GROMMUNIO_TIMEZONE:-Europe/Paris}
-      GROMMUNIO_ADMIN_PASSWORD: ${GROMMUNIO_ADMIN_PASSWORD:-devonly-changeme-grommunio-admin}
+      MYSQL_ROOT_PASSWORD: ${GROMMUNIO_MYSQL_ROOT_PASSWORD:-devonly-changeme-grommunio-mysql-root}
+      MYSQL_DATABASE: grommunio
+      MYSQL_USER: grommunio
+      MYSQL_PASSWORD: ${GROMMUNIO_MYSQL_PASSWORD:-devonly-changeme-grommunio-mysql}
+    volumes:
+      - grommunio-dev-mysql-data:/var/lib/mysql
+    networks: [libre365]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  grommunio-dev:
+    image: grommunio/gromox-core:0.3-opensuse-leap-15-4
+    restart: unless-stopped
+    depends_on:
+      grommunio-dev-db:
+        condition: service_healthy
+    environment:
+      TIMEZONE: ${GROMMUNIO_TIMEZONE:-Europe/Paris}
+      # FQDN/DOMAIN: dev-only placeholder values, never resolved on a real
+      # DNS zone - only used by the container itself to generate its
+      # self-signed TLS certificate and its default mail domain, both
+      # already dev-only concerns (see the TLS trust caveat below).
+      FQDN: ${GROMMUNIO_FQDN:-mail.libre365-dev.internal}
+      DOMAIN: ${GROMMUNIO_DOMAIN:-libre365-dev.internal}
+      ADMIN_PASS: ${GROMMUNIO_ADMIN_PASSWORD:-devonly-changeme-grommunio-admin}
+      MYSQL_HOST: grommunio-dev-db
+      MYSQL_USER: grommunio
+      MYSQL_PASS: ${GROMMUNIO_MYSQL_PASSWORD:-devonly-changeme-grommunio-mysql}
+      MYSQL_DB: grommunio
+      # [UNCERTAIN] whether gromox-core itself ever needs root-level DB
+      # access (var.env, this image's own template, lists a bare
+      # MYSQL_ROOT_PASS alongside the MYSQL_* app-credential set above,
+      # suggesting first-run schema creation might use it) - not verifiable
+      # from this sandboxed environment (docs.grommunio.com is unreachable
+      # here). Passed through as the safe superset: harmless if unused,
+      # required if it turns out to be.
+      MYSQL_ROOT_PASS: ${GROMMUNIO_MYSQL_ROOT_PASSWORD:-devonly-changeme-grommunio-mysql-root}
+      # This dev/test stack only ever needs mail (study 4.6's own scope,
+      # see the file header) - chat/files/office are covered elsewhere in
+      # this repo by Matrix, Seafile and OnlyOffice respectively, so the
+      # bundled groupware modules those would otherwise require (each with
+      # its own MariaDB) are turned off here.
+      ENABLE_OFFICE: "false"
+      ENABLE_FILES: "false"
+      ENABLE_ARCHIVE: "false"
     volumes:
       - grommunio-dev-data:/etc/gromox
     ports:
       - "${GROMMUNIO_DEV_HTTP_PORT:-8443}:8443"
+      # Only the 2 mail ports tests/integration/test_mail_grommunio.py
+      # actually exercises (SMTP submission + IMAPS) are published - the
+      # container also listens on 25/80/110/143/443/465/995 internally, none
+      # of which anything in this repo currently needs from the host.
+      - "${GROMMUNIO_DEV_SMTP_PORT:-587}:587"
+      - "${GROMMUNIO_DEV_IMAP_PORT:-993}:993"
     networks: [libre365]
     # No documented standard healthcheck for this image (usage not
     # recommended in prod by the vendor itself, see comment above) -
     # wait-for-healthy.sh falls back to a simple TCP check for this service.
+    #
+    # [UNCERTAIN, pre-existing and NOT fixed here] test_mail_grommunio.py
+    # connects over IMAPS/STARTTLS with Python's default SSLContext (real
+    # certificate verification, no override) - this container's self-signed
+    # certificate (FQDN above) will not validate against that default
+    # context. This was already broken independently of the wrong image
+    # name/missing database fixed in this same change; fixing it (installing
+    # the container's CA into the test runner's trust store, or generating a
+    # cert some other way) is a separate piece of work, not something to
+    # guess at without a live cluster to verify against.

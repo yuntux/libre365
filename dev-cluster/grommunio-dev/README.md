@@ -61,7 +61,7 @@ details.
 
 | Service | Image | Host port | Default credentials (dev only) |
 |---|---|---|---|
-| `grommunio-dev` | `grommunio/gromox-container:core-c9` | 8443 | admin / `devonly-changeme-grommunio-admin` - **dev/test only, see below** |
+| `grommunio-dev` | `grommunio/gromox-core:0.3-opensuse-leap-15-4` | 8443, 587, 993 | admin / `devonly-changeme-grommunio-admin` - **dev/test only, see below** |
 
 The host port is overridable via `.env` (see `.env.example`) in case of
 conflict with a service already running on the machine.
@@ -81,7 +81,7 @@ cluster instead - see `../dev-cluster/README.md` for its own port mapping.
 |---|---|---|---|
 | Orchestrator (this file) | Docker Compose, single host, only `grommunio-dev` | Kubernetes (Helm per building block), horizontal scaling and HA | 4.4 |
 | Orchestrator (everything else) | k3d local Kubernetes cluster reusing the production Helm charts/values, see `../dev-cluster/README.md` | Kubernetes (Helm per building block), horizontal scaling and HA | 4.4 |
-| Grommunio (mail/calendar) | `grommunio/gromox-container` container (image described as "not production-ready" by the vendor itself) | Dedicated Proxmox appliance VM, outside Kubernetes | 4.3 |
+| Grommunio (mail/calendar) | `grommunio/gromox-core` container (image described as "not production-ready" by the vendor itself) | Dedicated Proxmox appliance VM, outside Kubernetes | 4.3 |
 | Notification center (Novu) | Real `novu/novu` chart on the k3d dev cluster, with a dev-hardening overlay (single replica per component) - see `../dev-cluster/README.md` | Full Novu stack (`novu/api` + `novu/worker` + `novu/ws` + MongoDB + Redis), see `https://docs.novu.co/self-hosting` | 2.1 |
 | Secrets | In cleartext in `.env` (explicit "dev only" values) | Dedicated vault (Vault or equivalent), never in cleartext in the repository | 4.5 |
 | TLS / certificates | Absent (plain HTTP on localhost) | End-to-end TLS | 4.2, 4.4 |
@@ -92,7 +92,7 @@ cluster instead - see `../dev-cluster/README.md` for its own port mapping.
 
 The study (4.3) is explicit: Grommunio is deployed as a Proxmox appliance VM
 in production, precisely because its official container image
-(`grommunio/gromox-container`) is presented by the vendor itself as not
+(`grommunio/gromox-core`) is presented by the vendor itself as not
 production-ready (a bundle of nginx/Postfix/gromox/Redis/PHP-FPM under a
 single supervisord). This docker-compose setup is a development/test
 environment, not a replica of the production topology: including this
