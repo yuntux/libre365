@@ -1,0 +1,44 @@
+---
+# grommunio_cert role — see README.md for the full rationale. Verified
+# against grommunio's own documentation: certbot, not acme.sh, is the
+# underlying ACME client behind the appliance's own "Let's Encrypt"
+# option, storing certs under /etc/grommunio/ssl via a deploy-hook the
+# grommunio-setup package itself installs. Fully automated (issuance
+# AND renewal) - no manual/wizard step, using certbot's own non-
+# interactive flags rather than the interactive grommunio-setup wizard.
+
+- name: "Install certbot"
+  ansible.builtin.apt:
+    name: certbot
+    state: present
+    update_cache: true
+  when: grommunio_cert_enabled
+
+- name: "Build the -d <domain> arguments for certbot (one pair per hostname)"
+  ansible.builtin.set_fact:
+    grommunio_cert_domain_args: "{{ (grommunio_cert_domain_args | default([])) + ['-d', item] }}"
+  loop: "{{ grommunio_cert_domains }}"
+  when: grommunio_cert_enabled
+
+- name: "Obtain the initial Let's Encrypt certificate (idempotent - skipped once it exists)"
+  ansible.builtin.command:
+    argv: "{{ ['certbot', 'certonly', '-n', '--standalone', '--agree-tos', '--register-unsafely-without-email', '--preferred-challenges', 'http', '--cert-name', grommunio_cert_name] + grommunio_cert_domain_args + ['--pre-hook', 'systemctl stop ' + grommunio_cert_web_service, '--post-hook', 'systemctl start ' + grommunio_cert_web_service, '--deploy-hook', '/usr/share/grommunio-setup/grommunio-certbot-renew-hook'] }}"
+    creates: "/etc/letsencrypt/live/{{ grommunio_cert_name }}/fullchain.pem"
+  when: grommunio_cert_enabled
+  # --register-unsafely-without-email: no interactive prompt for an
+  # account email either, so this whole task never blocks waiting on
+  # input - the tradeoff (no Let's Encrypt expiry-warning emails / account
+  # recovery path) is deliberate: certbot.timer below is what actually
+  # keeps the certificate valid, an email reminder isn't load-bearing here.
+  # --pre-hook/--post-hook briefly free port 80 for the HTTP-01 challenge
+  # (certbot's own standard mechanism) and get saved into certbot's
+  # renewal configuration, so `certbot renew` (via certbot.timer) reuses
+  # them automatically on every future renewal too - no separate renewal-
+  # specific hook wiring needed here.
+
+- name: "Ensure certbot's systemd timer is enabled and running"
+  ansible.builtin.systemd:
+    name: certbot.timer
+    enabled: true
+    state: started
+  when: grommunio_cert_enabled

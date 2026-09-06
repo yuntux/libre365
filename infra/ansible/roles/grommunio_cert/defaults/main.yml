@@ -1,0 +1,22 @@
+---
+grommunio_cert_enabled: true
+
+# The multi-domain certificate covers both hostnames Grommunio answers for
+# directly (see docs/clients.md): mail.<domain> and autodiscover.<domain>.
+# cert_name is certbot's own identifier for the certificate (its live/
+# renewal-config directory name) — using the primary hostname, following
+# the exact convention grommunio's own documentation uses in its own
+# multi-domain example.
+grommunio_cert_name: "{{ grommunio_domain }}"
+grommunio_cert_domains:
+  - "{{ grommunio_domain }}"
+  - "{{ grommunio_autodiscover_domain }}"
+
+# certbot --standalone briefly binds port 80 itself for the HTTP-01
+# challenge - gromox-http.service (already managed by
+# playbooks/grommunio.yml) needs to be stopped for that instant. Same
+# caveat already accepted elsewhere in this repo for gromox unit names
+# (see playbooks/grommunio.yml's own comment on gromox-adaptor.service):
+# reasoned by analogy with that file's already-used gromox-http.service,
+# not independently verified against a live appliance.
+grommunio_cert_web_service: "gromox-http.service"

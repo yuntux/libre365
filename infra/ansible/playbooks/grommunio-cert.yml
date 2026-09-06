@@ -1,0 +1,13 @@
+---
+# Fully automates Let's Encrypt for the Grommunio VM (issuance AND
+# renewal, no manual step) - see ../roles/grommunio_cert/README.md for
+# the full rationale (Grommunio is deliberately not Caddy-fronted, so it
+# doesn't get Caddy's own Automatic HTTPS, and needs its own certificate
+# lifecycle).
+- name: "Automate Grommunio's Let's Encrypt certificate (certbot: issuance + certbot.timer)"
+  hosts: grommunio
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+  roles:
+    - grommunio_cert

@@ -6,7 +6,7 @@ block/connector.
 
 | Building block / topic | Study section | Location in the repository |
 |---|---|---|
-| Grommunio (mail/calendar) | 1.1 | `infra/terraform/grommunio.tf`, `infra/ansible/playbooks/grommunio.yml`; TLS renewal: `infra/ansible/playbooks/grommunio-cert-renewal.yml` |
+| Grommunio (mail/calendar) | 1.1 | `infra/terraform/grommunio.tf`, `infra/ansible/playbooks/grommunio.yml`; TLS (issuance + renewal): `infra/ansible/playbooks/grommunio-cert.yml` |
 | Matrix / Synapse / Element | 1.2 | `infra/k8s/helm-values/synapse.yaml`, `infra/ansible/playbooks/matrix.yml` |
 | Video conferencing (DINUM/LiveKit) + Element Call | 1.3 | `infra/k8s/helm-values/visio.yaml`, `infra/k8s/helm-values/element-call.yaml` |
 | Seafile | 1.4 | `infra/k8s/helm-values/seafile.yaml` |

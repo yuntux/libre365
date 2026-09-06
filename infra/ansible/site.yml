@@ -29,8 +29,8 @@
 - name: "3. Grommunio appliance VM (CardDAV GAL, web admin disabled — study 1.1, 2.13)"
   import_playbook: playbooks/grommunio.yml
 
-- name: "3b. Keep Grommunio's Let's Encrypt renewal enabled (certbot.timer — closes a gap noted during review)"
-  import_playbook: playbooks/grommunio-cert-renewal.yml
+- name: "3b. Automate Grommunio's Let's Encrypt certificate (certbot, issuance + renewal — closes a gap noted during review)"
+  import_playbook: playbooks/grommunio-cert.yml
 
 - name: "4. Matrix/Synapse domain and OIDC provider (study 1.2)"
   import_playbook: playbooks/matrix.yml
