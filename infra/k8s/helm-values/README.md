@@ -21,6 +21,17 @@ pip install -r ../../../scripts/requirements.txt
 python3 ../../../scripts/sync_platform.py
 ```
 
+## Domain names: also a single source of truth
+
+Every `sso.libre365.example.org`-style hostname in this directory (Ingress
+hostnames/TLS, OIDC issuer/endpoint URLs, `LIVEKIT_URL`, etc.) is generated
+the same way, from `platform.yaml`'s `domains:` section — **do not edit a
+domain directly in a file in this folder** for the same reason as image
+tags above. To change the shared base domain (e.g. before pointing
+production at a real bought domain instead of the `example.org`
+placeholder), edit `platform.yaml`'s `domains.base` and re-run
+`sync_platform.py`.
+
 ## Naming convention: `-100` / `-2000` overlays
 
 For components whose sizing really varies with scale (Synapse, OnlyOffice,

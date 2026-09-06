@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Synchronizes every consumer file from `platform.yaml` (single source of
-image versions and ports, see that file's header for the rationale).
+image versions, ports, and public domain names, see that file's header for
+the rationale).
 
 Usage:
     python3 scripts/sync_platform.py            # applies the changes
@@ -12,9 +13,11 @@ Usage:
 Files touched:
     - dev-cluster/grommunio-dev/docker-compose.yml (image tag, patched in place)
     - dev-cluster/grommunio-dev/.env.example       (generated ports block)
-    - infra/k8s/helm-values/*.yaml        (image.repository / image.tag)
-    - infra/k8s/manifests/gokapi.yaml     (raw `image:` line)
-    - connectors/*/Dockerfile             (Node base tag, patched in place)
+    - infra/k8s/helm-values/*.yaml        (image.repository / image.tag, domain names)
+    - infra/k8s/manifests/gokapi.yaml     (raw `image:` line, domain names)
+    - infra/k8s/manifests/caddy.yaml      (domain names)
+    - connectors/*/Dockerfile             (Python base tag, patched in place)
+    - connectors/thunderbird-filelink-gokapi/manifest.json  (domain name)
     - tests/integration/_platform_defaults.py  (generated file, do not edit)
 
 Never writes to platform.yaml itself.
@@ -91,6 +94,86 @@ def sub_from_tag(text: str, repository: str, new_tag: str) -> str:
         r"(FROM\s+)" + re.escape(repository) + r":[^\s]+"
     )
     return pattern.sub(lambda m: f"{m.group(1)}{repository}:{new_tag}", text)
+
+
+def sub_domain(text: str, subdomain: str, new_base: str) -> str:
+    """Replaces `<subdomain>.<anything-that-looks-like-a-domain>` with
+    `<subdomain>.<new_base>`, anchored on the subdomain label (stable
+    identifier tied to a specific service) rather than on the base domain
+    currently in the file — same principle as sub_image_tag anchoring on the
+    repository name rather than the previous tag, so re-running this after
+    changing `domains.base` in platform.yaml always converges, regardless of
+    what base domain the file currently has.
+
+    The lookbehind (rather than a plain `\\b`) is required: `\\b` alone lets
+    a short subdomain label like "call" match mid-identifier inside an
+    unrelated in-cluster Service DNS name such as
+    "element-call.libre365.svc.cluster.local" (the hyphen before "call" is
+    still a word boundary) — corrupting it into
+    "element-call.libre365.example.org". The lookbehind additionally
+    excludes a preceding word character, dot, or hyphen, so the subdomain
+    must start a fresh hostname label."""
+    pattern = re.compile(r"(?<![\w.-])" + re.escape(subdomain) + r"\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b")
+    return pattern.sub(f"{subdomain}.{new_base}", text)
+
+
+# Files with a "bare" occurrence of the base domain (no subdomain prefix):
+# a Matrix server_name, or the Thunderbird extension's WebExtension ID
+# (`<name>@<domain>` format). Each entry anchors on a stable, unrelated-to-
+# the-domain marker (a YAML key name, or the extension ID's fixed prefix),
+# capturing only the domain portion to replace — sub_domain's subdomain-label
+# anchor doesn't apply here since there is no subdomain.
+_BARE_DOMAIN_PATTERNS = {
+    REPO_ROOT / "infra/k8s/helm-values/element-web.yaml": [
+        r'(server_name:\s*")[^"]*(")',
+    ],
+    REPO_ROOT / "infra/k8s/helm-values/element-call.yaml": [
+        r'(name:\s*DEFAULT_HOMESERVER\s*\n\s*value:\s*")[^"]*(")',
+    ],
+    REPO_ROOT / "connectors/thunderbird-filelink-gokapi/manifest.json": [
+        r'("id":\s*"gokapi-filelink@)[^"]*(")',
+    ],
+}
+
+# Every file containing a subdomain-prefixed public domain name (see
+# platform.yaml's `domains` section for the rationale). Files using only
+# `*.libre365.svc.cluster.local` (in-cluster Service DNS, e.g. the k3d dev
+# manifests) are a different, unrelated namespace and are not listed here.
+DOMAIN_TARGET_FILES = [
+    "infra/k8s/helm-values/keycloak.yaml",
+    "infra/k8s/helm-values/synapse.yaml",
+    "infra/k8s/helm-values/element-web.yaml",
+    "infra/k8s/helm-values/element-call.yaml",
+    "infra/k8s/helm-values/visio-meet.yaml",
+    "infra/k8s/helm-values/seafile.yaml",
+    "infra/k8s/helm-values/onlyoffice.yaml",
+    "infra/k8s/helm-values/vikunja.yaml",
+    "infra/k8s/helm-values/minio.yaml",
+    "infra/k8s/helm-values/peertube.yaml",
+    "infra/k8s/helm-values/novu.yaml",
+    "infra/k8s/manifests/caddy.yaml",
+    "infra/k8s/manifests/gokapi.yaml",
+    "connectors/thunderbird-filelink-gokapi/manifest.json",
+]
+
+
+def compute_domain_changes(platform: dict) -> list[Change]:
+    domains = platform.get("domains")
+    if not domains:
+        return []
+    base = domains["base"]
+    subdomains = domains["subdomains"].values()
+
+    changes = []
+    for rel_path in DOMAIN_TARGET_FILES:
+        path = REPO_ROOT / rel_path
+        text = path.read_text()
+        for subdomain in subdomains:
+            text = sub_domain(text, subdomain, base)
+        for bare_pattern in _BARE_DOMAIN_PATTERNS.get(path, []):
+            text = re.sub(bare_pattern, rf"\g<1>{base}\g<2>", text)
+        changes.append(Change(path, text, f"{rel_path} (domain names)"))
+    return changes
 
 
 def compute_compose_changes(platform: dict) -> list[Change]:
@@ -330,6 +413,7 @@ def main() -> int:
     changes += compute_k3d_config_change(platform)
     changes += compute_env_example_changes(platform)
     changes += compute_test_defaults_changes(platform)
+    changes += compute_domain_changes(platform)
 
     dirty = [c for c in changes if c.is_dirty()]
 

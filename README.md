@@ -37,7 +37,7 @@ The entire infrastructure must be rebuildable from this repository alone
 variables to cover the 100 → 2000+ user growth path without rewrites, never
 hard-coded.
 
-## A single source for versions and ports: `platform.yaml`
+## A single source for versions, ports, and domain names: `platform.yaml`
 
 The development environment (`dev-cluster/`) and the production target
 (`infra/k8s/`) describe the same building blocks through two different
@@ -45,7 +45,9 @@ mechanisms (Docker Hub image vs. Helm chart) for the one brick that stays
 on docker-compose: without precaution, their version tags and their ports
 silently drift apart from one another — this has actually already happened
 once in this repository (the default ports in `tests/integration/` had
-diverged from those in the dev environment).
+diverged from those in the dev environment). The same risk existed for
+public domain names: `sso.libre365.example.org` alone used to be hardcoded
+independently in 8 different files.
 
 [`platform.yaml`](./platform.yaml) is now the only authorized source for
 these values. It feeds:
@@ -56,7 +58,12 @@ these values. It feeds:
 - the generated ports block in `dev-cluster/grommunio-dev/.env.example` and
   `dev-cluster/k3d-config.yaml`;
 - the default ports in `tests/integration/conftest.py`, via the generated
-  file `tests/integration/_platform_defaults.py`.
+  file `tests/integration/_platform_defaults.py`;
+- every public domain name (`domains:` section) across
+  `infra/k8s/helm-values/*.yaml`, `infra/k8s/manifests/*.yaml`, and the
+  Thunderbird extension manifest — see that section's comment for how
+  changing `domains.base` (e.g. to a real bought domain before production)
+  propagates everywhere on the next sync.
 
 Workflow: edit `platform.yaml`, then:
 

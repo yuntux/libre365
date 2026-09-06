@@ -1,5 +1,5 @@
 # =============================================================================
-# libre365 - single registry of versions and ports.
+# libre365 - single registry of versions, ports, and public domain names.
 # =============================================================================
 #
 # This file is the ONLY authorized source for:
@@ -7,9 +7,16 @@
 #     (dev-cluster/, study 4.6) and the production target
 #     (infra/k8s/helm-values, study 4.4);
 #   - the default ports exposed by docker-compose and consumed by the
-#     integration test suite (tests/integration/).
+#     integration test suite (tests/integration/);
+#   - the public domain names (`domains:` below) used across
+#     infra/k8s/helm-values/*.yaml, infra/k8s/manifests/*.yaml, and the
+#     Thunderbird WebExtension manifest — added after the same
+#     `sso.libre365.example.org` string was found hardcoded independently in
+#     8 different files with no single place to change it (e.g. before
+#     pointing the production target at a real bought domain instead of the
+#     `example.org` placeholder used throughout this repository).
 #
-# NEVER edit a tag/port directly in docker-compose.yml,
+# NEVER edit a tag/port/domain directly in docker-compose.yml,
 # infra/k8s/helm-values/*.yaml, infra/k8s/manifests/*.yaml, a connector
 # Dockerfile, or tests/integration/_platform_defaults.py: these files are
 # (re)generated/patched from this one. Workflow:
@@ -267,3 +274,49 @@ dev_cluster:
   servers: 1
   agents: 2
   node_port_range: "3000-32767"
+
+# -----------------------------------------------------------------------------
+# Public domain names (production target only - the k3d dev cluster and
+# docker-compose never use these, see dev-cluster/README.md for how they're
+# reached instead: NodePort/localhost or in-cluster Service DNS).
+#
+# `base` is the one placeholder domain used throughout this repository
+# (study doesn't mandate a real one - to be replaced with an actually
+# purchased domain before any real production deployment). `subdomains`
+# names each service's slot under that base (e.g. `sso` -> the FQDN
+# `sso.libre365.example.org`), so a service's own subdomain choice and the
+# shared base domain are two independent, single-source values instead of
+# the full FQDN being retyped in every Helm values file/manifest that
+# references it (Ingress hostname/TLS, OIDC issuer/endpoint URLs, the
+# Caddy reverse-proxy routing, the Thunderbird extension's WebExtension ID).
+#
+# Patching mechanism (scripts/sync_platform.py, sub_domain()): anchored on
+# the SUBDOMAIN label (e.g. "sso"), never on the previously-generated base -
+# same principle as image tag patching being anchored on the repository
+# name, not the previous tag. This means changing `base` here propagates
+# everywhere on the next sync, repeatably. It does NOT support renaming a
+# subdomain label itself (e.g. changing `sso` to `auth`): the script has no
+# record of what a service's PREVIOUS subdomain was, so it cannot find and
+# rename existing occurrences - that kind of change still has to be made by
+# hand across the files listed in DOMAIN_TARGET_FILES, with this file
+# updated to match afterwards.
+# -----------------------------------------------------------------------------
+domains:
+  base: "libre365.example.org"
+  subdomains:
+    sso: sso # Keycloak (study 1.7)
+    matrix: matrix # Synapse client/federation (study 1.2)
+    chat: chat # Element Web, via Caddy (study 1.2/2.3)
+    call: call # Element Call (study 1.3)
+    visio: visio # LaSuite Meet (study 1.3)
+    livekit: livekit # Shared SFU backend for Visio/Element Call (study 1.3)
+    files: files # Seafile, via Caddy (study 1.4/2.3)
+    office: office # OnlyOffice Document Server, via Caddy (study 1.5/2.3)
+    taches: taches # Vikunja, via Caddy (study 1.6/2.3)
+    depot: depot # Gokapi, via Caddy (study 1.8/2.3)
+    onboarding: onboarding # Static onboarding portal, no injection (study 2.5)
+    videos: videos # PeerTube, via Caddy (study 2.12/2.3)
+    s3: s3 # MinIO API (study 2.12)
+    minio_console: minio-console # MinIO console (study 2.12)
+    notifications: notifications # Novu (study 2.1)
+    registry: registry # Internal image registry (custom Caddy image, study 2.3)
