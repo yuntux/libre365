@@ -196,6 +196,61 @@ jobs:
           fi
           docker compose -f "$compose_file" config
 
+  grommunio-dev-boot-smoke:
+    name: grommunio-dev boot smoke test
+    runs-on: ubuntu-latest
+    # `docker compose config` above only resolves YAML/variable interpolation
+    # - it never contacts a registry, so a renamed/nonexistent image (or an
+    # image that boots but immediately crash-loops on a missing/wrong env
+    # var) passed that check without ever being caught by CI, found instead
+    # by a real deployment on a live machine (grommunio/gromox-container
+    # never existed as a Docker Hub repository). This job actually pulls and
+    # boots the real containers to catch that whole bug class going forward
+    # - cheap enough for a standard runner (2 small containers: MariaDB +
+    # gromox-core), unlike a full dev-cluster/deploy.sh run (see
+    # ephemeral-staging.yml's own comment on why THAT stays manual/
+    # workflow_dispatch: it needs far more RAM than a standard GitHub-hosted
+    # runner reliably offers).
+    #
+    # Deliberately does NOT run tests/integration/test_mail_grommunio.py's
+    # real send/receive scenario here: that test's IMAPS/STARTTLS connection
+    # uses Python's default (certificate-verifying) SSLContext, which
+    # rejects this container's self-signed certificate - a separate,
+    # already-flagged gap (see docker-compose.yml's own comment) independent
+    # of what this job checks for (the containers actually starting and
+    # staying healthy).
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for dev-cluster/grommunio-dev
+        id: check
+        run: |
+          if [ -f "dev-cluster/grommunio-dev/docker-compose.yml" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::dev-cluster/grommunio-dev/docker-compose.yml not present yet - job skipped."
+          fi
+
+      - name: Boot grommunio-dev and wait for it to become healthy
+        if: steps.check.outputs.present == 'true'
+        working-directory: dev-cluster/grommunio-dev
+        run: |
+          set -e
+          cp .env.example .env
+          docker compose up -d
+          ./scripts/wait-for-healthy.sh 180
+
+      - name: Dump logs on failure
+        if: steps.check.outputs.present == 'true' && failure()
+        working-directory: dev-cluster/grommunio-dev
+        run: docker compose logs --tail=200
+
+      - name: Tear down
+        if: steps.check.outputs.present == 'true' && always()
+        working-directory: dev-cluster/grommunio-dev
+        run: docker compose down -v
+
   k8s-manifests-validate:
     name: k8s manifests schema validation
     runs-on: ubuntu-latest
