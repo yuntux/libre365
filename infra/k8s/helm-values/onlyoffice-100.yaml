@@ -2,7 +2,7 @@
 # Reference load, study 1.5 L.195-196: "100 consultants x 20 documents opened in
 # parallel" (2000 potential connections) -> ~8 cores / 16 GB RAM minimum with margin,
 # to be validated with a JMeter load test before going to production (1.5 L.196).
-# Usage: helm upgrade --install onlyoffice onlyoffice/docs-cloud -f onlyoffice.yaml -f onlyoffice-100.yaml
+# Usage: helm upgrade --install onlyoffice onlyoffice/docs -f onlyoffice.yaml -f onlyoffice-100.yaml
 replicaCount: 2 # cluster from the initial design (1.5 L.198), even at 100 users
 
 resources:

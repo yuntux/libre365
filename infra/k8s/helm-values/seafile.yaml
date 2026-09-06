@@ -1,10 +1,14 @@
 # Component: Seafile — file storage and synchronization (study 1.4)
-# Chart used: haiwen/seafile-server has no official Helm chart published by Seafile;
-# community chart adopted: `seafile-charts/seafile-ce`
-#   Helm repo: https://seafile-charts.github.io/seafile-charts (or an equivalent
-#   community fork, e.g. `bahamas10/seafile` on ArtifactHub) — to be confirmed at
-#   deployment time, otherwise fall back to a raw manifest derived from the official
-#   `seafileltd/seafile-mc` Docker image.
+# Chart used: `ce` (Community Edition), published by `haiwen` - Seafile's OWN
+# GitHub org, not a random community fork.
+#   Helm repo: https://haiwen.github.io/seafile-helm-chart/repo
+#   [CORRECTED] the repo/chart name here used to be
+#   "seafile-charts.github.io/seafile-charts" / "seafile-charts/seafile-ce",
+#   which was fabricated and 404s - found by actually running
+#   dev-cluster/deploy.sh. [UNCERTAIN]: found via haiwen/seafile-helm-chart's
+#   own README (github.com, reachable), but this sandboxed environment's
+#   egress proxy blocks *.github.io outright, so the index.yaml itself was
+#   never independently fetched - confirm on first real run.
 #
 # 1.4 L.136 — sizing driven by the volume of stored data and the sync bandwidth, not
 # by the number of active users: no dedicated 100/2000 variant for Seafile (unlike

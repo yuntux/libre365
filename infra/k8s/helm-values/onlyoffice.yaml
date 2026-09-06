@@ -1,7 +1,14 @@
 # Component: OnlyOffice Document Server Community Edition >= 9.4 — study 1.5 L.192-199
-# Chart used: community chart `onlyoffice/docs-cloud` (ArtifactHub) or, failing that,
-#   a raw manifest derived from the official `onlyoffice/documentserver` image.
-#   Helm repo: https://onlyoffice.github.io/docs-cloud-chart (to be confirmed at deployment)
+# Chart used: `docs`, published by ONLYOFFICE itself (github.com/ONLYOFFICE/
+#   Kubernetes-Docs).
+#   Helm repo: https://download.onlyoffice.com/charts/stable
+#   [CORRECTED] the repo/chart name here used to be
+#   "onlyoffice.github.io/docs-cloud-chart" / "onlyoffice/docs-cloud", which
+#   was fabricated and 404s - found by actually running
+#   dev-cluster/deploy.sh. [UNCERTAIN]: found via ONLYOFFICE/Kubernetes-Docs'
+#   own README (github.com, reachable), but this sandboxed environment's
+#   egress proxy blocks download.onlyoffice.com outright, so the index.yaml
+#   itself was never independently fetched - confirm on first real run.
 #
 # 1.5 L.198 — target architecture chosen FROM THE INITIAL DESIGN: Document Server
 # cluster + load balancer + Redis (session storage), rather than a single instance to

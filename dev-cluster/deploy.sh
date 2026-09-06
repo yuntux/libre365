@@ -156,14 +156,32 @@ helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm >/dev/null
 # own comment above (OCI artifact, not an index.yaml-based repo).
 # seafile-charts/onlyoffice/peertube-helm repos are marked "to be confirmed"
 # in infra/k8s/helm-values/README.md (no single identified official chart at
-# the time of writing) - added best-effort here; if a repo add fails because
-# the chart moved, this script keeps going (`|| true`) rather than blocking
-# the whole dev tier on one unresolved brick, but that brick's
-# `helm upgrade --install` a few lines below will then fail loudly, which is
-# the correct behavior (fail on the actual missing chart, not silently skip).
-helm repo add seafile-charts https://seafile-charts.github.io/seafile-charts >/dev/null || true
-helm repo add onlyoffice https://onlyoffice.github.io/docs-cloud-chart >/dev/null || true
-helm repo add peertube-helm https://peertube-helm.github.io/charts >/dev/null || true
+# the time of writing) - if a repo add fails because the chart moved, this
+# script keeps going (`|| true`) rather than blocking the whole dev tier on
+# one unresolved brick, but that brick's `helm upgrade --install` a few
+# lines below will then fail loudly, which is the correct behavior (fail on
+# the actual missing chart, not silently skip).
+#
+# [CORRECTED] all three URLs below used to be fabricated - none of them
+# ever resolved (404 on every single one, found by actually running this
+# script). Replaced with the real repos each project's own current README
+# documents (verified by reading those READMEs directly, not by reaching
+# the gh-pages endpoints themselves - this sandboxed environment's egress
+# proxy blocks arbitrary custom domains including every *.github.io site,
+# so these are still [UNCERTAIN] in the sense that the index.yaml itself
+# wasn't independently fetched - confirm on first real run):
+#   seafile-charts: haiwen's OWN org (Seafile's actual publisher, not a
+#     random community fork) - chart is "ce" (Community Edition), not
+#     "seafile-ce" (see the `helm upgrade --install seafile` line below).
+#   onlyoffice: ONLYOFFICE's OWN download domain (github.com/ONLYOFFICE/
+#     Kubernetes-Docs' documented repo) - chart is "docs", not "docs-cloud"
+#     (see the `helm upgrade --install onlyoffice` line below).
+#   peertube-helm: no official PeerTube chart exists (same "no first-party
+#     chart" situation as Novu) - zendet/peertube-helm chosen as the most
+#     plausible community option found; chart name "peertube" unchanged.
+helm repo add seafile-charts https://haiwen.github.io/seafile-helm-chart/repo >/dev/null || true
+helm repo add onlyoffice https://download.onlyoffice.com/charts/stable >/dev/null || true
+helm repo add peertube-helm https://zendet.github.io/peertube-helm/ >/dev/null || true
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ >/dev/null
 helm repo add openbao https://openbao.github.io/openbao-helm/ >/dev/null || true
 helm repo add external-secrets https://charts.external-secrets.io >/dev/null
@@ -197,8 +215,18 @@ helm upgrade --install openbao openbao/openbao -n "$NAMESPACE" \
   -f infra/k8s/helm-values/openbao.yaml -f infra/k8s/helm-values/dev/openbao.yaml
 helm upgrade --install external-secrets external-secrets/external-secrets -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-secrets.yaml -f infra/k8s/helm-values/dev/external-secrets.yaml
-kubectl rollout status deployment/openbao -n "$NAMESPACE" --timeout=120s 2>/dev/null || \
-  kubectl rollout status statefulset/openbao -n "$NAMESPACE" --timeout=120s
+# [CORRECTED] `kubectl rollout status` only supports the RollingUpdate
+# strategy - found by actually running this script: OpenBao's chart (a
+# HashiCorp Vault fork, inheriting its chart conventions) deploys as a
+# StatefulSet with `updateStrategy: OnDelete` (so an operator can unseal
+# pods one at a time during a real upgrade, not relevant to a single-replica
+# dev instance but still the chart's default), which made `kubectl rollout
+# status statefulset/openbao` fail immediately with "rollout status is only
+# available for RollingUpdate strategy type" - not silenced by `|| true`
+# unlike the Deployment attempt before it, so this stopped the whole script.
+# `kubectl wait --for=condition=Ready` checks pod readiness directly instead
+# of the rollout mechanism, so it works regardless of the update strategy.
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=openbao -n "$NAMESPACE" --timeout=120s
 kubectl apply -f infra/k8s/manifests/dev/external-secrets-store.yaml
 kubectl apply -f infra/k8s/manifests/external-secrets.yaml
 ./dev-cluster/seed-openbao-dev-secrets.sh
@@ -210,9 +238,9 @@ helm upgrade --install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
   -f infra/k8s/helm-values/synapse.yaml -f infra/k8s/helm-values/dev/synapse.yaml
 helm upgrade --install element-web ananace-charts/matrix-element-web -n "$NAMESPACE" \
   -f infra/k8s/helm-values/element-web.yaml -f infra/k8s/helm-values/dev/element-web.yaml
-helm upgrade --install seafile seafile-charts/seafile-ce -n "$NAMESPACE" \
+helm upgrade --install seafile seafile-charts/ce -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seafile.yaml -f infra/k8s/helm-values/dev/seafile.yaml
-helm upgrade --install onlyoffice onlyoffice/docs-cloud -n "$NAMESPACE" \
+helm upgrade --install onlyoffice onlyoffice/docs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice.yaml -f infra/k8s/helm-values/dev/onlyoffice.yaml
 helm upgrade --install vikunja vikunja/vikunja -n "$NAMESPACE" \
   -f infra/k8s/helm-values/vikunja.yaml -f infra/k8s/helm-values/dev/vikunja.yaml

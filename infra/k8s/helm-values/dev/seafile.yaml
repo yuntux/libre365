@@ -5,7 +5,7 @@
 # top" role for the dev tier.
 #
 # Usage:
-#   helm upgrade --install seafile seafile-charts/seafile-ce -n libre365-dev \
+#   helm upgrade --install seafile seafile-charts/ce -n libre365-dev \
 #     -f seafile.yaml -f dev/seafile.yaml
 #
 # Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are
