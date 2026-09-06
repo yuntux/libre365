@@ -192,11 +192,14 @@ jobs:
         # One entry per real `helm upgrade --install` in
         # dev-cluster/deploy.sh's "8/14 Helm releases" step (plus
         # openbao/external-secrets/oauth2-proxy from steps 6/7/13) -
-        # `release|chart|version|values-files` (comma-separated, applied in
-        # order, mirroring `-f a.yaml -f b.yaml`). NOT included:
-        # element-call.yaml/visio-meet.yaml/vikunja.yaml - documented in
-        # README.md as "no official chart confirmed to exist" placeholders,
-        # not actually `helm upgrade --install`-ed anywhere yet.
+        # `release|chart|version|values-files|extra-args` (values-files
+        # comma-separated, applied in order, mirroring `-f a.yaml -f
+        # b.yaml`; extra-args is one flag, e.g. novu's
+        # --skip-schema-validation - see deploy.sh's own comment on that
+        # release for why). NOT included: element-call.yaml/
+        # visio-meet.yaml/vikunja.yaml - documented in README.md as "no
+        # official chart confirmed to exist" placeholders, not actually
+        # `helm upgrade --install`-ed anywhere yet.
         run: |
           set -euo pipefail
           releases=(
@@ -215,14 +218,14 @@ jobs:
             "onlyoffice|onlyoffice/docs||onlyoffice.yaml,onlyoffice-2000.yaml"
             "seaweedfs|seaweedfs/seaweedfs||seaweedfs.yaml,dev/seaweedfs.yaml"
             "peertube|peertube-helm/peertube||peertube.yaml,dev/peertube.yaml"
-            "novu|oci://ghcr.io/nova-edge/charts/novu|0.2.1|novu.yaml,dev/novu.yaml"
+            "novu|oci://ghcr.io/nova-edge/charts/novu|0.2.1|novu.yaml,dev/novu.yaml|--skip-schema-validation"
             "external-dns|external-dns/external-dns||external-dns.yaml,dev/external-dns.yaml"
             "oauth2-proxy-onlyoffice|oauth2-proxy/oauth2-proxy||oauth2-proxy-onlyoffice.yaml"
             "oauth2-proxy-novu|oauth2-proxy/oauth2-proxy||oauth2-proxy-novu.yaml"
           )
           fail=0
           for entry in "${releases[@]}"; do
-            IFS='|' read -r release chart version files <<<"$entry"
+            IFS='|' read -r release chart version files extra <<<"$entry"
             f_args=()
             IFS=',' read -ra file_list <<<"$files"
             for f in "${file_list[@]}"; do
@@ -230,8 +233,10 @@ jobs:
             done
             version_args=()
             [ -n "$version" ] && version_args=(--version "$version")
+            extra_args=()
+            [ -n "$extra" ] && extra_args=("$extra")
             echo "::group::helm template ${release} ${chart} (${files})"
-            if ! helm template "$release" "$chart" "${version_args[@]}" "${f_args[@]}" >/dev/null; then
+            if ! helm template "$release" "$chart" "${version_args[@]}" "${extra_args[@]}" "${f_args[@]}" >/dev/null; then
               echo "::error::helm template failed for release '${release}' (${chart}, ${files})"
               fail=1
             fi
