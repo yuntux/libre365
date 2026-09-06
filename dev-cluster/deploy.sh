@@ -215,8 +215,18 @@ helm upgrade --install openbao openbao/openbao -n "$NAMESPACE" \
   -f infra/k8s/helm-values/openbao.yaml -f infra/k8s/helm-values/dev/openbao.yaml
 helm upgrade --install external-secrets external-secrets/external-secrets -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-secrets.yaml -f infra/k8s/helm-values/dev/external-secrets.yaml
-kubectl rollout status deployment/openbao -n "$NAMESPACE" --timeout=120s 2>/dev/null || \
-  kubectl rollout status statefulset/openbao -n "$NAMESPACE" --timeout=120s
+# [CORRECTED] `kubectl rollout status` only supports the RollingUpdate
+# strategy - found by actually running this script: OpenBao's chart (a
+# HashiCorp Vault fork, inheriting its chart conventions) deploys as a
+# StatefulSet with `updateStrategy: OnDelete` (so an operator can unseal
+# pods one at a time during a real upgrade, not relevant to a single-replica
+# dev instance but still the chart's default), which made `kubectl rollout
+# status statefulset/openbao` fail immediately with "rollout status is only
+# available for RollingUpdate strategy type" - not silenced by `|| true`
+# unlike the Deployment attempt before it, so this stopped the whole script.
+# `kubectl wait --for=condition=Ready` checks pod readiness directly instead
+# of the rollout mechanism, so it works regardless of the update strategy.
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=openbao -n "$NAMESPACE" --timeout=120s
 kubectl apply -f infra/k8s/manifests/dev/external-secrets-store.yaml
 kubectl apply -f infra/k8s/manifests/external-secrets.yaml
 ./dev-cluster/seed-openbao-dev-secrets.sh
