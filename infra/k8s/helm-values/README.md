@@ -28,6 +28,22 @@ patcher, see below) — re-enabling one instead of routing through Caddy
 would first need a real Ingress Controller deployed, which is out of scope
 today.
 
+## DNS zone population: external-dns
+
+Caddy's Automatic HTTPS (above) only OBTAINS certificates once a domain
+already resolves to it — it does not create the A/AAAA records themselves.
+`external-dns.yaml` closes that gap: it watches the Caddy Service
+(`../manifests/caddy.yaml`, `sources: [service]`, not `ingress`, since none
+of those are active) for its `external-dns.alpha.kubernetes.io/hostname`
+annotation and creates/maintains the matching DNS records via the OVH
+provider (a DNS-zone/registrar choice — chosen for the same
+sovereignty/European-provider reasoning the study applies elsewhere — that
+is independent of compute staying self-hosted on Proxmox). **Read that
+file's header comment before deploying**: OVH has no built-in external-dns
+provider (unlike AWS/Cloudflare/Google) — support goes through the
+pluggable webhook-provider mechanism, and the exact webhook image/config
+could not be verified from the sandboxed environment this was authored in.
+
 ## Image versions: single source of truth
 
 The `image.repository`/`image.tag` fields in this directory (and the raw
@@ -96,12 +112,14 @@ the choice is documented at the top of each file concerned.
 | PeerTube | community chart `peertube` | https://peertube-helm.github.io/charts (to be confirmed) |
 | Caddy | no dedicated chart — raw manifest (`../manifests/caddy.yaml`), custom xcaddy image with an HTML injection plugin | — |
 | Novu | `novu` (official Novu chart) | https://novuhq.github.io/helm-charts |
+| external-dns | `external-dns` (kubernetes-sigs) | https://kubernetes-sigs.github.io/external-dns/ |
 
 Charts marked "to be confirmed" had no single identified official source at
 the time of writing (August/September 2026): several community forks exist
 depending on the component. Systematic fallback planned to a raw manifest
 derived from the official Docker image if no maintained chart is available
-at the time of actual deployment.
+at the time of actual deployment. `external-dns.yaml`'s OVH webhook-provider
+image carries the same caveat — see that file's header comment.
 
 ## Typical deployment command
 
@@ -112,6 +130,7 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add minio https://charts.min.io/
 helm repo add novu https://novuhq.github.io/helm-charts
 helm repo add vikunja https://vikunja.github.io/helm-charts
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 helm repo update
 
 # Namespace
@@ -134,6 +153,10 @@ helm upgrade --install keycloak bitnami/keycloak -n libre365 -f keycloak.yaml -f
 kubectl apply -f ../manifests/gokapi.yaml
 kubectl apply -f ../manifests/caddy-injection.yaml
 kubectl apply -f ../manifests/caddy.yaml
+
+# DNS zone population (see "DNS zone population" above - confirm the OVH
+# webhook image/config first)
+helm upgrade --install external-dns external-dns/external-dns -n libre365 -f external-dns.yaml
 ```
 
 Moving from 100 to 2000 users (and beyond, chapter 4.1 of the study)

@@ -288,7 +288,8 @@ dev_cluster:
 # shared base domain are two independent, single-source values instead of
 # the full FQDN being retyped in every Helm values file/manifest that
 # references it (Ingress hostname/TLS, OIDC issuer/endpoint URLs, the
-# Caddy reverse-proxy routing, the Thunderbird extension's WebExtension ID).
+# Caddy reverse-proxy routing and its external-dns hostname annotation, the
+# Thunderbird extension's WebExtension ID, external-dns's domainFilters).
 #
 # Patching mechanism (scripts/sync_platform.py, sub_domain()): anchored on
 # the SUBDOMAIN label (e.g. "sso"), never on the previously-generated base -

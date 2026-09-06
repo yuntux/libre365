@@ -1,0 +1,73 @@
+# Component: external-dns — automated DNS zone population (study 4.2/4.4,
+# not itself a numbered study component: closes the gap between
+# platform.yaml's `domains` list and an actual A/AAAA record existing for
+# each one).
+#
+# Chart: external-dns (kubernetes-sigs)
+#   Helm repo: https://kubernetes-sigs.github.io/external-dns/
+#   chart    : external-dns
+#
+# Provider: OVH, chosen for the same reason the study favors sovereign,
+# European options when a third party is unavoidable (Introduction; chapter
+# on hosting alternatives). This is a DNS-zone/registrar choice only — it
+# does not change anything about compute staying self-hosted on Proxmox
+# (chapter 4.2/4.3): OVH here only holds the domain's DNS zone, the same
+# way any registrar would, whoever runs the servers those records point to.
+#
+# IMPORTANT — verify before deploying: `external-dns` has no OVH provider
+# built into its core (unlike aws/cloudflare/google); OVH support is via
+# the pluggable webhook-provider mechanism, run as a sidecar container.
+# This file was authored in a sandboxed environment with no network access
+# to verify the current canonical OVH webhook image/repository or its exact
+# config keys against a live chart template — same caveat already
+# documented in ../README.md for seafile-charts/onlyoffice/peertube-helm.
+# `provider.webhook.image.repository` below is a placeholder: confirm the
+# maintained OVH webhook project (e.g. search "external-dns ovh webhook"
+# for the current actively-maintained one) and its actual config format
+# before the first real deployment.
+provider:
+  name: webhook
+  webhook:
+    image:
+      repository: REPLACE_ME_OVH_WEBHOOK_IMAGE_NOT_VERIFIED
+      tag: REPLACE_ME
+    env:
+      - name: OVH_ENDPOINT
+        value: "ovh-eu"
+      - name: OVH_APPLICATION_KEY
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-ovh-credentials
+            key: application-key
+      - name: OVH_APPLICATION_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-ovh-credentials
+            key: application-secret
+      - name: OVH_CONSUMER_KEY
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-ovh-credentials
+            key: consumer-key
+
+# `service` (not `ingress`): every public hostname is exposed through the
+# single Caddy LoadBalancer Service (../manifests/caddy.yaml), annotated
+# with the full domain list - see that file's `external-dns.alpha.
+# kubernetes.io/hostname` annotation - rather than through per-chart
+# Ingress objects, since none of those are active (see ../README.md,
+# "Public entry point: Caddy, not each chart's own Ingress").
+sources:
+  - service
+
+# Never delete records this didn't create (e.g. the registrar's own default
+# records) - upsert-only is the safer default for a shared DNS zone.
+policy: upsert-only
+
+# study 4.5 - secrets externalized to a dedicated vault, never in plaintext
+# in this repository. `external-dns-ovh-credentials` (application key/
+# secret/consumer key, obtained from the OVH API) is provisioned outside
+# this repo, same convention as every other `existingSecret` in this
+# directory.
+
+domainFilters:
+  - libre365.example.org

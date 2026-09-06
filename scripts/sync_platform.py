@@ -133,6 +133,9 @@ _BARE_DOMAIN_PATTERNS = {
     REPO_ROOT / "connectors/thunderbird-filelink-gokapi/manifest.json": [
         r'("id":\s*"gokapi-filelink@)[^"]*(")',
     ],
+    REPO_ROOT / "infra/k8s/helm-values/external-dns.yaml": [
+        r'(domainFilters:\s*\n\s*-\s*)\S+()',
+    ],
 }
 
 # Every file containing a subdomain-prefixed public domain name (see
@@ -153,6 +156,7 @@ DOMAIN_TARGET_FILES = [
     "infra/k8s/helm-values/novu.yaml",
     "infra/k8s/manifests/caddy.yaml",
     "infra/k8s/manifests/gokapi.yaml",
+    "infra/k8s/helm-values/external-dns.yaml",
     "connectors/thunderbird-filelink-gokapi/manifest.json",
 ]
 

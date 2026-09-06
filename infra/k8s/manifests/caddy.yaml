@@ -213,6 +213,21 @@ kind: Service
 metadata:
   name: caddy
   namespace: libre365
+  annotations:
+    # Consumed by external-dns (../helm-values/external-dns.yaml, `sources:
+    # [service]`) to create/maintain the A/AAAA records for every hostname
+    # this Service actually fronts - the DNS-zone-population half of what
+    # Caddy's own Automatic HTTPS does NOT do (it only obtains/renews
+    # certificates once a domain already resolves here). Kept as a hand-
+    # maintained list matching the Caddyfile's site addresses above (add a
+    # hostname here whenever a new one is added there) - each domain
+    # literal is still patched by scripts/sync_platform.py like every other
+    # occurrence in this file, since this is plain text within a file
+    # already in DOMAIN_TARGET_FILES.
+    # Single line, no spaces after the commas: external-dns splits this
+    # value on "," without necessarily trimming whitespace, so a folded
+    # multi-line scalar here would risk a leading-space-prefixed hostname.
+    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org"
 spec:
   selector:
     app.kubernetes.io/name: caddy
