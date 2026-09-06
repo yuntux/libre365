@@ -88,6 +88,32 @@ services:
     depends_on:
       grommunio-dev-db:
         condition: service_healthy
+    # [ARM64 workaround attempt] on a non-amd64 host running this image
+    # under QEMU user-mode emulation (see deploy.sh's own ARM64 comment),
+    # this image's internal redis-server has been observed crash-looping
+    # under emulation - a documented class of QEMU bug (segfaults inside
+    # translated binaries), not something specific to this repo's config -
+    # reported for other emulated services too (e.g. RediSearch on Apple
+    # Silicon). `seccomp:unconfined` is one of the few things a container
+    # runtime can control here: some qemu-user crashes are triggered by a
+    # syscall seccomp blocks/rewrites instead of returning ENOSYS cleanly.
+    # [UNCERTAIN] not confirmed to fix this specific crash (no live ARM64
+    # cluster to verify against from this sandboxed environment) - if it
+    # doesn't help, the real fallback is not running this container at all
+    # on an ARM64 dev machine (see dev-cluster/README.md).
+    security_opt:
+      - seccomp:unconfined
+    # Safety net independent of whether the workaround above works: a
+    # crash-looping process inside this container was observed generating
+    # a fresh ~20MB core dump every 1-2 seconds, filling an entire 60GB disk
+    # in about 2 hours before anyone noticed - found the hard way on a real
+    # machine. Disabling core dumps entirely means a future crash loop
+    # (from this or any other cause) degrades to "the mail service doesn't
+    # work" instead of "the whole VM runs out of disk space".
+    ulimits:
+      core:
+        soft: 0
+        hard: 0
     environment:
       TIMEZONE: ${GROMMUNIO_TIMEZONE:-Europe/Paris}
       # FQDN/DOMAIN: dev-only placeholder values, never resolved on a real
