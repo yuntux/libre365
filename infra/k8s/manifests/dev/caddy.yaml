@@ -103,9 +103,14 @@ data:
     }
 
     http://depot.libre365.example.org {
+        # Colors-only injection (Tasmane branding, study 1.8) - deliberately
+        # NOT the cross-app menu/search/notifications banner (banner.html):
+        # Gokapi is reachable by unauthenticated external third parties
+        # following a download link, who must never see the internal
+        # portal bar. See caddy-injection.yaml's gokapi-branding.html for
+        # why this replaced an earlier attempt at a Gokapi-side custom.css
+        # file (Gokapi has no such mechanism in the pinned v1.9.6).
         reverse_proxy gokapi.libre365.svc.cluster.local:80
-        # No injection on Gokapi: potential use by unauthenticated external third
-        # parties (download links), internal top bar not relevant here.
     }
 
     # Visio, Element Call, OnlyOffice, Keycloak, MinIO console: direct reverse proxy,

@@ -11,6 +11,17 @@
 # Native OIDC toward Keycloak (1.8 L.303, L.306) — MANDATORY to use Gokapi's
 # up-to-date Keycloak documentation at deployment time (a previous configuration
 # example allowed unauthorized access, see 1.8 L.306).
+#
+# Tasmane branding: NOT done here. An earlier version mounted a `custom.css`
+# at /app/custom/, which does nothing on the pinned v1.9.6 - checked against
+# the real Forceu/Gokapi source (internal/webserver/Webserver.go): that
+# version has no such folder/mechanism at all (its only hook,
+# helper.FolderExists("static"), replaces Gokapi's ENTIRE static file
+# server wholesale, with no per-file fallback to the embedded originals -
+# unsafe to use for a one-file override). Colors are injected via Caddy's
+# html_inject instead (infra/k8s/manifests/caddy.yaml's depot.<domain> site
+# block, infra/k8s/manifests/caddy-injection.yaml's gokapi-branding.html) -
+# needs no cooperation from Gokapi's own file layout at all.
 
 apiVersion: apps/v1
 kind: Deployment
@@ -67,80 +78,10 @@ spec:
           volumeMounts:
             - name: gokapi-data
               mountPath: /app/data
-            - name: gokapi-custom
-              mountPath: /app/custom
       volumes:
         - name: gokapi-data
           persistentVolumeClaim:
             claimName: gokapi-data
-        - name: gokapi-custom
-          configMap:
-            name: gokapi-custom
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gokapi-custom
-  namespace: libre365
-  labels:
-    app.kubernetes.io/name: gokapi
-data:
-  # Gokapi's own documented customization mechanism (docs/advanced.rst,
-  # "Customization"): any file dropped in a `custom` folder mounted at
-  # /app/custom/ is served at /custom/ and, for this one specific filename,
-  # applied automatically - "create a file in the folder named custom.css.
-  # The CSS will be applied to all pages." Not a guessed env var: verified
-  # against Gokapi's own docs before writing this.
-  custom.css: |
-    /* Tasmane graphic-charter tokens - see infra/k8s/manifests/caddy-injection.yaml's
-       banner.css for the full rationale (same source: the firm's own Brand
-       Guidelines). Kept in sync by hand today - if this ever needs to be
-       generated from a single place instead of copy-pasted in two
-       ConfigMaps, that's a scripts/sync_platform.py job, not a runtime one. */
-    :root {
-      --libre365-brand-primary: #2B3B58;   /* Madison */
-      --libre365-brand-secondary: #F55364; /* Ripe Malinka */
-      --libre365-brand-accent: #FF6900;    /* Burtuqali Orange */
-      --libre365-brand-surface: #EEEEEE;   /* Off White */
-      --libre365-brand-text: #0C141A;      /* Midnight Edition */
-      --libre365-brand-on-primary: #FFFFFF;
-    }
-
-    body {
-      font-family: "Aileron", system-ui, -apple-system, sans-serif;
-      background: var(--libre365-brand-surface);
-      color: var(--libre365-brand-text);
-    }
-
-    /* Gokapi's own template class names are NOT verified against the
-       installed v1.9.6 release from this sandbox (no live instance to
-       inspect) - .btn-primary/.navbar are Bootstrap's own well-known
-       default classes, which Gokapi's UI is built on, so this is a
-       reasonable starting point, not a guess made up from nothing; still,
-       confirm against the real rendered markup on first deploy and adjust
-       selectors if Gokapi's templates don't use them as expected. */
-    .navbar, .bg-primary {
-      background-color: var(--libre365-brand-primary) !important;
-      color: var(--libre365-brand-on-primary) !important;
-    }
-
-    .btn-primary {
-      background-color: var(--libre365-brand-primary) !important;
-      border-color: var(--libre365-brand-primary) !important;
-    }
-
-    .btn-primary:hover {
-      background-color: var(--libre365-brand-secondary) !important;
-      border-color: var(--libre365-brand-secondary) !important;
-    }
-
-    a {
-      color: var(--libre365-brand-primary);
-    }
-
-    a:hover {
-      color: var(--libre365-brand-secondary);
-    }
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

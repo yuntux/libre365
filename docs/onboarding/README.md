@@ -64,5 +64,7 @@ The same graphic-charter tokens (Tasmane's Brand Guidelines: Madison
 `#2B3B58`, Ripe Malinka `#F55364`, Off White `#EEEEEE`, Midnight Edition
 `#0C141A`, Aileron typeface) used on this onboarding page are also applied
 to `infra/k8s/manifests/caddy-injection.yaml`'s cross-cutting application
-banner and `infra/k8s/manifests/gokapi.yaml`'s Gokapi `custom.css` — kept in
-sync by hand across these three places today.
+banner and its Gokapi-specific `gokapi-branding.html` (same file, injected
+only on Gokapi's own site block — see that file's comment for why Gokapi's
+branding isn't a Gokapi-side file at all) — kept in sync by hand across
+these three places today.

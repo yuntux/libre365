@@ -60,9 +60,8 @@ data:
        guide's own logo mark itself uses on that same navy circle (page 12),
        so it's used here for the same purpose: text/icons ON the primary
        color, not body text in general. Every other themed surface in this
-       repo (infra/k8s/manifests/gokapi.yaml's `gokapi-custom` ConfigMap)
-       reads from the same tokens - update both together if the palette
-       ever changes. */
+       repo (the `gokapi-branding.html` key below) reads from the same
+       tokens - update both together if the palette ever changes. */
     :root {
       --libre365-brand-primary: #2B3B58;   /* Madison - "appears in logo, used on primary CTA, used on headings" */
       --libre365-brand-secondary: #F55364; /* Ripe Malinka */
@@ -126,6 +125,70 @@ data:
     body {
       margin-top: 48px !important;
     }
+  gokapi-branding.html: |
+    <!-- Tasmane branding for Gokapi (study 1.8) - colors ONLY, injected the
+         same way as banner.html above but on the depot.<domain> site block
+         alone, deliberately WITHOUT the cross-app menu/search/notifications
+         banner: Gokapi is reachable by unauthenticated external third
+         parties following a download link, who must never see the internal
+         portal bar (see caddy.yaml's depot.<domain> comment).
+
+         An earlier version of this branding tried to drop a `custom.css`
+         file into Gokapi's own /app/custom/ folder (infra/k8s/manifests/
+         gokapi.yaml's now-removed `gokapi-custom` ConfigMap) - checked
+         against the ACTUAL v1.9.6 source (Forceu/Gokapi, internal/
+         webserver/Webserver.go) during a later review: Gokapi has NO such
+         mechanism in this version at all. `helper.FolderExists("static")`
+         is the only hook - if present, it replaces Gokapi's ENTIRE static
+         file server wholesale (no per-file embedded fallback), and would
+         404 every Bootstrap/jQuery/icon asset it doesn't also fully
+         replicate; the docs' actual customization path is copying the
+         WHOLE `static`/`templates` folder out of the release tag and
+         maintaining it in lockstep with every Gokapi upgrade - a
+         maintenance burden and version-drift risk out of proportion to
+         "recolor the header". Injecting a `<style>` block via Caddy
+         instead needs no cooperation from Gokapi's own file layout at all
+         and cannot break its static assets.
+
+         Selectors below are verified against the ACTUAL rendered markup of
+         the exact `v1.9.6` tag pinned in platform.yaml (internal/webserver/
+         web/templates/html_header.tmpl, internal/webserver/web/static/css/
+         cover.css) - not guessed from Bootstrap's generic component names:
+         Gokapi's admin header uses Bootstrap's "cover" example structure
+         (`<header class="masthead">` + `<nav class="nav-masthead">`), NOT
+         the `.navbar` component (an earlier version's selector never
+         matched anything real) - and its `<body>` already carries
+         Bootstrap's own `bg-dark text-white` utility classes (`!important`
+         in Bootstrap 5), which is why the overrides below also need
+         `!important` and lean into a dark theme (the brand's navy primary
+         as the dark background) rather than fight it with a light one. -->
+    <style>
+      :root {
+        --libre365-brand-primary: #2B3B58;   /* Madison */
+        --libre365-brand-secondary: #F55364; /* Ripe Malinka */
+        --libre365-brand-accent: #FF6900;    /* Burtuqali Orange */
+        --libre365-brand-on-primary: #FFFFFF;
+      }
+      body {
+        background-color: var(--libre365-brand-primary) !important;
+      }
+      .nav-masthead .nav-link:hover,
+      .nav-masthead .nav-link:focus,
+      .nav-masthead .active {
+        border-bottom-color: var(--libre365-brand-accent);
+      }
+      .btn-primary {
+        /* Accent, not primary: the body background above is now the brand
+           primary color too - a primary-on-primary button would have no
+           contrast against it. */
+        background-color: var(--libre365-brand-accent) !important;
+        border-color: var(--libre365-brand-accent) !important;
+      }
+      .btn-primary:hover {
+        background-color: var(--libre365-brand-secondary) !important;
+        border-color: var(--libre365-brand-secondary) !important;
+      }
+    </style>
   banner.js: |
     // libre365 cross-cutting application banner (study 2.3) - client-side
     // wiring is deliberately NOT implemented here: this file exists only
