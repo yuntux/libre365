@@ -79,8 +79,6 @@ directly.
 |-------------------------------|-----------------------------|----------------------------------|
 | `KEYCLOAK_URL`                 | `http://localhost:8080`     | Keycloak                        |
 | `KEYCLOAK_REALM`               | `libre365`                   | Keycloak (test realm)        |
-| `KEYCLOAK_CLIENT_ID`           | `integration-tests`         | Keycloak (public direct access grants client) |
-| `KEYCLOAK_CLIENT_SECRET`       | *(empty)*                    | Keycloak (if the test client is not public) |
 | `GROMMUNIO_IMAP_HOST` / `_PORT`| `localhost` / `993`         | Grommunio (IMAP)                |
 | `GROMMUNIO_SMTP_HOST` / `_PORT`| `localhost` / `587`         | Grommunio (SMTP)                |
 | `SEAFILE_URL`                  | `http://localhost:8082`     | Seafile                         |
@@ -133,13 +131,16 @@ orchestrator.
 
 ## Design notes
 
-- **`test_sso_e2e.py`** is parametrized (`pytest.mark.parametrize`) per
-  component rather than written as five separate functions: the assertion
-  ("401/403 without a token, 200 with the Keycloak token") is
-  structurally identical for Grommunio/Seafile/Vikunja/OnlyOffice/Matrix,
-  only the URL and the codes expected per component change. Adding a
-  future SSO component is therefore done by adding an entry to the
-  `SSO_TARGETS` table, without duplicating test logic.
+- **`test_sso_e2e.py`** covers Seafile, Vikunja, and Matrix/Synapse, each
+  with its own function: unlike a generic bearer-token check, each of
+  these three apps mints its own native credential after a real Keycloak
+  login (a Seahub session cookie, a Vikunja JWT, a Matrix `access_token`),
+  so the exact login/exchange steps genuinely differ per component and
+  don't collapse into one shared, parametrized assertion — see that file's
+  module docstring and `docs/oidc.md` for why an earlier, generic
+  five-target version tested nothing real, and why Grommunio (no Keycloak
+  client at all) and OnlyOffice/Novu (gated by Caddy `forward_auth`, not
+  reachable through this suite's `base_urls`) aren't in it.
 - **`wait_for_service`** (in `conftest.py`) is used by every test file
   before any business assertion, to absorb the slow startup of the
   docker-compose stack and fail with an explicit message

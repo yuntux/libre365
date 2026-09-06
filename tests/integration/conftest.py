@@ -30,10 +30,12 @@ from __future__ import annotations
 import os
 import time
 import dataclasses
+import urllib.parse
 from typing import Callable, Optional
 
 import pytest
 import requests
+from bs4 import BeautifulSoup
 
 from _platform_defaults import DEFAULT_PORTS
 
@@ -142,19 +144,6 @@ def keycloak_realm() -> str:
     return os.environ.get("KEYCLOAK_REALM", "libre365")
 
 
-@pytest.fixture(scope="session")
-def keycloak_client_id() -> str:
-    # Public "direct access grants" client dedicated to integration tests
-    # (never reuse a production client here).
-    return os.environ.get("KEYCLOAK_CLIENT_ID", "integration-tests")
-
-
-@pytest.fixture(scope="session")
-def keycloak_client_secret() -> Optional[str]:
-    # Empty if the test Keycloak client is public (no secret).
-    return os.environ.get("KEYCLOAK_CLIENT_SECRET") or None
-
-
 # ---------------------------------------------------------------------------
 # Waiting for service availability (slow stack startup)
 # ---------------------------------------------------------------------------
@@ -212,64 +201,93 @@ def wait_for_service() -> Callable[..., None]:
 
     return _wait
 
-
 # ---------------------------------------------------------------------------
-# Keycloak SSO authentication ("password" grant for a test user)
+# Real browser-redirect OIDC login (test_sso_e2e.py)
+#
+# An earlier version of test_sso_e2e.py used a single Resource Owner
+# Password Credentials token, obtained via a dedicated "integration-tests"
+# Keycloak client, presented directly to every app's API. That doesn't
+# reflect how any of these apps actually implement OIDC (see
+# test_sso_e2e.py's module docstring and docs/oidc.md for the full
+# explanation): Seafile, Vikunja and Synapse all implement OIDC as a
+# browser AUTHORIZATION CODE redirect - the app itself exchanges the code
+# with Keycloak server-side and mints its OWN native session/token (a
+# Seahub session cookie, a Vikunja JWT, a Matrix access_token). None of
+# them validate an externally-obtained bearer token as a resource server
+# would, so that version tested nothing real - fixed by removing it
+# entirely (the "integration-tests" client, `keycloak_client_id`/
+# `keycloak_client_secret`/`keycloak_token` fixtures) rather than keeping
+# unused fixtures around.
+#
+# The functions below instead complete the actual redirect flow with a
+# plain `requests.Session` (no browser/JS needed: Keycloak's default theme
+# is a plain HTML form POST), so each per-app SSO test in test_sso_e2e.py
+# ends up with the SAME kind of credential a real user's browser would get.
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
-def keycloak_token(
-    base_urls: BaseUrls,
-    keycloak_realm: str,
-    keycloak_client_id: str,
-    keycloak_client_secret: Optional[str],
-    test_user: TestUser,
-    wait_for_service: Callable[..., None],
-) -> str:
+def keycloak_openid_config(base_urls: BaseUrls, keycloak_realm: str, wait_for_service: Callable[..., None]) -> dict:
+    """The realm's own `.well-known/openid-configuration` document -
+    `authorization_endpoint`/`token_endpoint` are read from here rather than
+    hard-coded, the same discovery URL `keycloak_token` already waits on."""
+    url = f"{base_urls.keycloak}/realms/{keycloak_realm}/.well-known/openid-configuration"
+    wait_for_service(url, timeout=float(os.environ.get("SERVICE_WAIT_TIMEOUT", "120")))
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def complete_keycloak_login(
+    authorization_url: str, username: str, password: str, session: Optional[requests.Session] = None
+) -> requests.Response:
     """
-    Obtains an OIDC access_token via the "password" grant (Resource Owner
-    Password Credentials) against Keycloak, for a test user.
+    Drives Keycloak's own login page like a real browser would, entirely
+    over HTTP (no JS execution needed - Keycloak's default `keycloak` theme
+    renders a plain `<form id="kc-form-login">` that POSTs `username`/
+    `password` to a session-tied `action` URL): GETs `authorization_url`
+    (following redirects onto the login page), parses that form, and POSTs
+    the credentials to it, following redirects to completion.
 
-    This is the entry point of the "end-to-end SSO authentication" scenario
-    (study 4.5, last scenario listed): this token is then presented to the
-    other components (Grommunio, Seafile, Vikunja, OnlyOffice, Matrix) in
-    test_sso_e2e.py to verify it is accepted everywhere.
-
-    The "password" grant is only used for integration testing with a
-    dedicated test user: it must never be enabled on a production Keycloak
-    client.
+    For an app whose backend does the code<->token exchange itself
+    (Seafile, Vikunja's callback endpoint), the returned response is
+    already on the app's own side, with the app's session cookie set in
+    `session`. For a flow where the final redirect carries a token/code in
+    its own query string instead (Matrix's SSO `loginToken`, Vikunja's
+    authorization `code`), read `response.url` - `requests` does not
+    execute anything at that destination, it just records where the
+    redirect chain ended.
     """
-    token_url = (
-        f"{base_urls.keycloak}/realms/{keycloak_realm}"
-        "/protocol/openid-connect/token"
-    )
+    session = session or requests.Session()
+    login_page = session.get(authorization_url, timeout=15)
+    login_page.raise_for_status()
 
-    wait_for_service(
-        f"{base_urls.keycloak}/realms/{keycloak_realm}/.well-known/openid-configuration",
-        timeout=float(os.environ.get("SERVICE_WAIT_TIMEOUT", "120")),
-    )
-
-    payload = {
-        "grant_type": "password",
-        "client_id": keycloak_client_id,
-        "username": test_user.username,
-        "password": test_user.password,
-    }
-    if keycloak_client_secret:
-        payload["client_secret"] = keycloak_client_secret
-
-    response = requests.post(token_url, data=payload, timeout=10)
-    if response.status_code != 200:
+    soup = BeautifulSoup(login_page.text, "html.parser")
+    form = soup.find("form", id="kc-form-login") or soup.find("form")
+    if form is None:
         pytest.fail(
-            "Failed to obtain the Keycloak token (password grant) on "
-            f"{token_url}: HTTP {response.status_code} - {response.text[:500]}"
+            "Could not find a login form on Keycloak's login page - the "
+            f"authorization_url ({authorization_url}) may not have reached "
+            "Keycloak's login screen at all (e.g. already authenticated, or "
+            "the realm/client rejected the request outright). "
+            f"Response URL: {login_page.url}"
         )
+    action_url = urllib.parse.urljoin(login_page.url, form["action"])
+    fields = {
+        field["name"]: field.get("value", "")
+        for field in form.find_all("input")
+        if field.get("name")
+    }
+    fields["username"] = username
+    fields["password"] = password
 
-    access_token = response.json().get("access_token")
-    if not access_token:
-        pytest.fail(f"Keycloak response without access_token: {response.text[:500]}")
+    return session.post(action_url, data=fields, timeout=15)
 
-    return access_token
+
+@pytest.fixture
+def keycloak_login() -> Callable[..., requests.Response]:
+    """Fixture-function wrapper around `complete_keycloak_login`, matching
+    this file's other fixture-function conventions (e.g. `wait_for_service`)."""
+    return complete_keycloak_login
 
 
 # ---------------------------------------------------------------------------

@@ -105,21 +105,60 @@ application's, which is where `check_oidc_coverage()` looks for them.
   missing from the file-mapping itself) — this is what would have caught
   every one of these gaps automatically instead of requiring a manual
   audit.
-- **Live end-to-end (`tests/integration/test_sso_e2e.py`)**: covers
-  Seafile, Vikunja, Matrix, OnlyOffice, and Grommunio today — each of these
-  accepts a Keycloak-issued bearer token directly against a protected API
-  endpoint, which is what that test's generic "no token → rejected, token →
-  accepted" pattern requires. Gokapi and PeerTube are **not** added to it:
-  both delegate to Keycloak via a browser redirect that ends in an
-  application-issued session/token of their own (Gokapi's native OIDC login
-  page; PeerTube's `openid-connect` plugin exchanging the code for a
-  PeerTube access token), not by accepting the Keycloak token itself as a
-  bearer credential on their API — the same category `test_sso_e2e.py`'s
-  own docstring already carves out for OnlyOffice/Grommunio's "broad,
-  deliberately loose" codes. Writing a same-shape test for them without a
-  live instance to confirm the exact redirect/session mechanics would risk
-  the same kind of unverified assumption this audit was meant to close, so
-  it's left as a documented follow-up rather than guessed. Visio (LaSuite
-  Meet) is not wired into the local dev/test tier at all yet (no
-  `platform.yaml` port/service entry — see that file's `visio` section),
-  so there is no environment for `test_sso_e2e.py` to target either.
+- **Live end-to-end (`tests/integration/test_sso_e2e.py`)**: an earlier
+  version of this test presented a single Resource Owner Password
+  Credentials token, issued to a shared `"integration-tests"` Keycloak
+  client, directly as `Authorization: Bearer` to Seafile/Vikunja/Matrix/
+  OnlyOffice/Grommunio's own APIs. That doesn't reflect how any of these
+  apps actually implement OIDC (a caught issue — see the "was this ever
+  correct?" note below) — none of them validate an externally-obtained
+  bearer token as a resource server would; they all complete a browser
+  authorization-code redirect and mint their OWN native credential (a
+  Seahub session cookie, a Vikunja JWT, a Matrix `access_token`). Rewritten
+  so each covered component (**Seafile, Vikunja, Matrix**) drives the real
+  redirect flow with a plain `requests.Session` via `conftest.py`'s
+  `keycloak_login` helper (Keycloak's default login page is a plain HTML
+  form, no browser/JS execution needed) and then verifies the credential
+  that flow actually produces is what the app's protected endpoint accepts.
+  Vikunja's exact callback payload shape and OIDC provider "key" derivation
+  are flagged `[UNCERTAIN]` in that test — not independently confirmed
+  against a live instance from this sandboxed environment; it fails with a
+  clear diagnostic rather than a false pass if either assumption doesn't
+  hold.
+  **Grommunio** is no longer in this test at all: it has no Keycloak client
+  (by design, see above), and the URL the old version queried
+  (`{caddy}/grommunio/api/whoami`) never corresponded to anything actually
+  built in this repository — there was no real mechanism there to test.
+  **OnlyOffice and Novu** aren't in it either, for a different, structural
+  reason: their SSO gate lives entirely in Caddy's `forward_auth` routing
+  (see above), but `base_urls` reaches every component through its own
+  directly-exposed port, bypassing Caddy's domain-based virtual hosting
+  entirely for everything in this suite — exercising the gate for real
+  would need to go through Caddy by domain name, which nothing here does
+  today. Their coverage today is structural only: `check_oidc_coverage()`
+  plus a real `caddy validate` run confirming the forward_auth routes are
+  syntactically valid — a genuine live-request test is a documented
+  follow-up, not something to fake against an environment that can't
+  exercise it.
+  **Gokapi, PeerTube, Visio** stay out for the same reason described
+  above the table: each delegates to Keycloak via a browser redirect that
+  ends in an application-issued session/token of its own, and neither their
+  exact redirect/session mechanics (Gokapi, PeerTube) nor a working
+  dev-tier environment to target at all (Visio has no `platform.yaml`
+  port/service entry yet) are available to script confidently from this
+  sandboxed environment.
+
+### Was the previous "generic bearer token" version of this test ever correct?
+
+No — flagged during a later review pass. Presenting a Resource Owner
+Password Credentials token, issued to a client (`"integration-tests"`)
+that isn't the app's own registered OIDC client, as a bearer credential on
+an app's REST API only works if that app implements OAuth2
+resource-server-style JWT validation of externally-issued tokens (RFC
+9068) with a matching audience — none of Seafile, Vikunja, or Synapse do
+this in their standard self-hosted OIDC integration; each is a
+browser-redirect login that mints its own native credential instead. The
+test likely never verified what it claimed to for any of its five original
+targets, and — consistent with every other "no live cluster in this
+sandbox" caveat throughout this repository — was probably never run
+against a real deployment to notice.

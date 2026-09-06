@@ -228,6 +228,33 @@ flowchart TB
         C2["Route"]
         C3["Injected top bar"]
     end
+
+    subgraph SHARED["Shared / cross-cutting objects (via connectors/)"]
+        SH_SEARCH["Search index entry"]
+        SH_NOTIF["Notification event"]
+        SH_PRESENCE["Presence signal"]
+    end
+
+    %% Cross-application object relationships — not separate macro-objects
+    %% of their own, but the same or a derived object crossing an app
+    %% boundary through one of the connectors/ modules (docs/mapping.md).
+    S3 -. "opened as (JWT, study 1.5)" .-> O1
+    P4 -. "LiveKit Egress recordings (study 2.12)" .-> V2
+    P4 -. "peertube-ingest connector (study 2.12)" .-> P2
+    M1 -. "matrix-visio-widget connector (study 2.4)" .-> V1
+    O2 -. "onlyoffice-mentions connector (study 2.7)" .-> SH_NOTIF
+    S3 -. "unified-search connector (study 2.2)" .-> SH_SEARCH
+    T2 -. "unified-search connector (study 2.2)" .-> SH_SEARCH
+    M2 -. "unified-search connector (study 2.2)" .-> SH_SEARCH
+    G2 -. "notification-hub connector (study 2.1)" .-> SH_NOTIF
+    M2 -. "notification-hub connector (study 2.1)" .-> SH_NOTIF
+    T2 -. "notification-hub connector (study 2.1)" .-> SH_NOTIF
+    SH_NOTIF -.-> N1
+    M3 -. "presence-aggregator connector (study 2.8)" .-> SH_PRESENCE
+    G1 -. "presence-aggregator connector (study 2.8)" .-> SH_PRESENCE
+    KC3 -. "OIDC identity, one account for every gated app" .-> M3
+    KC3 -. "OIDC identity, one account for every gated app" .-> S3
+    KC3 -. "OIDC identity, one account for every gated app" .-> T2
 ```
 
 ## Directory layout
