@@ -1,7 +1,7 @@
 # Component: Caddy — cross-cutting reverse proxy + application portal (study 2.3 L.407-417)
 # No dedicated Helm chart adopted: raw Deployment + ConfigMap manifest, because the
-# Caddy image must be built with the `caddy2-html-injection-plugin` plugin (xcaddy),
-# which is outside the scope of a generic chart.
+# Caddy image must be built with the `toowoxx/caddy2-html-injection-plugin` plugin
+# (xcaddy), which is outside the scope of a generic chart.
 #
 # 2.3 L.408-417 — HTML injection on the reverse proxy side chosen (rather than an
 # iframe portal, ruled out for security reasons: clickjacking, third-party cookies,
@@ -12,9 +12,9 @@
 # widget in a Matrix room, see 2.4, handled by Element/Matrix itself, not by Caddy).
 #
 # Image to build with xcaddy:
-#   xcaddy build --with github.com/lolPants/caddy2-html-injection-plugin
-# (module name to check/adjust depending on the community plugin adopted at build
-# time — several HTML injection plugins exist for Caddy 2, see study L.408).
+#   xcaddy build --with github.com/toowoxx/caddy2-html-injection-plugin
+# (registers the `injection` directive used below - content_type is optional,
+# any response is eligible when omitted).
 #
 # Caddy is the SOLE public HTTP(S) entry point for every service in
 # platform.yaml's `domains` list (this Caddyfile now covers all of them,
@@ -42,7 +42,7 @@ data:
   Caddyfile: |
     {
         # Built with the HTML injection module (xcaddy), see the header comment.
-        order html_inject before respond
+        order injection after encode
     }
 
     # Serves banner.css/banner.js (caddy-html-banner ConfigMap,
@@ -82,10 +82,9 @@ data:
         import banner_assets
         handle {
             reverse_proxy element-web.libre365.svc.cluster.local:80
-            html_inject {
-                selector "</body>"
-                file /etc/caddy/snippets/banner.html
-                position before
+            injection {
+                inject /etc/caddy/snippets/banner.html
+                before "</body>"
             }
         }
     }
@@ -94,10 +93,9 @@ data:
         import banner_assets
         handle {
             reverse_proxy seafile.libre365.svc.cluster.local:80
-            html_inject {
-                selector "</body>"
-                file /etc/caddy/snippets/banner.html
-                position before
+            injection {
+                inject /etc/caddy/snippets/banner.html
+                before "</body>"
             }
         }
     }
@@ -106,10 +104,9 @@ data:
         import banner_assets
         handle {
             reverse_proxy vikunja.libre365.svc.cluster.local:80
-            html_inject {
-                selector "</body>"
-                file /etc/caddy/snippets/banner.html
-                position before
+            injection {
+                inject /etc/caddy/snippets/banner.html
+                before "</body>"
             }
         }
     }
@@ -118,10 +115,9 @@ data:
         import banner_assets
         handle {
             reverse_proxy peertube.libre365.svc.cluster.local:9000
-            html_inject {
-                selector "</body>"
-                file /etc/caddy/snippets/banner.html
-                position before
+            injection {
+                inject /etc/caddy/snippets/banner.html
+                before "</body>"
             }
         }
     }
@@ -135,10 +131,9 @@ data:
         # why this replaced an earlier attempt at a Gokapi-side custom.css
         # file (Gokapi has no such mechanism in the pinned v1.9.6).
         reverse_proxy gokapi.libre365.svc.cluster.local:80
-        html_inject {
-            selector "</body>"
-            file /etc/caddy/snippets/gokapi-branding.html
-            position before
+        injection {
+            inject /etc/caddy/snippets/gokapi-branding.html
+            before "</body>"
         }
     }
 
@@ -367,8 +362,8 @@ spec:
         - name: banner-assets
           # Same ConfigMap as banner-snippet above, restricted to the two
           # keys served as static files (banner.html stays mounted
-          # separately, as a single file consumed by html_inject, not
-          # file_server).
+          # separately, as a single file consumed by the injection
+          # directive, not file_server).
           configMap:
             name: caddy-html-banner
             items:

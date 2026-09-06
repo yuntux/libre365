@@ -837,7 +837,7 @@ def _dev_caddyfile_from_production(caddyfile_text: str) -> str:
     hostname stay byte-for-byte the same values used in production
     (nothing new is hard-coded for "dev" here):
 
-    - `html_inject` directives and the `order html_inject before respond`
+    - `injection` directives and the `order injection after encode`
       global option: both need the custom xcaddy-built HTML-injection
       plugin baked into production's Caddy image, which cannot be built
       or pulled from this sandboxed/local dev environment (see this
@@ -856,12 +856,12 @@ def _dev_caddyfile_from_production(caddyfile_text: str) -> str:
     (see tests/integration/conftest.py's `DomainRoutingAdapter`).
     """
     text = re.sub(
-        r"\{\s*#[^\n]*\n\s*order html_inject before respond\s*\n\}\s*\n*",
+        r"\{\s*#[^\n]*\n\s*order injection after encode\s*\n\}\s*\n*",
         "",
         caddyfile_text,
         count=1,
     )
-    text = re.sub(r"\n[ \t]*html_inject\s*\{[^}]*\}", "", text)
+    text = re.sub(r"\n[ \t]*injection\s*\{[^}]*\}", "", text)
     # A line that is ONLY "<hostname[:port]> {" - matched structurally (not
     # against any specific domain name, so this keeps working regardless of
     # platform.yaml's domains.base) - excludes snippet definitions like

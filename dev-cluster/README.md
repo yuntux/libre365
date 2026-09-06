@@ -166,7 +166,7 @@ resolve and route correctly here too:
    production `../infra/k8s/manifests/caddy.yaml` — domain-based site
    blocks, `forward_auth`/`route` SSO gates and all. Only two things are
    stripped, because this sandboxed/local environment genuinely cannot run
-   them: `html_inject` (needs a custom xcaddy-built plugin unavailable
+   them: `injection` (needs a custom xcaddy-built plugin unavailable
    here — dev loses the injected top bar, not the routing) and automatic
    HTTPS (forced to plain `http://` — there is no real public DNS to get a
    certificate for from a local cluster).

@@ -24,7 +24,7 @@
 # up-to-date Keycloak documentation at deployment time (a previous configuration
 # example allowed unauthorized access, see 1.8 L.306).
 #
-# Tasmane branding: colors are injected via Caddy's html_inject
+# Tasmane branding: colors are injected via Caddy's injection directive
 # (infra/k8s/manifests/caddy.yaml's depot.<domain> site block,
 # infra/k8s/manifests/caddy-injection.yaml's gokapi-branding.html) rather
 # than Gokapi's native /app/custom/custom.css mechanism - the Caddy route

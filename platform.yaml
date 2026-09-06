@@ -100,7 +100,16 @@ shared:
 # the diff instead of being silently inferred.
 services:
   keycloak:
-    version: "26.0.7" # study 1.7
+    # study 1.7 - Bitnami stopped publishing free `bitnami/keycloak` image
+    # tags (moved to a paid "Bitnami Secure Images" subscription); its
+    # historical tags were frozen into `bitnamilegacy/keycloak`, which
+    # stops at 26.3.3 - the real Keycloak project has released well past
+    # that (26.7.3 at last check), but nothing newer is pullable for free
+    # under this chart's image path without either paying Bitnami or
+    # migrating off the `bitnami/keycloak` chart to the official image
+    # (`quay.io/keycloak/keycloak`, already used by the docker-compose dev
+    # tier below) - tracked as follow-up work, not done here.
+    version: "26.3.3"
     # Every OIDC app config in this repo builds its issuer/authorization
     # URL as "https://<sso_domain>/realms/<realm_name>" - this used to be
     # a literal "libre365" hand-copied into 7 different files (Vikunja,
@@ -116,11 +125,11 @@ services:
       image: quay.io/keycloak/keycloak
     helm:
       file: infra/k8s/helm-values/keycloak.yaml
-      image_repository: bitnami/keycloak
+      image_repository: bitnamilegacy/keycloak
       tag_path: .image.tag
 
   synapse:
-    version: "v1.114.0" # study 1.2
+    version: "v1.160.0" # study 1.2
     ports: { SYNAPSE_CLIENT_PORT: 8008, SYNAPSE_FEDERATION_PORT: 8448 }
     compose:
       image: matrixdotorg/synapse
@@ -134,7 +143,7 @@ services:
       tag_path: synapse.image.tag
 
   element_web:
-    version: "v1.11.86" # study 1.2
+    version: "v1.12.27" # study 1.2
     ports: { ELEMENT_PORT: 8081 }
     compose:
       image: vectorim/element-web
@@ -246,7 +255,14 @@ services:
       raw_image_line: true
 
   minio:
-    version: "RELEASE.2024-10-13T13-34-11Z" # study 2.12
+    # study 2.12 - the minio/minio repository is no longer maintained
+    # upstream (README: "THIS REPOSITORY IS NO LONGER MAINTAINED", source-
+    # only distribution going forward, no more pre-built binaries/images
+    # for the community edition); Docker Hub stopped publishing new
+    # `minio/minio` RELEASE tags around September 2025. Pinned to the last
+    # tag actually published there - going further requires building from
+    # source or moving to MinIO AIStor (the maintained successor).
+    version: "RELEASE.2025-09-07T16-13-09Z"
     ports: { MINIO_API_PORT: 9000, MINIO_CONSOLE_PORT: 9001 }
     compose:
       image: minio/minio
@@ -270,7 +286,10 @@ services:
       tag_path: .image.tag
 
   caddy:
-    version: "2.8.4-alpine" # study 2.3
+    # study 2.3 - land on 2.11.2 or later: GHSA-7r4p-vjf4-gxv4 (identity-
+    # header injection via forward_auth) is fixed there, and this repo's
+    # OnlyOffice/Novu SSO gates rely on forward_auth (study 1.7).
+    version: "2.11.4-alpine"
     ports: { CADDY_HTTP_PORT: 10080, CADDY_HTTPS_PORT: 10443 }
     compose:
       image: caddy

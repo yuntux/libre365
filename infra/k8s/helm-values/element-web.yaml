@@ -12,7 +12,7 @@ replicaCount: 2
 
 image:
   repository: vectorim/element-web
-  tag: "v1.11.86"
+  tag: "v1.12.27"
 
 config:
   default_server_config:
@@ -23,18 +23,24 @@ config:
       base_url: "https://vector.im"
 
   # 2.4 L.427-436 — MatrixRTC / Element Call natively embedded as a room widget,
-  # LiveKit backend (1.3 L.107).
+  # LiveKit backend (1.3 L.107). Element Call now ships bundled inside the
+  # Element Web package itself rather than being reached at a configured
+  # `url` (that field, and `participant_limit`, no longer exist in Element
+  # Web's config schema) - [UNCERTAIN, not re-verified end-to-end]: this
+  # may make the standalone Element Call deployment
+  # (infra/k8s/helm-values/element-call.yaml, the `call.libre365.example.org`
+  # Caddy site block) redundant for the embedded-widget use case; worth
+  # reassessing before the next deployment rather than assumed unaffected.
   element_call:
-    url: "https://call.libre365.example.org"
     use_exclusively: false
-    participant_limit: 8
     brand: "Element Call"
 
   # 2.4 L.436 — /visio widget (adapted from Tchap) pointing to DINUM/LaSuite Meet Visio.
   jitsi:
     preferredDomain: "" # not used: dedicated /visio widget, see connectors/ (out of scope for this k8s repository)
 
-  sso_immediate_redirect: true
+  sso_redirect_options:
+    immediate: true
   disable_custom_urls: false
   disable_guests: true
 

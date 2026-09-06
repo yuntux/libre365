@@ -12,7 +12,7 @@
 # exercise them. Generating it from the real Caddyfile instead means the
 # two can never drift apart like that again; only two things are stripped
 # because this sandboxed/local dev environment genuinely cannot run them:
-# `html_inject` (needs a custom xcaddy-built plugin unavailable here) and
+# `injection` (needs a custom xcaddy-built plugin unavailable here) and
 # automatic HTTPS (no real public DNS to get a certificate for - forced to
 # plain `http://` instead). `forward_auth`/`route` (the SSO gates) are
 # Caddy built-ins since 2.7, not part of that plugin, so they DO work here
@@ -22,9 +22,10 @@
 # runner respectively, with no real DNS anywhere.
 #
 # The Deployment/Service below stay hand-maintained (plain
-# `caddy:2.8.4-alpine`, no plugin needed since html_inject is stripped and
-# forward_auth needs no plugin at all) - unaffected by platform.yaml, same
-# convention as every other file under infra/k8s/manifests/dev/.
+# `caddy:2.11.4-alpine`, no plugin needed since the injection directive is
+# stripped and forward_auth needs no plugin at all) - unaffected by
+# platform.yaml, same convention as every other file under
+# infra/k8s/manifests/dev/.
 #
 # Backend hostnames in the generated Caddyfile are the in-cluster Service
 # DNS names created by each brick's own Helm release / raw manifest (see
@@ -233,7 +234,7 @@ spec:
     spec:
       containers:
         - name: caddy
-          image: caddy:2.8.4-alpine
+          image: caddy:2.11.4-alpine
           ports:
             - containerPort: 80
           resources:

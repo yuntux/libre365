@@ -316,7 +316,7 @@ def test_oidc_coverage_flags_a_client_missing_from_the_app_files_mapping(tmp_pat
 
 _SAMPLE_PROD_CADDYFILE = """{
     # Built with the HTML injection module (xcaddy), see the header comment.
-    order html_inject before respond
+    order injection after encode
 }
 
 (banner_assets) {
@@ -330,10 +330,9 @@ chat.libre365.example.org {
     import banner_assets
     handle {
         reverse_proxy element-web.libre365.svc.cluster.local:80
-        html_inject {
-            selector "</body>"
-            file /etc/caddy/snippets/banner.html
-            position before
+        injection {
+            inject /etc/caddy/snippets/banner.html
+            before "</body>"
         }
     }
 }
@@ -356,11 +355,11 @@ matrix.libre365.example.org:8448 {
 """
 
 
-def test_dev_caddyfile_strips_html_inject_but_keeps_forward_auth():
+def test_dev_caddyfile_strips_html_injection_but_keeps_forward_auth():
     dev_text = sync_platform._dev_caddyfile_from_production(_SAMPLE_PROD_CADDYFILE)
 
-    assert "html_inject" not in dev_text
-    assert "order html_inject before respond" not in dev_text
+    assert "injection" not in dev_text
+    assert "order injection after encode" not in dev_text
     assert "forward_auth" in dev_text
     assert "route /oauth2/*" in dev_text
     assert "oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180" in dev_text

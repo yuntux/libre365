@@ -14,8 +14,8 @@
 # keycloak-100.yaml / keycloak-2000.yaml overlays.
 
 image:
-  repository: bitnami/keycloak
-  tag: "26.0.7"
+  repository: bitnamilegacy/keycloak
+  tag: "26.3.3"
 
 auth:
   adminUser: admin
