@@ -36,6 +36,7 @@ ansible-playbook -i inventory/hosts.ini site.yml
 Or component by component:
 
 ```bash
+ansible-playbook -i inventory/hosts.ini playbooks/os-hardening.yml
 ansible-playbook -i inventory/hosts.ini playbooks/keycloak-realm.yml
 ansible-playbook -i inventory/hosts.ini playbooks/grommunio.yml
 ansible-playbook -i inventory/hosts.ini playbooks/matrix.yml
@@ -47,6 +48,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 
 | Playbook | Content | Study reference |
 |---|---|---|
+| `playbooks/os-hardening.yml` | fail2ban (`sshd` jail) + SSH password-auth/root-login hardening on every real VM (via the `os_hardening` role) — **read its role's README before the first run** | not a numbered requirement — closes a gap noted during review |
 | `playbooks/keycloak-realm.yml` | Main realm, TOTP + WebAuthn/FIDO2, per-component OIDC clients (via the `keycloak_realm` role) | 1.7 |
 | `playbooks/grommunio.yml` | `GAL_ENABLED`/`GAL_CACHE_TTL`, disabling the web admin, EWS/EAS/MAPI enabled | 1.1, 2.13 |
 | `playbooks/matrix.yml` | `server_name`, Synapse OIDC provider pointing to Keycloak | 1.2, 1.7 |
@@ -58,6 +60,7 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 `roles/keycloak_realm/` is the reference role: the
 `tasks/`/`defaults/`/`templates/`/`handlers/` structure to reuse for any
 future role extracted from these playbooks (see its own `README.md`).
+`roles/os_hardening/` follows the same structure.
 
 ## Secrets
 

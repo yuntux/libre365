@@ -1,0 +1,47 @@
+---
+# os_hardening role — see README.md for the full rationale (fail2ban +
+# SSH baseline, applied to every real VM in this stack: Grommunio and the
+# Kubernetes control-plane/worker nodes - see playbooks/os-hardening.yml
+# for which inventory groups this targets, and why "control_apis" is
+# deliberately excluded).
+
+- name: "Install fail2ban"
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+    update_cache: true
+  when: os_hardening_fail2ban_enabled
+
+- name: "Deploy the baseline jail configuration"
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  when: os_hardening_fail2ban_enabled
+  notify: "Restart fail2ban"
+
+- name: "Ensure fail2ban is enabled and running"
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+    state: started
+  when: os_hardening_fail2ban_enabled
+
+- name: "Disable SSH password authentication (key-based access only)"
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*PasswordAuthentication\s'
+    line: "PasswordAuthentication no"
+    validate: "sshd -t -f %s"
+  when: os_hardening_ssh_disable_password_auth
+  notify: "Restart sshd"
+
+- name: "Restrict root SSH login ({{ os_hardening_ssh_permit_root_login }})"
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?\s*PermitRootLogin\s'
+    line: "PermitRootLogin {{ os_hardening_ssh_permit_root_login }}"
+    validate: "sshd -t -f %s"
+  notify: "Restart sshd"

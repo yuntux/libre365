@@ -1,0 +1,38 @@
+---
+# os_hardening role — see README.md for the full rationale.
+
+# --- fail2ban -----------------------------------------------------------
+os_hardening_fail2ban_enabled: true
+
+# Left unblocked regardless of failed attempts - the Ansible control host
+# itself, and any address explicitly added by the caller (e.g. an admin's
+# fixed IP or the firm's VPN range). Without this, a control host that
+# occasionally sends a bad credential (a stale password auth attempt during
+# a migration, a monitoring probe) could ban itself out of the very hosts
+# it manages.
+os_hardening_fail2ban_ignoreip:
+  - "127.0.0.1/8"
+  - "::1"
+
+# sshd jail (the only jail enabled by default - other services in this
+# stack are behind Caddy/Keycloak, not exposed to raw SSH-style brute
+# force the same way).
+os_hardening_fail2ban_ssh_maxretry: 5
+os_hardening_fail2ban_ssh_findtime: 10m
+os_hardening_fail2ban_ssh_bantime: 1h
+# Progressively longer bans for repeat offenders within a day, rather than
+# a single fixed duration - fail2ban's own recommended "bantime.increment"
+# feature.
+os_hardening_fail2ban_bantime_increment: true
+os_hardening_fail2ban_bantime_factor: 4
+os_hardening_fail2ban_bantime_maxtime: 1w
+
+# --- SSH hardening --------------------------------------------------------
+os_hardening_ssh_disable_password_auth: true
+# "prohibit-password" rather than a flat "no": every host in this
+# inventory (including root@grommunio-vm, see inventory/hosts.ini.example)
+# is expected to already authenticate by key via cloud-init
+# (infra/terraform's ssh_public_key variable) - this keeps root reachable
+# by key while still refusing a root password, rather than locking root
+# out entirely (which "no" would do, differently from PasswordAuthentication).
+os_hardening_ssh_permit_root_login: "prohibit-password"

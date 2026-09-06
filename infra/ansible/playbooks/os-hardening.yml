@@ -1,0 +1,11 @@
+---
+# Baseline OS security hardening (fail2ban + SSH) - see
+# ../roles/os_hardening/README.md for the full rationale. Applied to every
+# real VM in this stack: `grommunio` and the Kubernetes nodes. Deliberately
+# does NOT target `control_apis` (localhost) - that group drives remote
+# REST APIs (Keycloak, Matrix), there's no actual VM behind it to harden.
+- name: "Baseline OS hardening (fail2ban, SSH)"
+  hosts: grommunio:k8s_control_plane:k8s_workers
+  become: true
+  roles:
+    - os_hardening
