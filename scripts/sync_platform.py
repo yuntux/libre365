@@ -25,8 +25,6 @@ Files touched:
 Never writes to platform.yaml itself.
 """
 
-from __future__ import annotations
-
 import argparse
 import html
 import io

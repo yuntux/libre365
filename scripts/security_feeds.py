@@ -25,8 +25,6 @@ must never fail the whole run: each feed is fetched independently, a
 failure is reported as a warning and the others still get processed.
 """
 
-from __future__ import annotations
-
 import argparse
 import hashlib
 import json

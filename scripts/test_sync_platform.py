@@ -11,8 +11,6 @@ of whichever base happens to be baked into the file at check time.
 Run with: pytest scripts/test_sync_platform.py
 """
 
-from __future__ import annotations
-
 import sync_platform
 
 
