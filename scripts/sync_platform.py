@@ -182,9 +182,12 @@ def compute_domain_changes(platform: dict) -> list[Change]:
 
 # Subdomain keys that legitimately have NO Caddyfile site block: `registry`
 # is a container-registry hostname (pulled by kubelet, never browsed/proxied),
-# and `livekit` has no Kubernetes deployment anywhere in this repository
-# (see visio-meet.yaml/element-call.yaml's own comments — out of scope for
-# this project). Every other domain in platform.yaml is expected to be
+# and `livekit` has no Kubernetes deployment anywhere in this repository —
+# visio-meet.yaml and element-call.yaml both USE a LiveKit URL
+# (LIVEKIT_URL/LIVEKIT_API_URL) but neither DEPLOYS LiveKit itself; that gap
+# is explained in infra/k8s/helm-values/README.md's "Out of scope for this
+# directory" section, not in either of those two files. Every other domain
+# in platform.yaml is expected to be
 # reachable through Caddy (../k8s/manifests/caddy.yaml) — see
 # infra/k8s/helm-values/README.md, "Public entry point: Caddy".
 DOMAINS_WITHOUT_CADDY_SITE = {"registry", "livekit"}

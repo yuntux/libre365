@@ -112,6 +112,37 @@ Service instead lists a different port first (e.g. a metrics port), adjust
 the index in `EXPOSE_MAP`; `lib-expose.sh`'s header comment explains exactly
 what to check (`kubectl get service <name> -n libre365 -o yaml`).
 
+## Testing DNS record computation (external-dns, `inmemory` provider)
+
+Production uses `external-dns` with the OVH provider to populate the real
+DNS zone (`../infra/k8s/helm-values/external-dns.yaml`) — but this
+sandboxed environment can't validate that against a real OVH account, and
+neither can this dev cluster. What CAN be tested locally, and is: whether
+external-dns correctly reads the Caddy Service's `external-dns.alpha.
+kubernetes.io/hostname` annotation and computes the right record for every
+domain in `platform.yaml`. `deploy.sh` installs external-dns here with
+`../infra/k8s/helm-values/dev/external-dns.yaml`'s `inmemory` provider
+override (external-dns's own built-in provider for exactly this — used the
+same way in its upstream e2e tests) instead of the real OVH webhook, and
+also applies the REAL `../infra/k8s/manifests/caddy.yaml` (not the
+simplified `caddy-dev` used for actual dev routing) purely so its Service
+carries the exact production annotation, rather than a hand-copied
+duplicate that could silently drift from it — see `deploy.sh`'s own
+comment on that step for why its pods are expected to never become Ready
+(harmless, only the Service/annotation matters here).
+
+```bash
+./dev-cluster/check-external-dns.sh
+```
+
+This reads every domain from `platform.yaml` (skipping `registry`/`livekit`,
+which have no Caddyfile site block by design — see `scripts/sync_platform.py`'s
+`DOMAINS_WITHOUT_CADDY_SITE`) and greps external-dns's logs for each one,
+failing loudly if any is missing. It validates the annotation-parsing/
+record-computation logic end to end. It does **not** validate that OVH's
+API would actually apply the change — that can only be checked against a
+real OVH account in an actual deployment (study, chapter 5.4).
+
 ## Usage
 
 Prerequisites: `k3d`, `kubectl`, `helm`, `docker` on `PATH`.
@@ -122,6 +153,11 @@ docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
 
 # Bring up the k3d cluster + every other brick (Novu included) + the 5 connectors
 ./dev-cluster/deploy.sh
+
+# Verify external-dns reads the Caddy Service's annotation correctly
+# (inmemory provider - no real DNS touched, see "Testing DNS record
+# computation" above)
+./dev-cluster/check-external-dns.sh
 
 # Fast inner loop after editing a connector's code
 ./dev-cluster/redeploy.sh unified-search
@@ -148,5 +184,5 @@ instead of docker-compose — see `../tests/integration/README.md`.
   NodePort range) and the same port tables that drive
   `grommunio-dev/.env.example` (port-forwarding list). Do not hand-edit it
   — see its own header comment.
-- `deploy.sh`, `redeploy.sh`, `destroy.sh`, `lib-expose.sh` are hand-written
-  orchestration, not generated.
+- `deploy.sh`, `redeploy.sh`, `destroy.sh`, `lib-expose.sh`,
+  `check-external-dns.sh` are hand-written orchestration, not generated.

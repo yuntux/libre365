@@ -1,0 +1,32 @@
+# Dev-speed hardening overlay for external-dns - see
+# ../../../../dev-cluster/README.md for the overall rationale, and its
+# "Testing DNS record computation" section for what this specifically
+# validates. Usage:
+#   helm upgrade --install external-dns external-dns/external-dns \
+#     -f external-dns.yaml -f dev/external-dns.yaml
+#
+# Overrides the base file's OVH webhook provider with `inmemory` -
+# external-dns's own built-in provider for exactly this use case (its
+# upstream e2e tests use it the same way): it computes the same DNS
+# records a real provider would from the Caddy Service's `external-dns.
+# alpha.kubernetes.io/hostname` annotation, logs every create/update/delete
+# action, but never calls a real DNS API. This tests "does external-dns
+# read the annotation correctly and compute the right record set" without
+# needing real OVH credentials - it does NOT test that OVH's own API
+# actually applies the change, which can only be verified in a real
+# deployment (see dev-cluster/README.md).
+provider:
+  name: inmemory
+
+# Verbose enough that `dev-cluster/check-external-dns.sh` can grep the pod
+# logs for a create action per expected hostname.
+logLevel: debug
+
+replicaCount: 1
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "250m"
+    memory: "128Mi"

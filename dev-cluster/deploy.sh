@@ -17,7 +17,7 @@ CLUSTER_NAME="libre365-dev"
 NAMESPACE="libre365"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
 
-echo "==> 1/6 k3d cluster"
+echo "==> 1/7 k3d cluster"
 if k3d cluster list -o json 2>/dev/null | grep -q "\"name\":\"${CLUSTER_NAME}\""; then
   echo "    cluster '${CLUSTER_NAME}' already exists, skipping creation."
 else
@@ -25,10 +25,10 @@ else
 fi
 kubectl config use-context "k3d-${CLUSTER_NAME}"
 
-echo "==> 2/6 namespace"
+echo "==> 2/7 namespace"
 kubectl apply -f infra/k8s/manifests/namespace.yaml
 
-echo "==> 3/6 Helm repos (see infra/k8s/helm-values/README.md)"
+echo "==> 3/7 Helm repos (see infra/k8s/helm-values/README.md)"
 helm repo add ananace-charts https://ananace.gitlab.io/charts >/dev/null
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null
 helm repo add minio https://charts.min.io/ >/dev/null
@@ -45,7 +45,7 @@ helm repo add onlyoffice https://onlyoffice.github.io/docs-cloud-chart >/dev/nul
 helm repo add peertube-helm https://peertube-helm.github.io/charts >/dev/null || true
 helm repo update >/dev/null
 
-echo "==> 4/6 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
+echo "==> 4/7 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
 helm upgrade --install keycloak bitnami/keycloak -n "$NAMESPACE" \
   -f infra/k8s/helm-values/keycloak.yaml -f infra/k8s/helm-values/dev/keycloak.yaml
 helm upgrade --install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
@@ -64,8 +64,12 @@ helm upgrade --install peertube peertube-helm/peertube -n "$NAMESPACE" \
   -f infra/k8s/helm-values/peertube.yaml -f infra/k8s/helm-values/dev/peertube.yaml
 helm upgrade --install novu novu/novu -n "$NAMESPACE" \
   -f infra/k8s/helm-values/novu.yaml -f infra/k8s/helm-values/dev/novu.yaml
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ >/dev/null
+helm repo update external-dns >/dev/null
+helm upgrade --install external-dns external-dns/external-dns -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/external-dns.yaml -f infra/k8s/helm-values/dev/external-dns.yaml
 
-echo "==> 5/6 In-house connectors: build + import images, apply manifests"
+echo "==> 5/7 In-house connectors: build + import images, apply manifests"
 for name in "${CONNECTORS[@]}"; do
   echo "    building libre365/${name}:dev"
   docker build -t "libre365/${name}:dev" "connectors/${name}"
@@ -75,7 +79,20 @@ kubectl apply -f infra/k8s/manifests/connectors/
 kubectl apply -f infra/k8s/manifests/gokapi.yaml
 kubectl apply -f infra/k8s/manifests/dev/caddy.yaml
 
-echo "==> 6/6 Exposing services as NodePort (matching platform.yaml's port numbers)"
+echo "==> 6/7 Production caddy.yaml's Service (for external-dns testing only)"
+# Applies the REAL infra/k8s/manifests/caddy.yaml as-is - not to run
+# production Caddy in dev (dev routing is caddy-dev, applied above), but so
+# its Service exists with the exact same external-dns hostname annotation
+# used in production, letting check-external-dns.sh validate against the
+# real thing instead of a hand-copied duplicate that could silently drift
+# from it. Its Deployment pods are expected to never become Ready here
+# (registry.libre365.example.org doesn't exist, and caddy-injection.yaml's
+# banner ConfigMap isn't applied in this dev flow) - harmless, only the
+# Service+annotation matters for this test. k3d's built-in Klipper load
+# balancer still assigns the LoadBalancer Service an IP regardless.
+kubectl apply -f infra/k8s/manifests/caddy.yaml
+
+echo "==> 7/7 Exposing services as NodePort (matching platform.yaml's port numbers)"
 source "$(dirname "${BASH_SOURCE[0]}")/lib-expose.sh"
 expose_all_services
 
