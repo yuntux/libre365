@@ -1,0 +1,53 @@
+# Dev-only Keycloak CR - see dev-cluster/README.md. Applied INSTEAD OF
+# ../keycloak.yaml in the k3d dev cluster (dev-cluster/deploy.sh), never
+# both: unlike every Helm-backed brick, Keycloak has no `-f base -f dev/`
+# overlay mechanism to layer on top of the production manifest (it's a raw
+# Operator CR, not a Helm release - see ../keycloak.yaml's own header), so
+# "dev hardening" here means a whole second CR rather than an additional
+# `-f` flag.
+#
+# Only two fields differ from ../keycloak.yaml, both found the hard way:
+# `deploy.sh` was applying the PRODUCTION 100-user-scale sizing
+# (`instances: 2`, `2Gi` memory request per instance - 4Gi requests before
+# even counting the 4Gi limit each allows bursting to) straight into the
+# dev cluster, unlike every other brick here which gets a dev/*.yaml
+# resource-shrinking overlay. On a modest dev machine that's most of the
+# available RAM spent on Keycloak alone before Synapse, Seafile, or
+# anything else even starts. `instances: 1` (no HA needed for a solo dev
+# session) and a single-digit-hundreds-of-Mi request/low-Gi limit (Keycloak
+# on Quarkus runs a single small realm comfortably in that range) bring it
+# in line with every other brick's dev footprint.
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: libre365
+spec:
+  image: quay.io/keycloak/keycloak:26.7.3
+  instances: 1
+  http:
+    httpEnabled: true
+  hostname:
+    hostname: sso.libre365.example.org
+  proxy:
+    headers: xforwarded
+  bootstrapAdmin:
+    user:
+      secret: keycloak-admin-secret
+  db:
+    vendor: postgres
+    host: keycloak-postgres-postgresql.libre365.svc.cluster.local
+    database: keycloak
+    usernameSecret:
+      name: keycloak-postgres-secret
+      key: username
+    passwordSecret:
+      name: keycloak-postgres-secret
+      key: password
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "768Mi"
+    limits:
+      cpu: "1"
+      memory: "1536Mi"
