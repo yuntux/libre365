@@ -62,8 +62,8 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
     keycloak-postgres) chart="bitnami/postgresql" ;;
     synapse) chart="ananace-charts/matrix-synapse" ;;
     element-web) chart="ananace-charts/matrix-element-web" ;;
-    seafile) chart="seafile-charts/seafile-ce" ;;
-    onlyoffice) chart="onlyoffice/docs-cloud" ;;
+    seafile) chart="seafile-charts/ce" ;;
+    onlyoffice) chart="onlyoffice/docs" ;;
     vikunja) chart="vikunja/vikunja" ;;
     seaweedfs) chart="seaweedfs/seaweedfs" ;;
     peertube) chart="peertube-helm/peertube" ;;

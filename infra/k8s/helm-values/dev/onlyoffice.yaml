@@ -6,7 +6,7 @@
 # exist in the -100/-2000 overlays), this file must set them directly.
 #
 # Usage:
-#   helm upgrade --install onlyoffice onlyoffice/docs-cloud -n libre365-dev \
+#   helm upgrade --install onlyoffice onlyoffice/docs -n libre365-dev \
 #     -f onlyoffice.yaml -f dev/onlyoffice.yaml
 #
 # Key paths reused below are exactly the ones already used in onlyoffice.yaml /

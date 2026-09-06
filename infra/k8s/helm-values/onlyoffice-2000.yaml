@@ -4,7 +4,7 @@
 # increases to absorb the volume of simultaneous connections, each replica staying
 # sized as at 100 (~8 cores/16 GB), in line with the cluster's horizontal scaling
 # principle adopted in 1.5 L.198.
-# Usage: helm upgrade --install onlyoffice onlyoffice/docs-cloud -f onlyoffice.yaml -f onlyoffice-2000.yaml
+# Usage: helm upgrade --install onlyoffice onlyoffice/docs -f onlyoffice.yaml -f onlyoffice-2000.yaml
 replicaCount: 4
 
 resources:
