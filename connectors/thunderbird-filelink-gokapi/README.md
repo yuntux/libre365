@@ -43,6 +43,58 @@ no associated Dockerfile.
 3. Attach a file above the configured Filelink threshold: Thunderbird offers to
    send it via Gokapi rather than as a classic attachment.
 
+## Fleet-wide deployment (`policies.json`)
+
+The manual steps above don't scale to every consultant's workstation. This is
+a **different mechanism from the mail account autoconfig** (`autoconfig.xml`,
+see `docs/clients.md`) — that one only ever describes mail server settings,
+it has no notion of an extension to install. Thunderbird's own **enterprise
+policy engine** covers that instead: `policies.json`'s `ExtensionSettings`
+key, with `"installation_mode": "force_installed"`, silently installs (and
+keeps installed) an extension from a URL — bypassing the AMO signing
+requirement that would otherwise block a custom, non-Mozilla-reviewed
+extension like this one.
+
+`policies.json` (this directory) is a ready-to-deploy template:
+
+```json
+{
+  "policies": {
+    "ExtensionSettings": {
+      "gokapi-filelink@libre365.example.org": {
+        "installation_mode": "force_installed",
+        "install_url": "https://onboarding.libre365.example.org/extensions/gokapi-filelink.xpi"
+      }
+    }
+  }
+}
+```
+
+Two things a maintainer still has to do — both are workstation/endpoint
+concerns, out of scope for this repository's server-side IaC:
+
+1. **Package this extension as a `.xpi`** (a plain zip of this directory's
+   contents — `manifest.json`, `background.js`, `management.html`,
+   `management.js`, `icons/`, excluding `README.md`/`policies.json`
+   themselves) and publish it at the `install_url` above. No build step
+   currently packages or publishes this automatically; the URL assumes it's
+   hosted on the onboarding static site
+   (`infra/k8s/manifests/caddy.yaml`'s `onboarding.<domain>` site block),
+   whose actual content isn't populated by anything in this repository
+   either (see that file's Caddyfile comment) — publishing the `.xpi` there
+   requires that gap to be closed too, or an alternative hosting location.
+2. **Deploy `policies.json` to every workstation** — Thunderbird looks for it
+   in a `distribution/` folder next to its own installation directory, or it
+   can be centrally pushed via a Windows GPO (`Software\Policies\Mozilla\Thunderbird`
+   registry keys, one per policy) or a macOS configuration profile. Which
+   channel to use depends on the firm's existing endpoint-management tooling
+   (Active Directory, MDM, or a plain login-script copy) — not something an
+   infrastructure-as-code repository targeting the server side can prescribe.
+
+The `install_url`'s domain is patched automatically by `scripts/sync_platform.py`
+like every other domain occurrence in this repository (see
+`platform.yaml`'s `domains.subdomains.onboarding`) — never edit it by hand.
+
 ## Accepted limitations (deliberate stub)
 
 - The exact format of Gokapi's `POST /api/files/upload` response is simplified
