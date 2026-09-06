@@ -143,8 +143,27 @@ data:
         reverse_proxy element-call.libre365.svc.cluster.local:80
     }
 
+    # study 1.7/docs/oidc.md — OnlyOffice Document Server has no login
+    # screen of its own (its JWT only signs individual document-open
+    # requests from Seafile), so a Keycloak SSO gate is added here instead:
+    # /oauth2/* is routed to oauth2-proxy itself (login start + callback),
+    # everything else goes through forward_auth first (redirects an
+    # unauthenticated browser to Keycloak) before ever reaching Document
+    # Server. "oauth2-proxy-onlyoffice" assumes that Helm release name for
+    # infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml (unverified against
+    # an actual `helm install` from this sandboxed environment, same
+    # category of assumption already documented for "novu-api" below).
     office.libre365.example.org {
-        reverse_proxy onlyoffice.libre365.svc.cluster.local:80
+        route /oauth2/* {
+            reverse_proxy oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180
+        }
+        route {
+            forward_auth oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180 {
+                uri /oauth2/auth
+                copy_headers X-Auth-Request-User X-Auth-Request-Email
+            }
+            reverse_proxy onlyoffice.libre365.svc.cluster.local:80
+        }
     }
 
     sso.libre365.example.org {
@@ -191,6 +210,26 @@ data:
     # dev-cluster/lib-expose.sh).
     notifications.libre365.example.org {
         reverse_proxy novu-api.libre365.svc.cluster.local:3000
+    }
+
+    # Novu's `web` ADMIN dashboard (template/workflow management) — a
+    # separate surface from the API above, gated by Keycloak SSO via
+    # oauth2-proxy (same pattern as the office.libre365.example.org block,
+    # see docs/oidc.md). "oauth2-proxy-novu"/"novu-web" both assume their
+    # respective chart's default naming convention, unverified from this
+    # sandboxed environment - same category of assumption as "novu-api"
+    # above.
+    notifications-admin.libre365.example.org {
+        route /oauth2/* {
+            reverse_proxy oauth2-proxy-novu.libre365.svc.cluster.local:4180
+        }
+        route {
+            forward_auth oauth2-proxy-novu.libre365.svc.cluster.local:4180 {
+                uri /oauth2/auth
+                copy_headers X-Auth-Request-User X-Auth-Request-Email
+            }
+            reverse_proxy novu-web.libre365.svc.cluster.local:4200
+        }
     }
 ---
 apiVersion: v1
@@ -345,7 +384,7 @@ metadata:
     # Single line, no spaces after the commas: external-dns splits this
     # value on "," without necessarily trimming whitespace, so a folded
     # multi-line scalar here would risk a leading-space-prefixed hostname.
-    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,autoconfig.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org"
+    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,autoconfig.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org,notifications-admin.libre365.example.org"
 spec:
   selector:
     app.kubernetes.io/name: caddy

@@ -13,11 +13,24 @@ Every entry in `infra/ansible/roles/keycloak_realm/defaults/main.yml`'s
 present, all consistent:
 
 1. A Keycloak client definition (the realm entry itself).
-2. The matching `client_id` configured on the application side, in its
-   `infra/k8s/helm-values/*.yaml` (or `infra/k8s/manifests/gokapi.yaml`).
+2. The matching `client_id` configured on the side that actually uses it —
+   normally the application's own `infra/k8s/helm-values/*.yaml` (or
+   `infra/k8s/manifests/gokapi.yaml`); for the two components with no
+   native OIDC support of their own (OnlyOffice, Novu — see below), that's
+   instead the `oauth2-proxy-*.yaml` gate placed in front of them.
 3. A real `ExternalSecret` in `infra/k8s/manifests/external-secrets.yaml`
-   backing the client secret the application references — never a
-   hardcoded or dangling `secretKeyRef`.
+   backing the client secret that side references — never a hardcoded or
+   dangling `secretKeyRef`.
+
+**Every component the study expects to be SSO-gated has a client** —
+including the two that don't speak OIDC themselves. Rather than leave them
+unprotected (as an earlier pass on this branch mistakenly did — see the
+changelog note at the end of this file) or invent OIDC support neither
+product has, they're gated at the reverse-proxy layer: Caddy's
+`forward_auth` sends every request to an `oauth2-proxy` instance first,
+which redirects an unauthenticated browser to Keycloak and only lets the
+request through once Keycloak has authenticated it. The application never
+sees Keycloak directly; the gate is what holds the client.
 
 `scripts/sync_platform.py`'s `check_oidc_coverage()` enforces (2) and (3)
 for every client declared in (1), unconditionally, on every run (`apply`
@@ -38,8 +51,8 @@ all fixed on this branch:
 | **PeerTube** | The `openid_connect` plugin block had a `client_id` but no `client_secret` at all. | Added a `client_secret` block (`existingSecret: peertube-oidc-secret`) to `peertube.yaml`, and the matching `ExternalSecret`. **[UNCERTAIN]**: the community chart's exact field shape for injecting a Secret into a plugin setting isn't independently confirmed — see that file's own comment; verify against the real chart before deploying. |
 | **Visio (LaSuite Meet)** | Full app-side OIDC config (`OIDC_RP_CLIENT_ID: "visio-meet"`, etc.) in `visio-meet.yaml`, but no `visio-meet` Keycloak client existed anywhere — the realm would reject every login attempt. | Added the `visio-meet` client to `keycloak_realm/defaults/main.yml` (redirect URI inferred from mozilla-django-oidc's default callback path, `/oidc/callback/` — LaSuite Meet is a Django app, per that file's env var naming convention; not independently confirmed against LaSuite Meet's own source), plus `visio-meet-oidc-secret`. |
 | **Matrix / Synapse** | Two conflicting configs: the Helm chart's native `synapse.oidc` block used `client_id: "synapse"` (wrong, unused), while a separate Ansible-rendered ConfigMap (`playbooks/matrix.yml`) used the correct `client_id: "matrix-synapse"` — but that ConfigMap was never actually consumed by anything (`grep` for its name/`extraConfig` found no reference anywhere in the chart wiring). | Fixed `synapse.yaml`'s own `client_id` to `"matrix-synapse"` (matching the realm and `synapse-oidc-secret`, which was already correct); deleted the dead `playbooks/matrix.yml` and its template rather than reconciling two configs when only one was ever live. |
-| **OnlyOffice Document Server** | Had a Keycloak client, but Community Edition has no standalone end-user login when embedded via a host app — it's reached exclusively via JWT-signed requests from Seafile (`onlyoffice-jwt-secret`, already correctly wired on both sides). The client had nothing that could ever use it. | Removed the `onlyoffice` Keycloak client — a modeling error, not a missing wire-up; inventing a login flow for it would misrepresent the architecture. |
-| **Novu** | Had a Keycloak client, but the notification-center widget authenticates subscribers via an HMAC-signed subscriber hash derived from the API key, not OIDC — and Novu's own admin dashboard is not exposed publicly in this stack at all (no Caddy site, no domain). Corroborated by an existing comment already in `infra/k8s/helm-values/novu.yaml` itself: "Novu is not exposed directly to consultants as a standalone application, but integrated into the top bar". | Removed the `novu` Keycloak client for the same reason as OnlyOffice. |
+| **OnlyOffice Document Server** | Had a Keycloak client with nothing to use it: Community Edition has no standalone end-user login when embedded via a host app — it's reached exclusively via JWT-signed requests from Seafile (`onlyoffice-jwt-secret`, already correctly wired on both sides) — but `office.libre365.example.org` was, and remains, a direct public route with no gate at all in front of the browser-facing surface. | An earlier pass on this branch removed the client outright, reasoning the app had "no login surface to protect" — that's true of OnlyOffice's own login, but false of the public endpoint itself: anyone could open `office.libre365.example.org` directly. Corrected: re-added the `onlyoffice` client and put a Caddy `forward_auth` → `oauth2-proxy` gate (`oauth2-proxy-onlyoffice.yaml`) in front of the site block, in addition to (not instead of) the existing JWT document-level signing. |
+| **Novu** | Had a Keycloak client with nothing to use it in the same way: the notification-center *widget* authenticates subscribers via an HMAC-signed subscriber hash, not OIDC. But `novu.yaml`'s own `env` block sets `FRONT_BASE_URL`/`WS_URL` to `notifications.libre365.example.org`, and that hostname *is* Caddy-fronted — the widget-facing API is the only thing actually gated by anything (its HMAC auth), and Novu's `web` admin dashboard had no route, gated or not. | An earlier pass removed the client, reasoning (partly on this file's own comment, which is accurate for the *widget*) that Novu has no exposed login surface — true for the widget, incomplete for the admin dashboard, which simply wasn't wired up either way. Corrected: re-added the `novu` client, added a new `notifications-admin.libre365.example.org` Caddy site exposing Novu's `web` dashboard, gated by its own `oauth2-proxy` instance (`oauth2-proxy-novu.yaml`). `notifications.libre365.example.org` (the API, consumed by the widget) is deliberately left as-is — gating it with an interactive Keycloak login would break the widget, which has no browser redirect flow to complete one. |
 
 ## Components with no client — by design
 
@@ -51,6 +64,35 @@ all fixed on this branch:
   Keycloak directly.
 - **MinIO**: no end-user login surface in this architecture (internal S3
   backend only) — no client needed.
+
+## OnlyOffice and Novu: gated by proxy, not by the app itself
+
+Two components in `keycloak_oidc_clients` — `onlyoffice` and `novu` — don't
+speak OIDC natively at all. Rather than leave their public routes
+unprotected, or invent OIDC support neither product actually has, each is
+put behind its own `oauth2-proxy` instance (official
+`oauth2-proxy/oauth2-proxy` chart):
+
+- `infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml` gates
+  `office.libre365.example.org` in front of Document Server.
+- `infra/k8s/helm-values/oauth2-proxy-novu.yaml` gates the *new*
+  `notifications-admin.libre365.example.org` site in front of Novu's `web`
+  dashboard — deliberately **not** in front of `notifications.libre365.example.org`
+  (the API), which the top-bar widget calls with its own HMAC
+  subscriberHash auth and has no interactive login flow to redirect
+  through.
+
+In `infra/k8s/manifests/caddy.yaml`, each gated site routes `/oauth2/*` to
+the proxy itself (login start + callback) and everything else through
+`forward_auth` first — verified against a real Caddy 2.8.4 binary
+(`caddy validate --adapter caddyfile`), the same way every other change to
+that file on this branch has been. Each proxy's Keycloak client
+(`onlyoffice`/`novu` in `keycloak_realm/defaults/main.yml`) has its
+`redirect_uris` pointing at that proxy's own `/oauth2/callback`, not at the
+application — the application never talks to Keycloak directly in either
+case. `check_oidc_coverage()`'s `OIDC_CLIENT_APP_FILES` mapping points
+these two client_ids at their gate's helm-values file rather than the
+application's, which is where `check_oidc_coverage()` looks for them.
 
 ## Automated regression coverage
 

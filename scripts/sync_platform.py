@@ -169,6 +169,8 @@ DOMAIN_TARGET_FILES = [
     "infra/k8s/helm-values/minio.yaml",
     "infra/k8s/helm-values/peertube.yaml",
     "infra/k8s/helm-values/novu.yaml",
+    "infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml",
+    "infra/k8s/helm-values/oauth2-proxy-novu.yaml",
     "infra/k8s/manifests/caddy.yaml",
     "infra/k8s/manifests/gokapi.yaml",
     "infra/k8s/helm-values/external-dns.yaml",
@@ -297,6 +299,11 @@ OIDC_CLIENT_APP_FILES = {
     "gokapi": "infra/k8s/manifests/gokapi.yaml",
     "peertube": "infra/k8s/helm-values/peertube.yaml",
     "visio-meet": "infra/k8s/helm-values/visio-meet.yaml",
+    # These two have no OIDC support of their own: the client authenticates
+    # an oauth2-proxy forward_auth gate in front of the app, not the app
+    # itself (see docs/oidc.md and each oauth2-proxy-*.yaml's own header).
+    "onlyoffice": "infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml",
+    "novu": "infra/k8s/helm-values/oauth2-proxy-novu.yaml",
 }
 
 

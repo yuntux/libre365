@@ -16,42 +16,47 @@ keycloak_realm_otp_policy_period: 30
 keycloak_realm_webauthn_enabled: true
 keycloak_realm_webauthn_passwordless_enabled: true # WebAuthn as the primary passwordless factor (passkey), see 1.7
 
-# OIDC clients — one per stack component that has an actual end-user login
-# surface of its own AND natively supports OIDC (study 1.7, selection
-# criteria: "to be checked service by service; Grommunio, Seafile, Vikunja
-# and OnlyOffice support OIDC; Matrix/Synapse too via an OIDC provider").
+# OIDC clients — one per stack component gated by Keycloak SSO (study 1.7,
+# selection criteria: "to be checked service by service; Grommunio,
+# Seafile, Vikunja and OnlyOffice support OIDC; Matrix/Synapse too via an
+# OIDC provider"). Every component the study expects to be SSO-gated has a
+# client here — including OnlyOffice and Novu, which don't support OIDC
+# NATIVELY (see below), gated at the reverse-proxy layer instead rather
+# than left unprotected.
 #
 # Every client below is expected to be a COMPLETE chain, not just a realm
 # entry: docs/oidc.md documents, and scripts/sync_platform.py's
 # check_oidc_coverage() enforces in CI, that each client_id here also
-# appears (a) in the corresponding infra/k8s/helm-values/*.yaml as the
-# actual OIDC client_id the app is configured with, and (b) in
-# infra/k8s/manifests/external-secrets.yaml as an ExternalSecret providing
-# that client's secret — found missing on both counts for several clients
-# during a review pass (see docs/oidc.md's changelog note for the details),
-# fixed there rather than re-explained here.
+# appears (a) in the file that actually uses it as the OIDC client_id
+# (either the application's own infra/k8s/helm-values/*.yaml, or an
+# oauth2-proxy gate's helm-values file for the two below that need one),
+# and (b) in infra/k8s/manifests/external-secrets.yaml as an ExternalSecret
+# providing that client's secret — found missing on both counts for
+# several clients during a review pass (see docs/oidc.md's changelog note
+# for the details), fixed there rather than re-explained here.
 #
-# Two components deliberately have NO client, despite superficially
-# "supporting OIDC" per the line quoted above - see docs/oidc.md for the
-# full reasoning, summarized here:
-#   - Grommunio: application SSO for grommunio-web is not treated as a
-#     priority by the study (the web admin stays disabled anyway, see
-#     playbooks/grommunio.yml) - left for future extension.
-#   - OnlyOffice Document Server: in this architecture it has no standalone
-#     end-user login at all - it's reached exclusively via JWT-signed
-#     requests from Seafile's own editor integration (onlyoffice-jwt-secret,
-#     already wired in seafile.yaml/onlyoffice.yaml), the same way every
-#     self-hosted OnlyOffice-behind-a-host-app deployment works. A client
-#     was previously created here with no corresponding login flow able to
-#     ever use it - removed rather than papered over with invented config.
-#   - Novu: the notification-center widget authenticates subscribers via an
+#   - OnlyOffice Document Server: Community Edition has no standalone
+#     end-user login screen of its own (JWT_ENABLED only signs individual
+#     document-open requests from Seafile's editor integration - it does
+#     nothing to stop a browser reaching office.libre365.example.org
+#     directly). Gated instead by a Caddy forward_auth to oauth2-proxy
+#     (infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml), which is what
+#     this client's redirect_uris point at - in addition to, not instead
+#     of, the existing JWT document-level signing.
+#   - Novu: the notification-center WIDGET authenticates subscribers via an
 #     HMAC-signed subscriber hash issued by the API key
-#     (connectors/notification-hub's own secret), not an OIDC login - so a
-#     "novu" Keycloak client had no real consumer either, for the same
-#     reason as OnlyOffice above. Novu's own admin dashboard is not exposed
-#     publicly in this stack (no Caddy site, no domain wired for it beyond
-#     the API), so there is no login surface at all today for OIDC to
-#     protect.
+#     (connectors/notification-hub's own secret), not OIDC - that part
+#     (novu-api, consumed by the top-bar widget) is deliberately left
+#     ungated so it keeps working without an interactive login. Novu's own
+#     `web` ADMIN dashboard is a separate surface, now exposed at
+#     notifications-admin.libre365.example.org behind its own oauth2-proxy
+#     gate (infra/k8s/helm-values/oauth2-proxy-novu.yaml), which is what
+#     this client's redirect_uris point at.
+#
+# Grommunio deliberately has NO client: application SSO for grommunio-web
+# is not treated as a priority by the study (the web admin stays disabled
+# anyway, see playbooks/grommunio.yml) - left for future extension, not a
+# gap (see docs/oidc.md).
 keycloak_oidc_clients:
   - client_id: "seafile"
     name: "Seafile"
@@ -99,6 +104,25 @@ keycloak_oidc_clients:
     # source/docs from this sandboxed environment.
     redirect_uris:
       - "https://{{ visio_domain }}/oidc/callback/"
+    public_client: false
+
+  - client_id: "onlyoffice"
+    name: "OnlyOffice (oauth2-proxy gate)"
+    root_url: "https://{{ onlyoffice_domain }}"
+    # oauth2-proxy's own default callback path - this client authenticates
+    # the forward_auth gate in front of OnlyOffice, not OnlyOffice itself.
+    redirect_uris:
+      - "https://{{ onlyoffice_domain }}/oauth2/callback"
+    public_client: false
+
+  - client_id: "novu"
+    name: "Novu admin dashboard (oauth2-proxy gate)"
+    root_url: "https://{{ notifications_admin_domain }}"
+    # Gates Novu's `web` admin dashboard only - novu-api (the top-bar
+    # widget's own HMAC-authenticated endpoint) stays ungated, see the
+    # comment above keycloak_oidc_clients.
+    redirect_uris:
+      - "https://{{ notifications_admin_domain }}/oauth2/callback"
     public_client: false
 
 keycloak_client_secrets_output_dir: "{{ playbook_dir }}/../secrets/keycloak-clients"

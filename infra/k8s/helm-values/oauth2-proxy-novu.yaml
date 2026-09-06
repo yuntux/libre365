@@ -1,0 +1,57 @@
+# Component: oauth2-proxy — Keycloak SSO gate in front of Novu's `web`
+# admin dashboard (study 1.7/2.1).
+#
+# Novu's `web` component (template/workflow management UI) has its own
+# built-in auth, but it is Novu's native user/organization system, not
+# Keycloak - consistent with novu.yaml's own long-standing comment that
+# Novu is "not exposed directly to consultants as a standalone
+# application" (it's the API only, `novu-api`, that's reached directly by
+# the top-bar widget's own HMAC subscriberHash auth, see
+# infra/k8s/manifests/caddy.yaml's `notifications.libre365.example.org`
+# block - deliberately NOT gated here, so the widget keeps working without
+# an interactive login). This file exposes and gates the *admin* dashboard
+# separately, at notifications-admin.libre365.example.org, the same way
+# oauth2-proxy-onlyoffice.yaml gates OnlyOffice: Caddy's `forward_auth`
+# sends every request here first, oauth2-proxy redirects to Keycloak (the
+# "novu" client, see infra/ansible/roles/keycloak_realm/defaults/main.yml),
+# and only an authenticated administrator ever reaches Novu's own login
+# page behind it.
+#
+# Chart used: official `oauth2-proxy/oauth2-proxy`
+#   Helm repo: https://oauth2-proxy.github.io/manifests
+#
+# [UNCERTAIN] "novu-web" assumes the chart's common <release>-<subchart>
+# naming for its web component and its default port (4200) - unverified
+# against a live template of novuhq/helm-charts from this sandboxed
+# environment, same category of assumption already flagged for
+# "novu-api" in caddy.yaml.
+
+replicaCount: 2
+
+config:
+  # client_id: "novu" — supplied via existingSecret below (key
+  # "client-id"), not as a plaintext value here, since the chart's
+  # existingSecret mechanism expects all three values (client-id,
+  # client-secret, cookie-secret) together in one Kubernetes Secret.
+  existingSecret: novu-oidc-secret
+
+extraArgs:
+  provider: keycloak-oidc
+  oidc-issuer-url: "https://sso.libre365.example.org/realms/libre365"
+  redirect-url: "https://notifications-admin.libre365.example.org/oauth2/callback"
+  upstreams: "http://novu-web.libre365.svc.cluster.local:4200"
+  email-domain: "*" # authorization stays with Keycloak realm membership, not an email allowlist
+  cookie-secure: "true"
+  reverse-proxy: "true" # trust Caddy's X-Forwarded-* headers (single hop, no public direct access to this Service)
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+service:
+  type: ClusterIP
+  port: 4180

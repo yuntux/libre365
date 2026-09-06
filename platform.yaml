@@ -356,4 +356,11 @@ domains:
     s3: s3 # MinIO API (study 2.12)
     minio_console: minio-console # MinIO console (study 2.12)
     notifications: notifications # Novu (study 2.1)
+    notifications_admin: notifications-admin # Novu admin dashboard (study 1.7/2.1)
+      # - Novu's own `web` UI (template/workflow management), gated by
+      # Keycloak SSO via the oauth2-proxy forward_auth gate in front of it
+      # (infra/k8s/helm-values/oauth2-proxy-novu.yaml) - separate from
+      # `notifications` above, which is the API consumed by the top-bar
+      # widget's own HMAC subscriberHash auth and must stay reachable
+      # without an interactive Keycloak login. See docs/oidc.md.
     registry: registry # Internal image registry (custom Caddy image, study 2.3)

@@ -257,6 +257,31 @@ def test_oidc_coverage_flags_a_client_id_wired_with_no_secret_reference_at_all(t
     assert "references no" in problems[0]
 
 
+def test_oidc_coverage_passes_for_an_oauth2_proxy_gated_client(tmp_path, monkeypatch):
+    """OnlyOffice/Novu don't support OIDC natively - their Keycloak client
+    authenticates an oauth2-proxy forward_auth gate instead (see
+    docs/oidc.md), so the "app file" is the oauth2-proxy gate's own
+    helm-values file, and the client_id appears there only in a comment
+    documenting which key of its existingSecret carries it - both
+    legitimate for this check, which only asks "is this client referenced
+    somewhere in the file that actually uses it"."""
+    _write_oidc_fixture(
+        tmp_path, monkeypatch,
+        defaults_client_ids=["onlyoffice"],
+        app_file_text=(
+            "config:\n"
+            '  # client_id: "onlyoffice" - supplied via existingSecret below\n'
+            "  existingSecret: onlyoffice-oidc-secret\n"
+        ),
+        external_secrets_text="metadata:\n  name: onlyoffice-oidc-secret\n",
+    )
+    monkeypatch.setattr(
+        sync_platform, "OIDC_CLIENT_APP_FILES", {"onlyoffice": "infra/k8s/helm-values/seafile.yaml"}
+    )
+
+    assert sync_platform.check_oidc_coverage({}) == []
+
+
 def test_oidc_coverage_flags_a_client_missing_from_the_app_files_mapping(tmp_path, monkeypatch):
     """A client_id declared in Keycloak's defaults with no entry at all in
     OIDC_CLIENT_APP_FILES - the mapping itself falling out of sync, distinct

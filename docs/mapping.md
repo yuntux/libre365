@@ -10,13 +10,13 @@ block/connector.
 | Matrix / Synapse / Element | 1.2 | `infra/k8s/helm-values/synapse.yaml` (OIDC entirely chart-native — see `docs/oidc.md`) |
 | Video conferencing (DINUM/LiveKit) + Element Call | 1.3 | `infra/k8s/helm-values/visio.yaml`, `infra/k8s/helm-values/element-call.yaml` |
 | Seafile | 1.4 | `infra/k8s/helm-values/seafile.yaml` |
-| OnlyOffice Document Server | 1.5 | `infra/k8s/helm-values/onlyoffice.yaml` |
+| OnlyOffice Document Server | 1.5 | `infra/k8s/helm-values/onlyoffice.yaml`; SSO gate: `infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml` (see `docs/oidc.md`) |
 | Vikunja | 1.6 | `infra/k8s/helm-values/vikunja.yaml` |
 | Keycloak (SSO/MFA) | 1.7 | `infra/k8s/helm-values/keycloak.yaml`, `infra/ansible/playbooks/keycloak-realm.yml`, `connectors/keycloak-otp-spi/` |
 | UI language (fr default, en available) | not a numbered study requirement — added on request | `platform.yaml`'s `locale` section (single source), `infra/ansible/roles/keycloak_realm/` (only component actually wired so far — see `docs/i18n.md` for the full per-component breakdown, most still open) |
 | Gokapi | 1.8 | `infra/k8s/manifests/gokapi.yaml` (no official Helm chart, see that file's header; Tasmane branding via its `gokapi-custom` ConfigMap, `custom.css`) |
 | Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code); autoconfig/Autodiscover: `platform.yaml` (`autoconfig`/`autodiscover` subdomains), `infra/k8s/manifests/caddy.yaml` (`caddy-autoconfig` ConfigMap, Caddy-fronted) |
-| Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/` |
+| Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/`; admin dashboard SSO gate: `infra/k8s/helm-values/oauth2-proxy-novu.yaml` (see `docs/oidc.md`) |
 | Unified search | 2.2 | `connectors/unified-search/` |
 | Portal / Caddy HTML injection | 2.3 | `infra/k8s/manifests/caddy.yaml` (sole public entry point, no Ingress Controller/cert-manager needed - see `infra/k8s/helm-values/README.md`), `infra/k8s/manifests/caddy-injection.yaml` (Tasmane graphic-charter branding via `banner.css`) |
 | Chat/video continuity (Matrix ↔ video conferencing widget) | 2.4 | `connectors/matrix-visio-widget/` |
