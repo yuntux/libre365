@@ -1,19 +1,38 @@
 ---
 # Variables common to all playbooks. Real secrets (passwords, API keys)
-# must be injected via Ansible Vault or an external vault (Vault/OpenBao) —
-# study 4.5: "never in plaintext in the code repository".
-# The values below are structural examples, not real secrets.
+# must be injected via Ansible Vault or an external vault (OpenBao, see
+# roles/openbao_config/) — study 4.5: "never in plaintext in the code
+# repository".
+#
+# Every domain below is derived directly from ../../../platform.yaml's
+# `domains` section (the same single source of truth
+# scripts/sync_platform.py patches into infra/k8s/) rather than being
+# retyped here — this file used to define its own, independent domain
+# scheme (a different base domain, and several subdomains that didn't
+# match the ones actually wired into Caddy/Ingress/OIDC issuer URLs under
+# infra/k8s/ — found during review: `onlyoffice_domain` was
+# "docs.libre365.example.internal" here while OnlyOffice is actually
+# reachable at "office.libre365.example.org" everywhere else, meaning the
+# Keycloak OIDC client this role would create for it had the wrong
+# redirect_uri). Reading directly from platform.yaml, live, on every
+# Ansible run makes that drift structurally impossible instead of relying
+# on two files being kept in sync by hand.
+_platform: "{{ lookup('file', playbook_dir + '/../../../platform.yaml') | from_yaml }}"
 
-libre365_domain: "libre365.example.internal"
+libre365_domain: "{{ _platform.domains.base }}"
 
-keycloak_base_url: "https://sso.{{ libre365_domain }}"
+keycloak_base_url: "https://{{ _platform.domains.subdomains.sso }}.{{ libre365_domain }}"
 keycloak_admin_realm: "master"
 keycloak_target_realm: "libre365"
 # To be supplied via `--extra-vars` or a vault file, never in plaintext here:
 keycloak_admin_user: "{{ vault_keycloak_admin_user | default('admin') }}"
 keycloak_admin_password: "{{ vault_keycloak_admin_password | default(omit) }}"
 
-grommunio_domain: "mail.{{ libre365_domain }}"
-matrix_domain: "matrix.{{ libre365_domain }}"
-seafile_domain: "files.{{ libre365_domain }}"
-onlyoffice_domain: "docs.{{ libre365_domain }}"
+grommunio_domain: "{{ _platform.domains.subdomains.mail }}.{{ libre365_domain }}"
+matrix_domain: "{{ _platform.domains.subdomains.matrix }}.{{ libre365_domain }}"
+seafile_domain: "{{ _platform.domains.subdomains.files }}.{{ libre365_domain }}"
+onlyoffice_domain: "{{ _platform.domains.subdomains.office }}.{{ libre365_domain }}"
+vikunja_domain: "{{ _platform.domains.subdomains.taches }}.{{ libre365_domain }}"
+gokapi_domain: "{{ _platform.domains.subdomains.depot }}.{{ libre365_domain }}"
+novu_domain: "{{ _platform.domains.subdomains.notifications }}.{{ libre365_domain }}"
+peertube_domain: "{{ _platform.domains.subdomains.videos }}.{{ libre365_domain }}"

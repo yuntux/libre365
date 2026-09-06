@@ -33,9 +33,9 @@ keycloak_oidc_clients:
 
   - client_id: "vikunja"
     name: "Vikunja"
-    root_url: "https://tasks.{{ libre365_domain }}"
+    root_url: "https://{{ vikunja_domain }}"
     redirect_uris:
-      - "https://tasks.{{ libre365_domain }}/auth/openid/*"
+      - "https://{{ vikunja_domain }}/auth/openid/*"
     public_client: false
 
   - client_id: "onlyoffice"
@@ -54,23 +54,23 @@ keycloak_oidc_clients:
 
   - client_id: "gokapi"
     name: "Gokapi"
-    root_url: "https://send.{{ libre365_domain }}"
+    root_url: "https://{{ gokapi_domain }}"
     redirect_uris:
-      - "https://send.{{ libre365_domain }}/oauth2/callback"
+      - "https://{{ gokapi_domain }}/oauth2/callback"
     public_client: false
 
   - client_id: "novu"
     name: "Novu (notification center)"
-    root_url: "https://notify.{{ libre365_domain }}"
+    root_url: "https://{{ novu_domain }}"
     redirect_uris:
-      - "https://notify.{{ libre365_domain }}/auth/oidc/callback"
+      - "https://{{ novu_domain }}/auth/oidc/callback"
     public_client: false
 
   - client_id: "peertube"
     name: "PeerTube"
-    root_url: "https://video.{{ libre365_domain }}"
+    root_url: "https://{{ peertube_domain }}"
     redirect_uris:
-      - "https://video.{{ libre365_domain }}/plugins/auth-openid-connect/router/callback"
+      - "https://{{ peertube_domain }}/plugins/auth-openid-connect/router/callback"
     public_client: false
 
 keycloak_client_secrets_output_dir: "{{ playbook_dir }}/../secrets/keycloak-clients"

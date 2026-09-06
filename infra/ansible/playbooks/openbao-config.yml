@@ -10,5 +10,7 @@
   hosts: control_apis
   connection: local
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
   roles:
     - openbao_config

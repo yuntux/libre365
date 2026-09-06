@@ -7,6 +7,8 @@
 - name: "Configure the Grommunio appliance VM"
   hosts: grommunio
   become: true
+  vars_files:
+    - ../group_vars/all.yml
   vars:
     grommunio_dav_config_path: /etc/gromox/dav/grommunio-dav.cfg
     # GAL over CardDAV — study 2.13, line ~608-616: native feature added in
