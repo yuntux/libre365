@@ -113,6 +113,8 @@ the choice is documented at the top of each file concerned.
 | Caddy | no dedicated chart — raw manifest (`../manifests/caddy.yaml`), custom xcaddy image with an HTML injection plugin | — |
 | Novu | `novu` (official Novu chart) | https://novuhq.github.io/helm-charts |
 | external-dns | `external-dns` (kubernetes-sigs) | https://kubernetes-sigs.github.io/external-dns/ |
+| OpenBao | `openbao` (OpenBao project) | https://openbao.github.io/openbao-helm/ (not independently verified from this sandbox — see `openbao.yaml`'s own header comment) |
+| External Secrets Operator | `external-secrets` (external-secrets project, CNCF) | https://charts.external-secrets.io |
 
 Charts marked "to be confirmed" had no single identified official source at
 the time of writing (August/September 2026): several community forks exist
@@ -157,6 +159,17 @@ kubectl apply -f ../manifests/caddy.yaml
 # DNS zone population (see "DNS zone population" above - confirm the OVH
 # webhook image/config first)
 helm upgrade --install external-dns external-dns/external-dns -n libre365 -f external-dns.yaml
+
+# Secrets management (see "Secrets" below) - deploy BEFORE the charts
+# above that reference an existingSecret, then run
+# infra/ansible/playbooks/openbao-config.yml once OpenBao is initialized
+# and unsealed
+helm repo add openbao https://openbao.github.io/openbao-helm/
+helm repo add external-secrets https://charts.external-secrets.io
+helm upgrade --install openbao openbao/openbao -n libre365 -f openbao.yaml
+helm upgrade --install external-secrets external-secrets/external-secrets -n libre365 -f external-secrets.yaml
+kubectl apply -f ../manifests/external-secrets-store.yaml
+kubectl apply -f ../manifests/external-secrets.yaml
 ```
 
 Moving from 100 to 2000 users (and beyond, chapter 4.1 of the study)
@@ -167,10 +180,18 @@ definition itself.
 ## Secrets
 
 No secret in plaintext in this directory (study chapter 4.5 — secrets
-management externalized to a dedicated vault, e.g. Vault). All
-`existingSecret` / `secretKeyRef` references in these values files point to
-Kubernetes Secrets provisioned outside this repository (Ansible/Vault, see
-`infra/ansible/`, managed by another team).
+management externalized to a dedicated vault). All `existingSecret` /
+`secretKeyRef` references in these values files point to Kubernetes
+Secrets populated by External Secrets Operator from OpenBao — see
+`openbao.yaml`, `external-secrets.yaml`, `../manifests/external-secrets-
+store.yaml`, and `../manifests/external-secrets.yaml` (one `ExternalSecret`
+per reference in this directory, graded by confidence — read its header
+comment before writing a value into OpenBao). Bootstrapping OpenBao's
+Kubernetes auth method for this is `infra/ansible/roles/openbao_config`'s
+job (`infra/ansible/playbooks/openbao-config.yml`) — see that role's
+README for the prerequisites (OpenBao must already be initialized and
+unsealed, a manual step deliberately not automated anywhere in this
+repository).
 
 ## Out of scope for this directory
 

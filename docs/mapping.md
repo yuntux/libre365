@@ -32,6 +32,8 @@ block/connector.
 | Proxmox / Kubernetes infrastructure | 4.1–4.7 | `infra/terraform/`, `infra/k8s/` |
 | Single source of versions/ports/domains (docker-compose ↔ Helm ↔ tests) | 4.1 (rebuildable IaC, without drift) | `platform.yaml`, `scripts/sync_platform.py` |
 | DNS zone population (A/AAAA records) | 4.2/4.4 (not a numbered study requirement) | `infra/k8s/helm-values/external-dns.yaml` (OVH provider — see that file's header comment for what to verify before deploying) |
+| Secrets management (dedicated vault, never in plaintext) | 4.5 | `infra/k8s/helm-values/openbao.yaml` + `external-secrets.yaml`, `infra/k8s/manifests/external-secrets*.yaml`, `infra/ansible/roles/openbao_config/` |
+| OS security hardening (fail2ban, SSH) | not a numbered study requirement — closes a gap noted during review | `infra/ansible/roles/os_hardening/` |
 | Dev/staging/prod environments | 4.6 | `dev-cluster/` (k3d, reuses `infra/k8s/helm-values/` + `infra/k8s/helm-values/dev/` hardening overlays, plus `dev-cluster/grommunio-dev/` docker-compose for the one brick k3d can't host) |
 | CVE monitoring / version monitoring / ephemeral staging | 5.2–5.5 | `.github/workflows/` |
 | Durable integration tests | 5.5 | `tests/integration/` |

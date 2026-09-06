@@ -143,6 +143,42 @@ record-computation logic end to end. It does **not** validate that OVH's
 API would actually apply the change — that can only be checked against a
 real OVH account in an actual deployment (study, chapter 5.4).
 
+## Testing secret propagation (OpenBao + External Secrets Operator)
+
+Production populates every `existingSecret:`/`secretKeyRef:` referenced
+across `../infra/k8s/helm-values/*.yaml` from OpenBao
+(`../infra/k8s/helm-values/openbao.yaml`, study 4.5) via External Secrets
+Operator (ESO) — see `../infra/k8s/manifests/external-secrets.yaml` for
+the full list and their confidence grading (some secretKey names are
+declared explicitly elsewhere in this repo, others follow a well-known
+Bitnami/official-chart convention not independently re-verified from this
+sandboxed environment). What's testable locally, and is: does ESO actually
+read a value written to OpenBao and turn it into the right Kubernetes
+Secret/key? `deploy.sh` installs OpenBao here in its own **dev-server
+mode** (`../infra/k8s/helm-values/dev/openbao.yaml` — single in-memory
+instance, fixed well-known root token, auto-unsealed - never use this
+outside a throwaway dev cluster) wired to ESO via a dev-only
+`ClusterSecretStore` using that fixed token
+(`../infra/k8s/manifests/dev/external-secrets-store.yaml` — production
+uses OpenBao's Kubernetes auth method instead, see
+`infra/ansible/roles/openbao_config/README.md`), then runs
+`seed-openbao-dev-secrets.sh` to write dev-only dummy values at the exact
+paths every chart below expects (without this, Keycloak/the
+Postgres-backed charts would just sit waiting for a Secret that never
+appears).
+
+```bash
+./dev-cluster/check-external-secrets.sh
+```
+
+This checks that every expected Secret/key from
+`../infra/k8s/manifests/external-secrets.yaml` was actually created,
+failing loudly (and dumping the `ExternalSecret` resources' status) if
+any is missing. It validates the OpenBao → ESO → Kubernetes Secret path
+end to end. It does **not** validate the [CONVENTION]/[UNCERTAIN]
+secretKey names against the real third-party charts themselves — only
+deploying that exact chart for real can confirm those.
+
 ## Usage
 
 Prerequisites: `k3d`, `kubectl`, `helm`, `docker` on `PATH`.
@@ -158,6 +194,11 @@ docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
 # (inmemory provider - no real DNS touched, see "Testing DNS record
 # computation" above)
 ./dev-cluster/check-external-dns.sh
+
+# Verify OpenBao + External Secrets Operator actually propagate secrets
+# (dev-mode OpenBao, no real vault touched, see "Testing secret
+# propagation" above)
+./dev-cluster/check-external-secrets.sh
 
 # Fast inner loop after editing a connector's code
 ./dev-cluster/redeploy.sh unified-search
@@ -185,4 +226,5 @@ instead of docker-compose — see `../tests/integration/README.md`.
   `grommunio-dev/.env.example` (port-forwarding list). Do not hand-edit it
   — see its own header comment.
 - `deploy.sh`, `redeploy.sh`, `destroy.sh`, `lib-expose.sh`,
-  `check-external-dns.sh` are hand-written orchestration, not generated.
+  `check-external-dns.sh`, `seed-openbao-dev-secrets.sh`,
+  `check-external-secrets.sh` are hand-written orchestration, not generated.
