@@ -234,17 +234,33 @@ def check_domain_coverage(platform: dict) -> list[str]:
     )
     annotated_domains = set(annotation_match.group(1).split(",")) if annotation_match else set()
 
+    # Matched on the SUBDOMAIN LABEL (e.g. "sso"), not the full FQDN with
+    # the current `domains.base` baked in: this check runs unconditionally,
+    # including as the very first thing `sync_platform.py` does on a run
+    # that is ABOUT to change `domains.base` itself — comparing full FQDNs
+    # would then compare the NEW base (from the platform.yaml already on
+    # disk) against caddy.yaml's site blocks, which still carry the OLD
+    # base until compute_domain_changes() below patches them later in this
+    # same run. That ordering bug made changing `domains.base` at all
+    # immediately fail with a false "no matching Caddyfile site block" for
+    # every single domain, before ever reaching the code that would have
+    # fixed it. Label-based matching sidesteps the ordering entirely: which
+    # base is currently on disk doesn't matter, only whether a site block
+    # for that subdomain label exists at all.
+    site_labels = {domain.split(".", 1)[0] for domain in site_domains}
+    annotated_labels = {domain.split(".", 1)[0] for domain in annotated_domains}
+
     problems = []
     for key, subdomain in expected.items():
         fqdn = f"{subdomain}.{domains['base']}"
-        if fqdn not in site_domains:
+        if subdomain not in site_labels:
             problems.append(
                 f"platform.yaml declares domains.subdomains.{key} ({fqdn}) but no "
                 "matching Caddyfile site block was found in infra/k8s/manifests/caddy.yaml "
                 "(add one, or add its key to DOMAINS_WITHOUT_CADDY_SITE in "
                 "scripts/sync_platform.py if it's genuinely not meant to be reachable through Caddy)"
             )
-        elif fqdn not in annotated_domains:
+        elif subdomain not in annotated_labels:
             problems.append(
                 f"{fqdn} has a Caddyfile site block but is missing from the Caddy Service's "
                 "external-dns.alpha.kubernetes.io/hostname annotation in infra/k8s/manifests/caddy.yaml "
