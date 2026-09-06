@@ -10,6 +10,226 @@ each code directory refers explicitly to the chapter/section of the study
 that motivates its existence — see [`docs/mapping.md`](./docs/mapping.md) for
 the complete correspondence table.
 
+## Architecture diagrams
+
+### 1. Infrastructure layers
+
+```mermaid
+flowchart TD
+    subgraph L0["Layer 0 — Virtualization (Proxmox)"]
+        PVE["Proxmox VE"]
+    end
+
+    subgraph L1["Layer 1 — Provisioning (Terraform, ch. 4.2)"]
+        TFK8S["Kubernetes nodes (VMs)"]
+        TFVM["Grommunio VM"]
+        TFNET["Proxmox network / storage"]
+    end
+
+    subgraph L2["Layer 2 — Orchestration (Kubernetes, ch. 4.3/4.4)"]
+        HELM["Helm charts (infra/k8s/helm-values)"]
+        RAW["Raw manifests (infra/k8s/manifests)"]
+        CADDY["Caddy — sole public entry point + SSO gates"]
+    end
+
+    subgraph L3["Layer 3 — Application config (Ansible, ch. 4.5)"]
+        ANSGROM["Grommunio (mail/GAL/Let's Encrypt cert)"]
+        ANSKC["Keycloak realm (OIDC clients, MFA, locale)"]
+        ANSHARD["OS hardening (fail2ban, SSH)"]
+    end
+
+    subgraph L4["Layer 4 — Secrets (ch. 4.5)"]
+        BAO["OpenBao"]
+        ESO["External Secrets Operator"]
+    end
+
+    subgraph L5["Layer 5 — DNS / certificates"]
+        EDNS["external-dns (OVH)"]
+        ACME["Automatic HTTPS (Caddy) / ACME certbot (Grommunio)"]
+    end
+
+    PVE --> TFK8S
+    PVE --> TFVM
+    PVE --> TFNET
+    TFK8S --> HELM
+    TFK8S --> RAW
+    HELM --> CADDY
+    RAW --> CADDY
+    TFVM --> ANSGROM
+    HELM --> ANSKC
+    ANSKC -. OIDC clients .-> CADDY
+    BAO --> ESO
+    ESO --> HELM
+    ESO --> RAW
+    ANSGROM --> ACME
+    CADDY --> ACME
+    CADDY --> EDNS
+    TFVM --> EDNS
+```
+
+### 2. Functional cartography
+
+The functional domains identified by the study, independent of which
+application covers each one (see diagram 3 for that mapping):
+
+```mermaid
+flowchart TB
+    subgraph COMM["Communication"]
+        F_MAIL["Mail & calendar"]
+        F_CHAT["Instant messaging"]
+        F_VISIO["Video conferencing"]
+    end
+
+    subgraph COLLAB["Document collaboration"]
+        F_FILES["File storage & sync"]
+        F_DOCS["Collaborative document editing"]
+        F_TASKS["Task management"]
+        F_SHARE["Secure external file sharing"]
+    end
+
+    subgraph MEDIA["Video platform"]
+        F_VIDEO["Video hosting & streaming"]
+    end
+
+    subgraph PLATFORM["Portal & cross-cutting"]
+        F_SSO["Identity & single sign-on"]
+        F_PORTAL["Unified application portal"]
+        F_NOTIF["Unified notifications"]
+        F_SEARCH["Unified search"]
+        F_PRESENCE["Unified presence"]
+        F_GAL["Company directory (GAL)"]
+        F_ROOM["Room booking"]
+    end
+```
+
+### 3. Functional coverage — which application covers which function
+
+```mermaid
+flowchart LR
+    subgraph Functions
+        F_MAIL["Mail & calendar"]
+        F_CHAT["Instant messaging"]
+        F_VISIO["Video conferencing"]
+        F_FILES["File storage & sync"]
+        F_DOCS["Collaborative document editing"]
+        F_TASKS["Task management"]
+        F_SHARE["Secure external file sharing"]
+        F_VIDEO["Video hosting & streaming"]
+        F_SSO["Identity & single sign-on"]
+        F_PORTAL["Unified application portal"]
+        F_NOTIF["Unified notifications"]
+        F_SEARCH["Unified search"]
+        F_PRESENCE["Unified presence"]
+        F_GAL["Company directory (GAL)"]
+        F_ROOM["Room booking"]
+    end
+
+    subgraph Applications
+        A_GROM["Grommunio"]
+        A_MATRIX["Matrix/Synapse + Element Web"]
+        A_MEET["LaSuite Meet + Element Call"]
+        A_SEAFILE["Seafile"]
+        A_OO["OnlyOffice Document Server"]
+        A_VIKUNJA["Vikunja"]
+        A_GOKAPI["Gokapi"]
+        A_PEERTUBE["PeerTube + MinIO"]
+        A_KC["Keycloak"]
+        A_CADDY["Caddy (injected top bar)"]
+        A_NOVU["Novu"]
+        A_SEARCHC["unified-search connector"]
+        A_PRESENCEC["presence-aggregator connector"]
+    end
+
+    F_MAIL --- A_GROM
+    F_GAL --- A_GROM
+    F_ROOM --- A_GROM
+    F_CHAT --- A_MATRIX
+    F_VISIO --- A_MEET
+    F_FILES --- A_SEAFILE
+    F_DOCS --- A_OO
+    F_TASKS --- A_VIKUNJA
+    F_SHARE --- A_GOKAPI
+    F_VIDEO --- A_PEERTUBE
+    F_SSO --- A_KC
+    F_PORTAL --- A_CADDY
+    F_NOTIF --- A_NOVU
+    F_SEARCH --- A_SEARCHC
+    F_PRESENCE --- A_PRESENCEC
+```
+
+### 4. Applications and their internal macro-objects
+
+```mermaid
+flowchart TB
+    subgraph GROMMUNIO["Grommunio"]
+        G1["Mailbox"]
+        G2["Calendar event"]
+        G3["Contact (GAL)"]
+        G4["Meeting room"]
+    end
+
+    subgraph MATRIX["Matrix / Synapse / Element"]
+        M1["Room"]
+        M2["Message"]
+        M3["User account"]
+    end
+
+    subgraph MEET["LaSuite Meet / Element Call"]
+        V1["Meeting"]
+        V2["Recording"]
+    end
+
+    subgraph SEAFILE["Seafile"]
+        S1["Library"]
+        S2["Folder"]
+        S3["File"]
+        S4["Share link"]
+    end
+
+    subgraph ONLYOFFICE["OnlyOffice"]
+        O1["Document"]
+        O2["Co-editing session"]
+    end
+
+    subgraph VIKUNJA["Vikunja"]
+        T1["Project"]
+        T2["Task"]
+        T3["Label"]
+    end
+
+    subgraph GOKAPI["Gokapi"]
+        K1["Encrypted upload"]
+        K2["Share link"]
+        K3["API key"]
+    end
+
+    subgraph PEERTUBE["PeerTube + MinIO"]
+        P1["Channel"]
+        P2["Video"]
+        P3["Playlist"]
+        P4["S3 bucket (MinIO)"]
+    end
+
+    subgraph KEYCLOAK["Keycloak"]
+        KC1["Realm"]
+        KC2["OIDC client"]
+        KC3["User"]
+        KC4["Role"]
+    end
+
+    subgraph NOVU["Novu"]
+        N1["Notification"]
+        N2["Subscriber"]
+        N3["Template"]
+    end
+
+    subgraph CADDY["Caddy"]
+        C1["Site (domain)"]
+        C2["Route"]
+        C3["Injected top bar"]
+    end
+```
+
 ## Directory layout
 
 ```
