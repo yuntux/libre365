@@ -1,0 +1,34 @@
+# Dev-speed hardening overlay for OpenBao - see
+# ../../../../dev-cluster/README.md, "Testing secret propagation", for the
+# overall rationale. Usage:
+#   helm upgrade --install openbao openbao/openbao -n libre365 \
+#     -f openbao.yaml -f dev/openbao.yaml
+#
+# Switches to OpenBao's own dev-server mode: single in-memory instance,
+# auto-unsealed, pre-populated with a well-known root token
+# ("libre365-dev-root-token") - the standard way both Vault and OpenBao
+# support running the exact same server for local development/testing
+# without the initialization/unseal ceremony a real deployment requires
+# (see the base openbao.yaml's own comment on that). NEVER use dev mode
+# outside this local k3d cluster - anyone with network access to the pod
+# has full access with that fixed token, by design.
+server:
+  dev:
+    enabled: true
+    devRootToken: "libre365-dev-root-token"
+
+  ha:
+    enabled: false
+  dataStorage:
+    enabled: false
+
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+injector:
+  enabled: false

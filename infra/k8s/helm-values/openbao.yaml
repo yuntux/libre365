@@ -1,0 +1,68 @@
+# Component: OpenBao — secrets vault (study 4.5: "secrets management
+# externalized into a dedicated vault, never in plaintext in the code
+# repository"). Backs every `existingSecret:`/`secretKeyRef:` referenced
+# across infra/k8s/helm-values/*.yaml, populated into actual Kubernetes
+# Secrets by External Secrets Operator (../manifests/external-secrets.yaml)
+# rather than by hand.
+#
+# Chart: openbao (OpenBao project — Linux Foundation fork of HashiCorp
+# Vault after its license change, chosen for the same sovereign/
+# vendor-independence reasoning applied elsewhere in this study, e.g. the
+# self-hosted Visio choice)
+#   Helm repo: https://openbao.github.io/openbao-helm/ (not independently
+#   verified from this sandboxed environment — see the caveat below)
+#   chart    : openbao
+#
+# IMPORTANT — verify before deploying: OpenBao's Helm chart is a fork of
+# hashicorp/vault-helm and, at the time of writing, tracks its value
+# structure closely (`server.ha.raft.*`, `server.dataStorage.*`,
+# `injector.*`...) — the keys below follow that upstream convention, but
+# this was authored in a sandboxed environment with no network access to
+# openbao.github.io/openbao-helm to confirm they haven't diverged since.
+# Cross-check against the chart's own values.yaml before the first real
+# deployment (same caveat already applied elsewhere in this repo to
+# seafile-charts/onlyoffice/peertube-helm/external-dns's OVH webhook — see
+# ../README.md).
+
+server:
+  # Raft integrated storage: no external database/KV store dependency
+  # (Consul, etc.) for OpenBao's own storage backend - one less moving
+  # part to operate, standard recommended pattern for both Vault and
+  # OpenBao.
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: true
+      setNodeId: true
+
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+  # No Ingress: OpenBao is an internal-only service, never exposed through
+  # Caddy (../manifests/caddy.yaml) or any public domain in platform.yaml's
+  # `domains` list - only External Secrets Operator and the
+  # openbao_config Ansible role (infra/ansible/) talk to it, both from
+  # inside the cluster/network. Reach its UI/CLI for manual operations
+  # (initialization, unseal, policy authoring) via `kubectl port-forward`,
+  # never through a public hostname.
+
+# The Vault Agent Injector sidecar mechanism is unused here - secrets reach
+# application pods as regular Kubernetes Secrets (via External Secrets
+# Operator), not injected files per-pod.
+injector:
+  enabled: false
+
+ui:
+  enabled: true
+  serviceType: ClusterIP

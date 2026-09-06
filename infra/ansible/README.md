@@ -36,6 +36,8 @@ ansible-playbook -i inventory/hosts.ini site.yml
 Or component by component:
 
 ```bash
+ansible-playbook -i inventory/hosts.ini playbooks/os-hardening.yml
+ansible-playbook -i inventory/hosts.ini playbooks/openbao-config.yml
 ansible-playbook -i inventory/hosts.ini playbooks/keycloak-realm.yml
 ansible-playbook -i inventory/hosts.ini playbooks/grommunio.yml
 ansible-playbook -i inventory/hosts.ini playbooks/matrix.yml
@@ -47,6 +49,8 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 
 | Playbook | Content | Study reference |
 |---|---|---|
+| `playbooks/os-hardening.yml` | fail2ban (`sshd` jail) + SSH password-auth/root-login hardening on every real VM (via the `os_hardening` role) — **read its role's README before the first run** | not a numbered requirement — closes a gap noted during review |
+| `playbooks/openbao-config.yml` | OpenBao Kubernetes auth method + `external-secrets` policy/role for External Secrets Operator (via the `openbao_config` role) — **read its role's README for prerequisites (OpenBao must already be initialized/unsealed)** | 4.5 |
 | `playbooks/keycloak-realm.yml` | Main realm, TOTP + WebAuthn/FIDO2, per-component OIDC clients (via the `keycloak_realm` role) | 1.7 |
 | `playbooks/grommunio.yml` | `GAL_ENABLED`/`GAL_CACHE_TTL`, disabling the web admin, EWS/EAS/MAPI enabled | 1.1, 2.13 |
 | `playbooks/matrix.yml` | `server_name`, Synapse OIDC provider pointing to Keycloak | 1.2, 1.7 |
@@ -58,6 +62,22 @@ ansible-playbook -i inventory/hosts.ini playbooks/onlyoffice.yml
 `roles/keycloak_realm/` is the reference role: the
 `tasks/`/`defaults/`/`templates/`/`handlers/` structure to reuse for any
 future role extracted from these playbooks (see its own `README.md`).
+`roles/os_hardening/` and `roles/openbao_config/` follow the same
+structure.
+
+## Secrets management (study 4.5): OpenBao + External Secrets Operator
+
+`playbooks/openbao-config.yml` wires up the OpenBao vault deployed by
+`../k8s/helm-values/openbao.yaml` so External Secrets Operator
+(`../k8s/helm-values/external-secrets.yaml`) can populate the real
+Kubernetes Secrets referenced by every `existingSecret:`/`secretKeyRef:`
+across `../k8s/helm-values/*.yaml` (see
+`../k8s/manifests/external-secrets.yaml`) — rather than a human creating
+each one by hand. See `roles/openbao_config/README.md` for the full
+prerequisites (OpenBao must already be initialized and unsealed — a
+manual, security-sensitive step deliberately not automated anywhere in
+this repository) and `../k8s/helm-values/README.md`'s own section on this
+for the Kubernetes-side half of the picture.
 
 ## Secrets
 

@@ -1,0 +1,145 @@
+---
+# openbao_config role — bootstraps OpenBao's Kubernetes auth method so
+# External Secrets Operator (ESO) can authenticate without a long-lived
+# static credential (the dev-only alternative, a fixed dev-mode root
+# token, is documented in ../../../k8s/manifests/dev/external-secrets-store.yaml).
+# See README.md for the full rationale and prerequisites.
+#
+# Talks to OpenBao's own HTTP API directly (ansible.builtin.uri) rather
+# than a Vault-specific Ansible collection: this API shape (PUT
+# /v1/sys/auth/<path>, /v1/auth/kubernetes/config, /v1/sys/policies/acl/
+# <name>, /v1/auth/kubernetes/role/<name>, X-Vault-Token header) is
+# extremely stable and has been unchanged for years in both HashiCorp
+# Vault and OpenBao (which deliberately maintains API compatibility) -
+# more verifiable from this sandboxed environment (no network access to
+# check exact Ansible collection module/parameter names) than depending on
+# a third-party collection for what is, at its core, a handful of plain
+# HTTP PUTs.
+
+- name: "Check for kubectl"
+  ansible.builtin.command: kubectl version --client
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+
+- name: "Ensure a long-lived ServiceAccount token exists for {{ openbao_config_external_secrets_service_account }}"
+  # Kubernetes 1.24+ no longer auto-creates a Secret-backed token for every
+  # ServiceAccount (see the "LegacyServiceAccountTokenNoAutoGeneration"
+  # feature gate) - a token of this Secret type must be created explicitly
+  # to get a long-lived JWT, which OpenBao's Kubernetes auth config needs
+  # as its `token_reviewer_jwt` (a short-lived TokenRequest-API token would
+  # expire and break OpenBao's ability to validate future logins).
+  #
+  # `kubectl apply` via the command module rather than the `kubernetes.core`
+  # collection: keeps this role dependency-free (only `kubectl` itself,
+  # already required by every other tool in this repo's Kubernetes
+  # tooling) instead of adding another Ansible collection + the Python
+  # `kubernetes` client library it requires.
+  ansible.builtin.command:
+    cmd: kubectl apply -f -
+    stdin: |
+      apiVersion: v1
+      kind: Secret
+      type: kubernetes.io/service-account-token
+      metadata:
+        name: {{ openbao_config_external_secrets_service_account }}-token
+        namespace: {{ openbao_config_external_secrets_namespace }}
+        annotations:
+          kubernetes.io/service-account.name: {{ openbao_config_external_secrets_service_account }}
+  changed_when: "'unchanged' not in openbao_apply_result.stdout"
+  register: openbao_apply_result
+  delegate_to: localhost
+  run_once: true
+
+- name: "Read the token, the cluster CA certificate, and the API server address"
+  ansible.builtin.command: >-
+    kubectl get secret {{ openbao_config_external_secrets_service_account }}-token
+    -n {{ openbao_config_external_secrets_namespace }}
+    -o jsonpath={{ item.jsonpath }}
+  register: openbao_k8s_facts
+  changed_when: false
+  delegate_to: localhost
+  run_once: true
+  loop:
+    - { name: token, jsonpath: "'{.data.token}'" }
+    - { name: ca_cert, jsonpath: "'{.data\\.ca\\.crt}'" }
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "Set facts from the token/CA lookup"
+  ansible.builtin.set_fact:
+    openbao_k8s_token_reviewer_jwt: "{{ (openbao_k8s_facts.results[0].stdout | b64decode) }}"
+    openbao_k8s_ca_cert: "{{ (openbao_k8s_facts.results[1].stdout | b64decode) }}"
+
+- name: "Check whether the kubernetes auth method is already enabled"
+  ansible.builtin.uri:
+    url: "{{ openbao_config_addr }}/v1/sys/auth"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+    status_code: [200]
+  register: openbao_auth_methods
+  delegate_to: localhost
+  run_once: true
+
+- name: "Enable the kubernetes auth method"
+  ansible.builtin.uri:
+    url: "{{ openbao_config_addr }}/v1/sys/auth/kubernetes"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+    body_format: json
+    body:
+      type: kubernetes
+    status_code: [200, 204]
+  when: "'kubernetes/' not in openbao_auth_methods.json"
+  delegate_to: localhost
+  run_once: true
+
+- name: "Configure the kubernetes auth method"
+  ansible.builtin.uri:
+    url: "{{ openbao_config_addr }}/v1/auth/kubernetes/config"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+    body_format: json
+    body:
+      kubernetes_host: "{{ openbao_config_kubernetes_host }}"
+      kubernetes_ca_cert: "{{ openbao_k8s_ca_cert }}"
+      token_reviewer_jwt: "{{ openbao_k8s_token_reviewer_jwt }}"
+    status_code: [200, 204]
+  no_log: true # the request body carries the token reviewer JWT
+  delegate_to: localhost
+  run_once: true
+
+- name: "Write the external-secrets policy (read-only, libre365/* only)"
+  ansible.builtin.uri:
+    url: "{{ openbao_config_addr }}/v1/sys/policies/acl/{{ openbao_config_external_secrets_policy_name }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+    body_format: json
+    body:
+      policy: |
+        path "{{ openbao_config_kv_mount }}/data/libre365/*" {
+          capabilities = ["read"]
+        }
+    status_code: [200, 204]
+  delegate_to: localhost
+  run_once: true
+
+- name: "Bind the external-secrets ServiceAccount to that policy via a kubernetes auth role"
+  ansible.builtin.uri:
+    url: "{{ openbao_config_addr }}/v1/auth/kubernetes/role/{{ openbao_config_external_secrets_policy_name }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ openbao_root_token }}"
+    body_format: json
+    body:
+      bound_service_account_names: "{{ openbao_config_external_secrets_service_account }}"
+      bound_service_account_namespaces: "{{ openbao_config_external_secrets_namespace }}"
+      policies: "{{ openbao_config_external_secrets_policy_name }}"
+      ttl: "{{ openbao_config_external_secrets_role_ttl }}"
+    status_code: [200, 204]
+  delegate_to: localhost
+  run_once: true

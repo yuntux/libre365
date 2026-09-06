@@ -1,0 +1,13 @@
+---
+- name: "Restart fail2ban"
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: restarted
+
+- name: "Restart sshd"
+  ansible.builtin.systemd:
+    # Debian/Ubuntu (this repo's target images, see infra/terraform's
+    # source_image variable) name the service "ssh", not "sshd" - unlike
+    # RHEL-family distributions.
+    name: ssh
+    state: restarted

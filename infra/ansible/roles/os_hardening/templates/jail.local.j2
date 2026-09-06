@@ -1,0 +1,16 @@
+{{ ansible_managed | comment }}
+# libre365 - baseline fail2ban jail configuration (study 4.2, general
+# security hardening - not a numbered study requirement, closes a gap
+# noted during review).
+
+[DEFAULT]
+ignoreip = {{ os_hardening_fail2ban_ignoreip | join(' ') }}
+bantime  = {{ os_hardening_fail2ban_ssh_bantime }}
+findtime = {{ os_hardening_fail2ban_ssh_findtime }}
+maxretry = {{ os_hardening_fail2ban_ssh_maxretry }}
+bantime.increment = {{ os_hardening_fail2ban_bantime_increment | lower }}
+bantime.factor = {{ os_hardening_fail2ban_bantime_factor }}
+bantime.maxtime = {{ os_hardening_fail2ban_bantime_maxtime }}
+
+[sshd]
+enabled = true
