@@ -1,5 +1,10 @@
 # Sizing overlay — 2000 users (study 1.2 L.88)
 # Usage: helm upgrade --install synapse ananace-charts/matrix-synapse -f synapse.yaml -f synapse-2000.yaml
+#
+# [CORRECTED] `workers:` is a top-level key in this chart, not nested under
+# `synapse:` - and "synchrotron"/"genericWorkers"/"federationSender" are
+# "synchrotron"/"generic_worker"/"federation_sender" (see synapse.yaml's own
+# header for the full story, verified against the chart's real source).
 synapse:
   resources:
     requests:
@@ -8,13 +13,14 @@ synapse:
     limits:
       cpu: "6"
       memory: "5.6Gi"
-  workers:
-    synchrotron:
-      replicaCount: 3
-    genericWorkers:
-      replicaCount: 4
-    federationSender:
-      replicaCount: 2
+
+workers:
+  synchrotron:
+    replicaCount: 3
+  generic_worker:
+    replicaCount: 4
+  federation_sender:
+    replicaCount: 2
 
 postgresql:
   primary:

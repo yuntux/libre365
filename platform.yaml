@@ -141,11 +141,13 @@ services:
     helm:
       file: infra/k8s/helm-values/synapse.yaml
       image_repository: matrixdotorg/synapse
-      # ananace-chart/matrix-synapse chart: everything related to Synapse is
-      # nested under the `synapse:` root key (workers, oidc, federation...) —
-      # the image override follows the same convention rather than a root
-      # `.image.tag`, which this chart doesn't have.
-      tag_path: synapse.image.tag
+      # [CORRECTED] `image:` is a TOP-LEVEL key in ananace-chart/matrix-synapse
+      # (verified directly against the chart's real values.yaml after a live
+      # deployment failure - "workers"/"serverName" turned out to be
+      # similarly misplaced throughout infra/k8s/helm-values/synapse*.yaml,
+      # see that file's own header for the full story) - NOT nested under
+      # `synapse:` as this comment used to claim.
+      tag_path: image.tag
 
   element_web:
     version: "v1.12.27" # study 1.2
