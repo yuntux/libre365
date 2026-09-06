@@ -168,7 +168,14 @@ def sub_domain(text: str, subdomain: str, new_base: str) -> str:
 # anchor doesn't apply here since there is no subdomain.
 _BARE_DOMAIN_PATTERNS = {
     REPO_ROOT / "infra/k8s/helm-values/element-web.yaml": [
-        r'(server_name:\s*")[^"]*(")',
+        # [CORRECTED] this used to target `"m.homeserver".server_name` under
+        # a `config.default_server_config` key that never existed in the
+        # real chart's schema (see element-web.yaml's own header, found by
+        # actually running dev-cluster/deploy.sh): the real, top-level
+        # field is `defaultServer.name`. Anchored on the whole
+        # `defaultServer:` block (not a bare `name:\s*"`) since that key
+        # name alone is far too generic to safely regex-replace on its own.
+        r'(defaultServer:\s*\n\s*url:\s*"[^"]*"\s*\n\s*name:\s*")[^"]*(")',
     ],
     REPO_ROOT / "infra/k8s/helm-values/element-call.yaml": [
         r'(name:\s*DEFAULT_HOMESERVER\s*\n\s*value:\s*")[^"]*(")',

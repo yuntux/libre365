@@ -2,85 +2,109 @@
 # Chart used: `ce` (Community Edition), published by `haiwen` - Seafile's OWN
 # GitHub org, not a random community fork.
 #   Helm repo: https://haiwen.github.io/seafile-helm-chart/repo
-#   [CORRECTED] the repo/chart name here used to be
-#   "seafile-charts.github.io/seafile-charts" / "seafile-charts/seafile-ce",
-#   which was fabricated and 404s - found by actually running
-#   dev-cluster/deploy.sh. [UNCERTAIN]: found via haiwen/seafile-helm-chart's
-#   own README (github.com, reachable), but this sandboxed environment's
-#   egress proxy blocks *.github.io outright, so the index.yaml itself was
-#   never independently fetched - confirm on first real run.
+#   chart    : ce
+#
+# [CORRECTED, substantially] found by actually running dev-cluster/deploy.sh
+# ("SEAFILE_SERVER_HOSTNAME is not specified and is not allowed to be
+# empty" - the env var WAS set, just under the wrong top-level key), then
+# verifying this chart's real source directly
+# (github.com/haiwen/seafile-helm-chart, template/13.0/ce/values.yaml and
+# templates/) rather than guessing further. This chart's schema is a lot
+# smaller and stricter than previously assumed:
+# - Everything lives under a single top-level `seafile:` key (`initMode`,
+#   `existingSecret`, `configs`, `env`, `extraResources`, `extraEnv`,
+#   `extraVolumes`) - there is no top-level `image:`/`resources:`/
+#   `persistence:` at all.
+# - `image.repository`/`image.tag` don't exist either: the container image
+#   is one combined "repo:tag" string, `seafile.configs.image` (helper
+#   `seafile.image` in _helpers.tpl falls back to
+#   "seafileltd/seafile-mc:<AppVersion>-latest", a rolling tag, if unset).
+#   Kept in sync BY HAND with platform.yaml's services.seafile.version -
+#   scripts/sync_platform.py's generic tag_path patcher only supports the
+#   split repository/tag convention, incompatible with this chart (see
+#   platform.yaml's own comment on this entry).
+# - `env:` is NOT a free-form map: templates/seafile-env.yaml only ever
+#   writes the fixed list of names in the chart's own `seafile.presetEnv`
+#   (SEAFILE_*, CACHE_PROVIDER, REDIS_*/MEMCACHED_*, ENABLE_*, ...) into a
+#   ConfigMap - any other key placed here is silently dropped from the
+#   rendered chart output entirely (not even a warning). OAuth/OnlyOffice/
+#   ShareLink settings, which aren't in that preset list, go through
+#   ../manifests/seafile-extra-env.yaml instead (see `extraEnv` below).
+# - This chart has NO bundled MySQL or cache subchart at all (unlike what
+#   `mysql.enabled`/`memcached.enabled` used to assume) - it only ever
+#   talks to an externally-provisioned MySQL and Redis/Memcached, addressed
+#   purely by hostname env vars. Provisioned here as their own standalone
+#   releases: seafile-mysql.yaml (bitnami/mysql) and seafile-memcached.yaml
+#   (bitnami/memcached) - see dev-cluster/deploy.sh.
+# - `resources:` is `seafile.extraResources` (an exact passthrough to the
+#   container's own `resources:` field).
+# - The previous `OAUTH_CLIENT_SECRET`/`ONLYOFFICE_JWT_SECRET` as
+#   `valueFrom: {secretKeyRef: ...}` objects nested inside `env:` were
+#   fictional: this chart's `env:` values are plain strings (rendered with
+#   `| quote` in the ConfigMap template), not Kubernetes EnvVar objects.
+#   Credentials instead flow through `seafile.existingSecret` (the whole
+#   Secret is injected via envFrom) and `seafile.extraEnv`'s
+#   configMapRef/secretRef entries - see below and
+#   ../manifests/seafile-extra-env.yaml's header for exactly why.
 #
 # 1.4 L.136 — sizing driven by the volume of stored data and the sync bandwidth, not
 # by the number of active users: no dedicated 100/2000 variant for Seafile (unlike
 # Synapse/OnlyOffice/Keycloak), a single values file suffices; only
-# `persistence.size` needs to be revised upward as the data volume grows.
+# `seafile.configs.seafileDataVolume.storage` needs to be revised upward as the data
+# volume grows.
 #
 # 1.4 L.141 — known limitation: horizontal clustering (several frontends + shared
 # cache) only exists in the (paid) Pro edition. The Community edition below stays
 # single-node, scalable vertically only — to be anticipated budget-wise beyond a
 # load threshold, see the study.
 
-image:
-  repository: seafileltd/seafile-mc
-  tag: "13.0.25"
+seafile:
+  # Set to false after the very first successful startup (chart README):
+  # leaves the INIT_* credentials in seafile-secret harmless to rotate
+  # afterwards, since they're then no longer read.
+  initMode: true
 
-replicaCount: 1 # single-node, Community edition (1.4 L.141)
+  existingSecret:
+    name: seafile-secret
 
-resources:
-  requests:
-    cpu: "2"
-    memory: "8Gi"
-  limits:
-    cpu: "4"
-    memory: "16Gi"
+  configs:
+    image: "seafileltd/seafile-mc:13.0.25"
+    seafileDataVolume:
+      storage: 500Gi
+      # Volume sizing to be revised continuously based on the actual stored volume (1.4 L.136)
 
-env:
-  # 2.11 L.565 — ban on unauthenticated share links: any unauthenticated external
-  # sharing must go through Gokapi (1.8), not through a public Seafile share link.
-  SHARE_LINK_LOGIN_REQUIRED: "true"
-  # Complement documented in 2.11 L.565: can be disabled more finely per role in
-  # seahub_settings.py (CAN_GENERATE_SHARE_LINK), out of scope for generic Helm
-  # values — to be set via an additional seahub_settings.py ConfigMap if needed.
+  env:
+    SEAFILE_SERVER_HOSTNAME: "files.libre365.example.org"
 
-  # 1.5 L.193 — OnlyOffice integration as the office server (Community edition >= 9.4,
-  # connection cap lifted).
-  OFFICE_SERVER_TYPE: "OnlyOffice"
-  ONLYOFFICE_APIJS_URL: "https://office.libre365.example.org/web-apps/apps/api/documents/api.js"
-  ONLYOFFICE_JWT_SECRET:
-    valueFrom:
-      secretKeyRef:
-        name: onlyoffice-jwt-secret
-        key: secret
+    # 1.4 — external MySQL, see seafile-mysql.yaml (this chart has no
+    # bundled database of its own).
+    SEAFILE_MYSQL_DB_HOST: "seafile-mysql"
 
-  # 1.7 — Keycloak SSO (native Seafile OIDC). Client secret from
-  # seafile-oidc-secret (infra/k8s/manifests/external-secrets.yaml,
-  # OpenBao-sourced).
-  ENABLE_OAUTH: "true"
-  OAUTH_PROVIDER_DOMAIN: "sso.libre365.example.org"
-  OAUTH_CLIENT_ID: "seafile"
-  OAUTH_CLIENT_SECRET:
-    valueFrom:
-      secretKeyRef:
-        name: seafile-oidc-secret
-        key: client-secret
+    # 1.4 — external Memcached, see seafile-memcached.yaml (this chart has
+    # no bundled cache of its own).
+    CACHE_PROVIDER: "memcached"
+    MEMCACHED_HOST: "seafile-memcached"
 
-  SEAFILE_SERVER_HOSTNAME: "files.libre365.example.org"
+  extraResources:
+    requests:
+      cpu: "2"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "16Gi"
 
-persistence:
-  data:
-    enabled: true
-    size: 500Gi
-    storageClass: ""
-  # Volume sizing to be revised continuously based on the actual stored volume (1.4 L.136)
-
-mysql:
-  enabled: true
-  auth:
-    database: seafile_db
-    existingSecret: seafile-mysql-secret
-
-memcached:
-  enabled: true
+  # 2.11 L.565 / 1.5 L.193 / 1.7 — ShareLink/OnlyOffice/OIDC settings this
+  # chart's own `env:` can't carry (see header comment above), including
+  # the Keycloak OIDC client_id "seafile"
+  # (infra/ansible/roles/keycloak_realm/defaults/main.yml) - see
+  # ../manifests/seafile-extra-env.yaml for OAUTH_CLIENT_ID and the rest of
+  # the non-secret config. Both entries below are whole-object injections
+  # (envFrom): every key of each becomes a container env var as-is.
+  extraEnv:
+    - configMapRef:
+        name: seafile-extra-env
+    - secretRef:
+        name: seafile-oidc-secret # key: OAUTH_CLIENT_SECRET
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
 # see ../manifests/caddy.yaml's header comment for the full rationale.

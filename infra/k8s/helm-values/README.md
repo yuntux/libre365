@@ -109,7 +109,9 @@ instead of a separate cascade file.
 | Element Web | `element-web` (ananace-chart) | https://ananace.gitlab.io/charts |
 | Element Call | no official chart — "chart-like" values manifest, to be adapted as raw | — |
 | Visio (LaSuite Meet) | `suitenumerique/meet` if published, otherwise raw manifest | https://github.com/suitenumerique/meet |
-| Seafile | chart `ce` published by `haiwen` (Seafile's own GitHub org) | https://haiwen.github.io/seafile-helm-chart/repo ([UNCERTAIN]: found via that org's own README, but this sandboxed environment's egress proxy blocks `*.github.io` outright, so the index.yaml itself was never independently fetched - the previous URL here, `seafile-charts.github.io/seafile-charts`, was fabricated and 404s) |
+| Seafile | chart `ce` published by `haiwen` (Seafile's own GitHub org) — has no bundled MySQL/cache of its own (confirmed by actually running `dev-cluster/deploy.sh`), see `seafile-mysql`/`seafile-memcached` below | https://haiwen.github.io/seafile-helm-chart/repo ([UNCERTAIN]: found via that org's own README, but this sandboxed environment's egress proxy blocks `*.github.io` outright, so the index.yaml itself was never independently fetched - the previous URL here, `seafile-charts.github.io/seafile-charts`, was fabricated and 404s) |
+| Seafile MySQL | `mysql` (bitnami) — standalone release, the `ce` chart above requires an externally-provisioned MySQL | https://charts.bitnami.com/bitnami |
+| Seafile Memcached | `memcached` (bitnami) — standalone release, same reason as Seafile MySQL above | https://charts.bitnami.com/bitnami |
 | OnlyOffice Document Server | chart `docs` published by ONLYOFFICE itself | https://download.onlyoffice.com/charts/stable ([UNCERTAIN], same reason as Seafile above - found via github.com/ONLYOFFICE/Kubernetes-Docs' own README, egress-blocked from independently fetching the index.yaml; the previous URL here, `onlyoffice.github.io/docs-cloud-chart`, was fabricated and 404s) |
 | Vikunja | no official chart confirmed to exist (see `vikunja.yaml`'s header) — "chart-like" values manifest, to be adapted to a generic app-template chart or a raw manifest | — |
 | Keycloak | no Helm chart — official Keycloak Operator CR (`../manifests/keycloak.yaml`), `bitnami/postgresql` for its now-standalone database | Operator: raw kubectl apply (see that file's header); Postgres: https://charts.bitnami.com/bitnami |
@@ -152,6 +154,9 @@ helm repo update
 kubectl apply -f ../manifests/namespace.yaml
 
 # Component with no scale overlay
+helm upgrade --install seafile-mysql bitnami/mysql -n libre365 -f seafile-mysql.yaml
+helm upgrade --install seafile-memcached bitnami/memcached -n libre365 -f seafile-memcached.yaml
+kubectl apply -f ../manifests/seafile-extra-env.yaml
 helm upgrade --install seafile seafile-charts/ce -n libre365 -f seafile.yaml
 helm upgrade --install seaweedfs seaweedfs/seaweedfs -n libre365 -f seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n libre365 -f peertube.yaml
