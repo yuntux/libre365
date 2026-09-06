@@ -227,6 +227,16 @@ helm upgrade --install external-secrets external-secrets/external-secrets -n "$N
 # `kubectl wait --for=condition=Ready` checks pod readiness directly instead
 # of the rollout mechanism, so it works regardless of the update strategy.
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=openbao -n "$NAMESPACE" --timeout=120s
+# [CORRECTED] `helm upgrade --install external-secrets` above returns as
+# soon as its manifests (including its own CRDs) are applied, but the API
+# server can take a few seconds to actually register a brand-new CRD -
+# found by actually running this script: `kubectl apply -f
+# .../external-secrets-store.yaml` (a ClusterSecretStore) failed with "no
+# matches for kind ClusterSecretStore ... ensure CRDs are installed first"
+# on the very next line. Waiting for both CRDs this script itself applies
+# resources of (ClusterSecretStore, ExternalSecret) to become Established
+# closes that race.
+kubectl wait --for=condition=Established crd/clustersecretstores.external-secrets.io crd/externalsecrets.external-secrets.io --timeout=60s
 kubectl apply -f infra/k8s/manifests/dev/external-secrets-store.yaml
 kubectl apply -f infra/k8s/manifests/external-secrets.yaml
 ./dev-cluster/seed-openbao-dev-secrets.sh
