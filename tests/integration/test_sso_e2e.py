@@ -2,51 +2,49 @@
 Critical scenario (study 4.5): "end-to-end SSO authentication (Keycloak) on
 each of the previous components".
 
-A first version of this file (fixed on review - see `docs/oidc.md`) tested
-all five components generically: obtain a token via the Resource Owner
-Password Credentials grant on a shared "integration-tests" Keycloak client,
-then present it as `Authorization: Bearer <token>` directly to each app's
-API. That is not how any of these apps actually implement OIDC: Seafile,
-Vikunja and Synapse all use a browser AUTHORIZATION CODE redirect - the app
-itself exchanges the code with Keycloak server-side and mints its OWN
-native credential (a Seahub session cookie, a Vikunja JWT, a Matrix
-`access_token`). None of them validate an externally-obtained Keycloak
-token as a resource server would, and even if they did, a token minted for
-a different client_id/audience ("integration-tests" rather than
-"seafile"/"vikunja"/"matrix-synapse") would fail an audience check anyway.
-That version tested nothing real.
+A first version of this file tested all five components generically:
+obtain a token via the Resource Owner Password Credentials grant on a
+shared "integration-tests" Keycloak client, then present it as
+`Authorization: Bearer <token>` directly to each app's API. That is not how
+any of these apps actually implement OIDC: Seafile, Vikunja and Synapse all
+use a browser AUTHORIZATION CODE redirect - the app itself exchanges the
+code with Keycloak server-side and mints its OWN native credential (a
+Seahub session cookie, a Vikunja JWT, a Matrix `access_token`). None of
+them validate an externally-obtained Keycloak token as a resource server
+would, and even if they did, a token minted for a different client_id/
+audience ("integration-tests" rather than "seafile"/"vikunja"/
+"matrix-synapse") would fail an audience check anyway. That version tested
+nothing real.
 
-Each function below instead drives the ACTUAL redirect flow with a plain
-`requests.Session` (via the `keycloak_login` fixture in conftest.py -
-Keycloak's default theme is a plain HTML form POST, no browser/JS needed),
-ending up with the same kind of credential a real user's browser would get,
-then verifies THAT credential is what the app's own protected endpoint
-actually accepts.
+A second version fixed that, but reached each app through its own
+directly-exposed port (`base_urls`) - which bypasses Caddy, and with it
+BOTH the OnlyOffice/Novu SSO gates (`forward_auth`, only wired into
+Caddy's own routing) AND the exact domain each Keycloak client is actually
+registered against (`redirect_uris` are the public domain, not
+`localhost:<port>` - a real login would end up redirected to a URL nothing
+in that version could resolve or serve).
 
-Two components from the original version are deliberately not here:
-  - Grommunio: has no Keycloak client at all (see docs/oidc.md - not a
-    priority for the study, `grommunio-web` stays disabled) - the URL the
-    old version queried (`{caddy}/grommunio/api/whoami`) does not
-    correspond to anything actually built in this repository; there was no
-    real mechanism there to test in the first place.
-  - OnlyOffice / Novu: gated by a Caddy `forward_auth` -> oauth2-proxy ->
-    Keycloak chain instead of native OIDC (see docs/oidc.md) - structurally
-    verified by `check_oidc_coverage()` and a real `caddy validate` run,
-    but not by a live test here: this suite's `base_urls` fixture reaches
-    every other component through its own directly-exposed port, bypassing
-    Caddy's domain-based virtual hosting entirely (see conftest.py) - the
-    forward_auth gate only exists on Caddy's own routing, so exercising it
-    for real would need the suite to reach these two components THROUGH
-    Caddy by domain name, which nothing in this suite does for any
-    component today. Left as a documented follow-up rather than a test
-    that can't actually run against the dev/staging environments this
-    suite targets.
+This version drives every flow through `domain_session`/`public_url`
+(conftest.py) instead: the exact `http://<subdomain>.<public_domain>` URLs
+every Keycloak client and every app's own OIDC config already use, made
+reachable from outside the cluster via `DomainRoutingAdapter` (mirroring
+`dev-cluster/deploy.sh`'s CoreDNS patch, which does the same for pods
+inside it) - see `dev-cluster/README.md`'s "Testing Keycloak SSO/OIDC
+end-to-end". This is what finally lets OnlyOffice/Novu's oauth2-proxy
+gates be exercised for real, not just checked structurally
+(`check_oidc_coverage()`, `caddy validate`).
+
+Grommunio is not here at all: it has no Keycloak client (see docs/oidc.md
+- not a priority for the study, `grommunio-web` stays disabled), and the
+URL an earlier version queried (`{caddy}/grommunio/api/whoami`) never
+corresponded to anything actually built in this repository.
 """
 
 from __future__ import annotations
 
 import secrets
 import urllib.parse
+from typing import Callable
 
 import pytest
 import requests
@@ -59,28 +57,30 @@ VIKUNJA_PROVIDER_NAME = "Libre365 SSO"
 
 
 @pytest.mark.sso
-def test_seafile_oidc_login_grants_api_access(base_urls, test_user, keycloak_login, wait_for_service):
+def test_seafile_oidc_login_grants_api_access(
+    domain_session: requests.Session, public_url: Callable[..., str], test_user, keycloak_login, wait_for_service
+):
     """Seafile's OIDC login (ENABLE_OAUTH, seafile.yaml) is a server-side
     authorization code exchange that ends in a Seahub session cookie -
     `api2` accepts that cookie (SessionAuthentication), not a bearer token."""
-    wait_for_service(f"{base_urls.seafile}/accounts/login/", expected_statuses=(200, 302))
+    seafile = public_url("files")
+    wait_for_service(f"{seafile}/accounts/login/", expected_statuses=(200, 302), session=domain_session)
 
-    unauthenticated = requests.get(f"{base_urls.seafile}/api2/repos/", timeout=15)
+    unauthenticated = domain_session.get(f"{seafile}/api2/repos/", timeout=15)
     assert unauthenticated.status_code in (401, 403), (
         f"[seafile] Expected the repos API to reject an unauthenticated "
         f"request, got {unauthenticated.status_code}."
     )
 
-    session = requests.Session()
     login_response = keycloak_login(
-        f"{base_urls.seafile}/oauth/login/", test_user.username, test_user.password, session=session
+        f"{seafile}/oauth/login/", test_user.username, test_user.password, session=domain_session
     )
     assert login_response.status_code < 400, (
         f"[seafile] OIDC login via Keycloak did not complete: "
         f"HTTP {login_response.status_code} on {login_response.url}."
     )
 
-    authenticated = session.get(f"{base_urls.seafile}/api2/repos/", timeout=15)
+    authenticated = domain_session.get(f"{seafile}/api2/repos/", timeout=15)
     assert authenticated.status_code == 200, (
         f"[seafile] Expected the repos API to accept the session obtained via "
         f"Keycloak SSO login, got {authenticated.status_code}. End-to-end SSO "
@@ -89,7 +89,9 @@ def test_seafile_oidc_login_grants_api_access(base_urls, test_user, keycloak_log
 
 
 @pytest.mark.sso
-def test_vikunja_oidc_login_grants_a_native_jwt(base_urls, test_user, keycloak_openid_config, keycloak_login):
+def test_vikunja_oidc_login_grants_a_native_jwt(
+    domain_session: requests.Session, public_url: Callable[..., str], test_user, keycloak_openid_config, keycloak_login
+):
     """
     Vikunja's OIDC login (VIKUNJA_AUTH_OPENID_*, vikunja.yaml) is a
     frontend-driven authorization code flow: the SPA builds the
@@ -103,13 +105,15 @@ def test_vikunja_oidc_login_grants_a_native_jwt(base_urls, test_user, keycloak_o
     instance from this sandboxed environment; this test fails with a clear
     diagnostic rather than a false pass if either assumption is wrong.
     """
-    unauthenticated = requests.get(f"{base_urls.vikunja}/api/v1/tasks/all", timeout=15)
+    vikunja = public_url("taches")
+
+    unauthenticated = domain_session.get(f"{vikunja}/api/v1/tasks/all", timeout=15)
     assert unauthenticated.status_code == 401, (
         f"[vikunja] Expected the tasks API to reject an unauthenticated "
         f"request, got {unauthenticated.status_code}."
     )
 
-    info = requests.get(f"{base_urls.vikunja}/api/v1/info", timeout=15)
+    info = domain_session.get(f"{vikunja}/api/v1/info", timeout=15)
     info.raise_for_status()
     providers = info.json().get("auth", {}).get("openid", {}).get("providers") or []
     provider = next((p for p in providers if p.get("name") == VIKUNJA_PROVIDER_NAME), None)
@@ -124,7 +128,7 @@ def test_vikunja_oidc_login_grants_a_native_jwt(base_urls, test_user, keycloak_o
     if not provider_key:
         pytest.fail(f"[vikunja] OpenID provider {VIKUNJA_PROVIDER_NAME!r} has no 'key' field: {provider!r}")
 
-    redirect_uri = f"{base_urls.vikunja}/auth/openid/{provider_key}"
+    redirect_uri = f"{vikunja}/auth/openid/{provider_key}"
     state = secrets.token_urlsafe(16)
     authorization_url = keycloak_openid_config["authorization_endpoint"] + "?" + urllib.parse.urlencode(
         {
@@ -136,7 +140,7 @@ def test_vikunja_oidc_login_grants_a_native_jwt(base_urls, test_user, keycloak_o
         }
     )
 
-    login_response = keycloak_login(authorization_url, test_user.username, test_user.password)
+    login_response = keycloak_login(authorization_url, test_user.username, test_user.password, session=domain_session)
     query = urllib.parse.parse_qs(urllib.parse.urlparse(login_response.url).query)
     code = query.get("code", [None])[0]
     if not code:
@@ -145,8 +149,8 @@ def test_vikunja_oidc_login_grants_a_native_jwt(base_urls, test_user, keycloak_o
             f"code - ended up at {login_response.url}."
         )
 
-    callback = requests.post(
-        f"{base_urls.vikunja}/api/v1/auth/openid/{provider_key}/callback",
+    callback = domain_session.post(
+        f"{vikunja}/api/v1/auth/openid/{provider_key}/callback",
         json={"code": code, "scope": "openid email profile", "state": query.get("state", [state])[0], "redirect_url": redirect_uri},
         timeout=15,
     )
@@ -157,8 +161,8 @@ def test_vikunja_oidc_login_grants_a_native_jwt(base_urls, test_user, keycloak_o
         )
     jwt = callback.json()["token"]
 
-    authenticated = requests.get(
-        f"{base_urls.vikunja}/api/v1/tasks/all", headers={"Authorization": f"Bearer {jwt}"}, timeout=15
+    authenticated = domain_session.get(
+        f"{vikunja}/api/v1/tasks/all", headers={"Authorization": f"Bearer {jwt}"}, timeout=15
     )
     assert authenticated.status_code == 200, (
         f"[vikunja] Expected the tasks API to accept the JWT obtained via "
@@ -168,7 +172,9 @@ def test_vikunja_oidc_login_grants_a_native_jwt(base_urls, test_user, keycloak_o
 
 
 @pytest.mark.sso
-def test_matrix_oidc_login_grants_a_native_access_token(base_urls, test_user, keycloak_login):
+def test_matrix_oidc_login_grants_a_native_access_token(
+    domain_session: requests.Session, public_url: Callable[..., str], test_user, keycloak_login
+):
     """
     Synapse's OIDC login (synapse.yaml's native `oidc:` block, client_id
     `matrix-synapse`) is the Matrix Client-Server API's own SSO redirect
@@ -183,18 +189,19 @@ def test_matrix_oidc_login_grants_a_native_access_token(base_urls, test_user, ke
     configuration, not independently confirmed from this sandboxed
     environment.
     """
-    unauthenticated = requests.get(f"{base_urls.matrix}/_matrix/client/v3/account/whoami", timeout=15)
+    matrix = public_url("matrix")
+
+    unauthenticated = domain_session.get(f"{matrix}/_matrix/client/v3/account/whoami", timeout=15)
     assert unauthenticated.status_code == 401, (
         f"[matrix] Expected whoami to reject an unauthenticated request, "
         f"got {unauthenticated.status_code}."
     )
 
-    redirect_url = base_urls.matrix
     authorization_url = (
-        f"{base_urls.matrix}/_matrix/client/v3/login/sso/redirect"
-        f"?redirectUrl={urllib.parse.quote(redirect_url, safe='')}"
+        f"{matrix}/_matrix/client/v3/login/sso/redirect"
+        f"?redirectUrl={urllib.parse.quote(matrix, safe='')}"
     )
-    login_response = keycloak_login(authorization_url, test_user.username, test_user.password)
+    login_response = keycloak_login(authorization_url, test_user.username, test_user.password, session=domain_session)
     query = urllib.parse.parse_qs(urllib.parse.urlparse(login_response.url).query)
     login_token = query.get("loginToken", [None])[0]
     if not login_token:
@@ -203,8 +210,8 @@ def test_matrix_oidc_login_grants_a_native_access_token(base_urls, test_user, ke
             f"loginToken - ended up at {login_response.url}."
         )
 
-    token_response = requests.post(
-        f"{base_urls.matrix}/_matrix/client/v3/login",
+    token_response = domain_session.post(
+        f"{matrix}/_matrix/client/v3/login",
         json={"type": "m.login.token", "token": login_token},
         timeout=15,
     )
@@ -215,8 +222,8 @@ def test_matrix_oidc_login_grants_a_native_access_token(base_urls, test_user, ke
         )
     access_token = token_response.json()["access_token"]
 
-    authenticated = requests.get(
-        f"{base_urls.matrix}/_matrix/client/v3/account/whoami",
+    authenticated = domain_session.get(
+        f"{matrix}/_matrix/client/v3/account/whoami",
         headers={"Authorization": f"Bearer {access_token}"},
         timeout=15,
     )
@@ -224,4 +231,76 @@ def test_matrix_oidc_login_grants_a_native_access_token(base_urls, test_user, ke
         f"[matrix] Expected whoami to accept the access_token obtained via "
         f"Keycloak SSO login, got {authenticated.status_code}. End-to-end SSO "
         "is not working for Matrix/Synapse."
+    )
+
+
+def _assert_oauth2_proxy_gate_blocks_then_allows(
+    domain_session: requests.Session,
+    gated_url: str,
+    test_user,
+    keycloak_login: Callable[..., requests.Response],
+    label: str,
+) -> None:
+    """
+    Shared assertion for the two oauth2-proxy-gated components
+    (OnlyOffice, Novu's admin dashboard - docs/oidc.md): `domain_session` is
+    guaranteed cookie-free at the start of every test (see its own
+    docstring), so the FIRST request on it here is genuinely
+    unauthenticated - it must end up at Keycloak's login page (proof the
+    gate is active - matched on the response ending up on the
+    `sso.<public_domain>` host, not on any specific status code, since
+    oauth2-proxy/Keycloak's exact redirect chain status codes aren't
+    independently confirmed from this sandboxed environment); completing
+    the real Keycloak login through it must then reach the actual
+    application behind the gate (status 200, not another login prompt).
+    """
+    unauthenticated = domain_session.get(gated_url, timeout=15)
+    unauthenticated_host = urllib.parse.urlsplit(unauthenticated.url).hostname or ""
+    assert unauthenticated_host.startswith("sso."), (
+        f"[{label}] Expected an unauthenticated request to be redirected to Keycloak's "
+        f"login page (oauth2-proxy's forward_auth gate), but ended up at "
+        f"{unauthenticated.url} instead - the gate does not appear to be active."
+    )
+
+    login_response = keycloak_login(gated_url, test_user.username, test_user.password, session=domain_session)
+    assert login_response.status_code == 200, (
+        f"[{label}] Expected the oauth2-proxy gate to grant access to the real application "
+        f"after a successful Keycloak login, got HTTP {login_response.status_code} on "
+        f"{login_response.url}. End-to-end SSO is not working for {label}."
+    )
+
+
+@pytest.mark.sso
+def test_onlyoffice_oauth2_proxy_gate_blocks_then_allows(
+    domain_session: requests.Session, public_url: Callable[..., str], test_user, keycloak_login
+):
+    """
+    OnlyOffice Document Server has no login screen of its own (its JWT only
+    signs individual document-open requests from Seafile - see
+    test_coedition_onlyoffice.py); office.libre365.example.org is instead
+    gated by Caddy's `forward_auth` -> oauth2-proxy -> Keycloak chain
+    (infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml, docs/oidc.md) -
+    this is what actually protects the public route, in addition to (not
+    instead of) that JWT signing.
+    """
+    _assert_oauth2_proxy_gate_blocks_then_allows(
+        domain_session, public_url("office"), test_user, keycloak_login, "onlyoffice"
+    )
+
+
+@pytest.mark.sso
+def test_novu_admin_oauth2_proxy_gate_blocks_then_allows(
+    domain_session: requests.Session, public_url: Callable[..., str], test_user, keycloak_login
+):
+    """
+    Novu's `web` ADMIN dashboard (template/workflow management) is gated
+    the same way as OnlyOffice (infra/k8s/helm-values/oauth2-proxy-novu.yaml,
+    docs/oidc.md) - a separate surface from `notifications.<public_domain>`
+    (the API), which the top-bar widget calls with its own HMAC
+    subscriberHash auth and is deliberately NOT covered here: gating it
+    with an interactive Keycloak login would break the widget, which has no
+    browser redirect flow to complete one.
+    """
+    _assert_oauth2_proxy_gate_blocks_then_allows(
+        domain_session, public_url("notifications_admin"), test_user, keycloak_login, "novu-admin"
     )

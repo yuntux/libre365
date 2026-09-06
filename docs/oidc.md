@@ -125,28 +125,49 @@ application's, which is where `check_oidc_coverage()` looks for them.
   against a live instance from this sandboxed environment; it fails with a
   clear diagnostic rather than a false pass if either assumption doesn't
   hold.
-  **Grommunio** is no longer in this test at all: it has no Keycloak client
-  (by design, see above), and the URL the old version queried
+
+  **Grommunio** is not in this test at all: it has no Keycloak client (by
+  design, see above), and the URL an earlier version queried
   (`{caddy}/grommunio/api/whoami`) never corresponded to anything actually
   built in this repository — there was no real mechanism there to test.
-  **OnlyOffice and Novu** aren't in it either, for a different, structural
-  reason: their SSO gate lives entirely in Caddy's `forward_auth` routing
-  (see above), but `base_urls` reaches every component through its own
-  directly-exposed port, bypassing Caddy's domain-based virtual hosting
-  entirely for everything in this suite — exercising the gate for real
-  would need to go through Caddy by domain name, which nothing here does
-  today. Their coverage today is structural only: `check_oidc_coverage()`
-  plus a real `caddy validate` run confirming the forward_auth routes are
-  syntactically valid — a genuine live-request test is a documented
-  follow-up, not something to fake against an environment that can't
-  exercise it.
-  **Gokapi, PeerTube, Visio** stay out for the same reason described
-  above the table: each delegates to Keycloak via a browser redirect that
-  ends in an application-issued session/token of its own, and neither their
-  exact redirect/session mechanics (Gokapi, PeerTube) nor a working
-  dev-tier environment to target at all (Visio has no `platform.yaml`
-  port/service entry yet) are available to script confidently from this
-  sandboxed environment.
+
+  **OnlyOffice and Novu** ARE now covered too
+  (`test_onlyoffice_oauth2_proxy_gate_blocks_then_allows`,
+  `test_novu_admin_oauth2_proxy_gate_blocks_then_allows`) — a second gap
+  found on top of the first: their SSO gate lives entirely in Caddy's
+  `forward_auth` routing, but this suite's dev tier (`caddy-dev`) used to
+  be a completely different, hand-maintained, path-based portal with none
+  of production's domain-based site blocks or SSO gates at all, so nothing
+  could reach them regardless of which port a test used. Fixed at the
+  infrastructure level, not by adding yet more test-only special cases:
+  - `infra/k8s/manifests/dev/caddy.yaml`'s Caddyfile is now **generated**
+    from the real, production one (`scripts/sync_platform.py`'s
+    `compute_dev_caddy_change()`) — domain-based routing and the
+    `forward_auth` gates included, so the two can never silently drift
+    apart again.
+  - `dev-cluster/deploy.sh`'s CoreDNS step
+    (`dev-cluster/patch-coredns-hosts.sh`) makes every `platform.yaml`
+    domain resolve to that Caddy instance from INSIDE the cluster (every
+    app's own OIDC issuer/authurl config uses the real public domain
+    unconditionally — never a second, dev-only hard-coded value).
+  - `tests/integration/conftest.py`'s `DomainRoutingAdapter` does the same
+    thing for the test runner OUTSIDE the cluster — self-tested against a
+    throwaway local HTTP server in `test_domain_routing_adapter.py`, not
+    just plausible-looking code.
+
+  See `dev-cluster/README.md`'s "Testing Keycloak SSO/OIDC end-to-end" for
+  the full picture — this also means the Seafile/Vikunja/Matrix tests
+  above now go through the real public domain (Caddy), not each app's
+  directly-exposed port, matching how a real browser would actually reach
+  them.
+
+  **Gokapi, PeerTube, Visio** stay out for a different reason: each
+  delegates to Keycloak via a browser redirect that ends in an
+  application-issued session/token of its own, and neither their exact
+  redirect/session mechanics (Gokapi, PeerTube) nor a working dev-tier
+  environment to target at all (Visio has no `platform.yaml` port/service
+  entry yet) are available to script confidently from this sandboxed
+  environment — a documented follow-up, not guessed.
 
 ### Was the previous "generic bearer token" version of this test ever correct?
 

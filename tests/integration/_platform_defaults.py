@@ -28,3 +28,27 @@ DEFAULT_PORTS = {
     "UNIFIED_SEARCH_PORT": 4002,
     "VIKUNJA_PORT": 3456,
 }
+
+DOMAIN_BASE = 'libre365.example.org'
+DOMAIN_SUBDOMAINS = {
+    "autoconfig": 'autoconfig',
+    "autodiscover": 'autodiscover',
+    "call": 'call',
+    "chat": 'chat',
+    "depot": 'depot',
+    "files": 'files',
+    "livekit": 'livekit',
+    "mail": 'mail',
+    "matrix": 'matrix',
+    "minio_console": 'minio-console',
+    "notifications": 'notifications',
+    "notifications_admin": 'notifications-admin',
+    "office": 'office',
+    "onboarding": 'onboarding',
+    "registry": 'registry',
+    "s3": 's3',
+    "sso": 'sso',
+    "taches": 'taches',
+    "videos": 'videos',
+    "visio": 'visio',
+}

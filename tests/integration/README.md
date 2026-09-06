@@ -79,6 +79,7 @@ directly.
 |-------------------------------|-----------------------------|----------------------------------|
 | `KEYCLOAK_URL`                 | `http://localhost:8080`     | Keycloak                        |
 | `KEYCLOAK_REALM`               | `libre365`                   | Keycloak (test realm)        |
+| `LIBRE365_DOMAIN_BASE`         | `DOMAIN_BASE` (generated from `platform.yaml`'s `domains.base`) | `test_sso_e2e.py`'s `domain_session`/`public_url` (see `docs/oidc.md`) - override only if the target environment genuinely uses a different domain |
 | `GROMMUNIO_IMAP_HOST` / `_PORT`| `localhost` / `993`         | Grommunio (IMAP)                |
 | `GROMMUNIO_SMTP_HOST` / `_PORT`| `localhost` / `587`         | Grommunio (SMTP)                |
 | `SEAFILE_URL`                  | `http://localhost:8082`     | Seafile                         |
@@ -131,16 +132,26 @@ orchestrator.
 
 ## Design notes
 
-- **`test_sso_e2e.py`** covers Seafile, Vikunja, and Matrix/Synapse, each
-  with its own function: unlike a generic bearer-token check, each of
-  these three apps mints its own native credential after a real Keycloak
-  login (a Seahub session cookie, a Vikunja JWT, a Matrix `access_token`),
-  so the exact login/exchange steps genuinely differ per component and
-  don't collapse into one shared, parametrized assertion — see that file's
-  module docstring and `docs/oidc.md` for why an earlier, generic
-  five-target version tested nothing real, and why Grommunio (no Keycloak
-  client at all) and OnlyOffice/Novu (gated by Caddy `forward_auth`, not
-  reachable through this suite's `base_urls`) aren't in it.
+- **`test_sso_e2e.py`** covers Seafile, Vikunja, Matrix/Synapse, and the
+  OnlyOffice/Novu oauth2-proxy gates, each with its own function: unlike a
+  generic bearer-token check, each app mints its own native credential
+  after a real Keycloak login (a Seahub session cookie, a Vikunja JWT, a
+  Matrix `access_token`) or sits behind its own gate, so the exact login/
+  exchange steps genuinely differ per component and don't collapse into
+  one shared, parametrized assertion — see that file's module docstring
+  and `docs/oidc.md` for why an earlier, generic five-target version
+  tested nothing real, and why Grommunio (no Keycloak client at all) isn't
+  in it. Every function reaches its target through the real public domain
+  (`domain_session`/`public_url`, `../../docs/oidc.md`'s "Live end-to-end"
+  section), not `base_urls`' directly-exposed ports — required for the
+  OnlyOffice/Novu gates to be reachable at all, and closer to how a real
+  browser reaches every other component too.
+- **`test_domain_routing_adapter.py`** is an offline self-test of
+  `conftest.py`'s `DomainRoutingAdapter` (the mechanism behind
+  `domain_session`) against a throwaway local HTTP server — no live
+  cluster needed, always runs, proves the request-rewriting logic works
+  independent of whether a k3d cluster is available to exercise it
+  end-to-end.
 - **`wait_for_service`** (in `conftest.py`) is used by every test file
   before any business assertion, to absorb the slow startup of the
   docker-compose stack and fail with an explicit message

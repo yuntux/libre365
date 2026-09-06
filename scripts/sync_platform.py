@@ -20,6 +20,9 @@ Files touched:
     - connectors/thunderbird-filelink-gokapi/manifest.json  (domain name)
     - connectors/thunderbird-filelink-gokapi/policies.json  (domain name)
     - infra/k8s/manifests/onboarding.yaml  (generated: onboarding page + QR codes, study 2.5)
+    - infra/k8s/manifests/dev/caddy.yaml    (Caddyfile only, generated from the
+                                              production Caddyfile - see
+                                              compute_dev_caddy_change())
     - tests/integration/_platform_defaults.py  (generated file, do not edit)
 
 Also enforces (never generates/patches, only fails loudly on drift, both in
@@ -46,6 +49,7 @@ from pathlib import Path
 import qrcode
 import qrcode.image.svg
 import yaml
+from ruamel.yaml.scalarstring import LiteralScalarString
 from ruamel.yaml import YAML
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -799,9 +803,98 @@ data:
     return [Change(path, manifest_yaml, "infra/k8s/manifests/onboarding.yaml (generated: onboarding page + QR codes)")]
 
 
+def _dev_caddyfile_from_production(caddyfile_text: str) -> str:
+    """
+    Derives the k3d dev cluster's Caddyfile (infra/k8s/manifests/dev/
+    caddy.yaml) from the real, already domain-patched production one
+    (infra/k8s/manifests/caddy.yaml) - GENERATED so the two can never
+    silently drift apart the way a hand-maintained dev copy eventually
+    would (found happening for real: dev's Caddyfile was a hand-written,
+    path-based portal with none of production's domain-based site blocks
+    or SSO gates, discovered while trying to add a live test for the
+    OnlyOffice/Novu oauth2-proxy gates and finding nothing in dev could
+    exercise them).
+
+    Only strips what the dev environment genuinely cannot run - domain
+    site addresses, `forward_auth`/`route` SSO gates, and every backend
+    hostname stay byte-for-byte the same values used in production
+    (nothing new is hard-coded for "dev" here):
+
+    - `html_inject` directives and the `order html_inject before respond`
+      global option: both need the custom xcaddy-built HTML-injection
+      plugin baked into production's Caddy image, which cannot be built
+      or pulled from this sandboxed/local dev environment (see this
+      file's own header comment). Dev loses the injected top bar, not the
+      routing underneath it.
+    - Automatic HTTPS on every domain site address, forced to plain
+      `http://` instead: there is no real public DNS for
+      `*.<domains.base>` to obtain a certificate for from a local
+      cluster - left on, Caddy would hang retrying ACME issuance forever.
+
+    `forward_auth`/`route` (the OnlyOffice/Novu SSO gates, study 1.7) are
+    both Caddy built-ins since 2.7 - not part of the unavailable custom
+    plugin - so they survive unchanged and ARE exercisable in dev, once
+    something resolves `*.<domains.base>` to this Caddy instance inside
+    the cluster (see dev-cluster/deploy.sh's CoreDNS step) and outside it
+    (see tests/integration/conftest.py's `DomainRoutingAdapter`).
+    """
+    text = re.sub(
+        r"\{\s*#[^\n]*\n\s*order html_inject before respond\s*\n\}\s*\n*",
+        "",
+        caddyfile_text,
+        count=1,
+    )
+    text = re.sub(r"\n[ \t]*html_inject\s*\{[^}]*\}", "", text)
+    # A line that is ONLY "<hostname[:port]> {" - matched structurally (not
+    # against any specific domain name, so this keeps working regardless of
+    # platform.yaml's domains.base) - excludes snippet definitions like
+    # "(banner_assets) {", which start with "(".
+    text = re.sub(
+        r"(?m)^([a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?(?::\d+)?)[ \t]*\{[ \t]*$",
+        r"http://\1 {",
+        text,
+    )
+    return text
+
+
+def compute_dev_caddy_change(platform: dict) -> list[Change]:
+    """Regenerates infra/k8s/manifests/dev/caddy.yaml's Caddyfile from the
+    real one via `_dev_caddyfile_from_production` (see its docstring) -
+    that file's Deployment/Service documents are hand-maintained and kept
+    untouched (ruamel round-trip), the same convention as every other file
+    under infra/k8s/manifests/dev/ (sizing overlays, never platform.yaml-
+    driven)."""
+    domains = platform.get("domains")
+    if not domains:
+        return []
+
+    prod_path = REPO_ROOT / "infra/k8s/manifests/caddy.yaml"
+    prod_text = prod_path.read_text()
+    base = domains["base"]
+    for subdomain in domains["subdomains"].values():
+        prod_text = sub_domain(prod_text, subdomain, base)
+
+    prod_caddyfile = next(
+        doc["data"]["Caddyfile"]
+        for doc in yaml.safe_load_all(prod_text)
+        if doc and doc.get("kind") == "ConfigMap" and "Caddyfile" in doc.get("data", {})
+    )
+    dev_caddyfile = _dev_caddyfile_from_production(prod_caddyfile)
+
+    dev_path = REPO_ROOT / "infra/k8s/manifests/dev/caddy.yaml"
+    with dev_path.open() as f:
+        dev_docs = list(ruamel_yaml.load_all(f))
+    dev_docs[0]["data"]["Caddyfile"] = LiteralScalarString(dev_caddyfile)
+
+    buf = io.StringIO()
+    ruamel_yaml.dump_all(dev_docs, buf)
+    return [Change(dev_path, buf.getvalue(), "infra/k8s/manifests/dev/caddy.yaml (Caddyfile, generated from the production one)")]
+
+
 def compute_test_defaults_changes(platform: dict) -> list[Change]:
     path = REPO_ROOT / "tests" / "integration" / "_platform_defaults.py"
     port_map = all_ports(platform)
+    domains = platform.get("domains") or {}
 
     body = [
         '"""',
@@ -816,6 +909,20 @@ def compute_test_defaults_changes(platform: dict) -> list[Change]:
     ]
     for key in sorted(port_map):
         body.append(f'    "{key}": {port_map[key]!r},')
+    body.append("}")
+    body.append("")
+
+    # DOMAIN_BASE/DOMAIN_SUBDOMAINS: the same values every OIDC config in
+    # this repo uses (Keycloak's KC_HOSTNAME, each app's issuer/authurl) -
+    # conftest.py's DomainRoutingAdapter/public_url fixtures read these
+    # instead of a second, hard-coded copy of the domain, so a real
+    # `domains.base` change (e.g. to a bought production domain) propagates
+    # to the test suite the same way it already does to every Helm-values
+    # file (see compute_domain_changes()).
+    body.append(f"DOMAIN_BASE = {domains.get('base', '')!r}")
+    body.append("DOMAIN_SUBDOMAINS = {")
+    for key, subdomain in sorted((domains.get("subdomains") or {}).items()):
+        body.append(f'    "{key}": {subdomain!r},')
     body.append("}")
     body.append("")
 
@@ -865,6 +972,7 @@ def main() -> int:
     changes += compute_test_defaults_changes(platform)
     changes += compute_domain_changes(platform)
     changes += compute_onboarding_changes(platform)
+    changes += compute_dev_caddy_change(platform)
 
     dirty = [c for c in changes if c.is_dirty()]
 

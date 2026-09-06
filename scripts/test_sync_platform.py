@@ -304,3 +304,148 @@ def test_oidc_coverage_flags_a_client_missing_from_the_app_files_mapping(tmp_pat
     assert len(problems) == 1
     assert "unmapped-client" in problems[0]
     assert "does not know which application file" in problems[0]
+
+
+# --- _dev_caddyfile_from_production() / compute_dev_caddy_change() --------
+#
+# Regression tests for the discovery that infra/k8s/manifests/dev/caddy.yaml
+# used to be a completely different, hand-maintained, path-based portal with
+# none of production's domain-based site blocks or SSO gates - nothing in
+# dev could exercise the OnlyOffice/Novu oauth2-proxy gates as a result.
+# Fixed by generating dev's Caddyfile from the real one.
+
+_SAMPLE_PROD_CADDYFILE = """{
+    # Built with the HTML injection module (xcaddy), see the header comment.
+    order html_inject before respond
+}
+
+(banner_assets) {
+    handle_path /libre365-banner/* {
+        root * /srv/banner-assets
+        file_server
+    }
+}
+
+chat.libre365.example.org {
+    import banner_assets
+    handle {
+        reverse_proxy element-web.libre365.svc.cluster.local:80
+        html_inject {
+            selector "</body>"
+            file /etc/caddy/snippets/banner.html
+            position before
+        }
+    }
+}
+
+office.libre365.example.org {
+    route /oauth2/* {
+        reverse_proxy oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180
+    }
+    route {
+        forward_auth oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180 {
+            uri /oauth2/auth
+        }
+        reverse_proxy onlyoffice.libre365.svc.cluster.local:80
+    }
+}
+
+matrix.libre365.example.org:8448 {
+    reverse_proxy synapse.libre365.svc.cluster.local:8448
+}
+"""
+
+
+def test_dev_caddyfile_strips_html_inject_but_keeps_forward_auth():
+    dev_text = sync_platform._dev_caddyfile_from_production(_SAMPLE_PROD_CADDYFILE)
+
+    assert "html_inject" not in dev_text
+    assert "order html_inject before respond" not in dev_text
+    assert "forward_auth" in dev_text
+    assert "route /oauth2/*" in dev_text
+    assert "oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180" in dev_text
+
+
+def test_dev_caddyfile_forces_plain_http_on_domain_addresses_but_not_snippets():
+    dev_text = sync_platform._dev_caddyfile_from_production(_SAMPLE_PROD_CADDYFILE)
+
+    assert "http://chat.libre365.example.org {" in dev_text
+    assert "http://office.libre365.example.org {" in dev_text
+    assert "http://matrix.libre365.example.org:8448 {" in dev_text
+    assert "http://(banner_assets)" not in dev_text
+    assert "(banner_assets) {" in dev_text
+
+
+def test_dev_caddyfile_is_idempotent_if_run_twice():
+    once = sync_platform._dev_caddyfile_from_production(_SAMPLE_PROD_CADDYFILE)
+    twice = sync_platform._dev_caddyfile_from_production(once)
+
+    assert once == twice
+
+
+def _dev_caddy_fixture(tmp_path, monkeypatch, prod_caddyfile: str) -> None:
+    manifests_dir = tmp_path / "infra" / "k8s" / "manifests"
+    manifests_dir.mkdir(parents=True)
+    (manifests_dir / "caddy.yaml").write_text(
+        "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: caddy-caddyfile\ndata:\n  Caddyfile: |\n"
+        + "\n".join(f"    {line}" for line in prod_caddyfile.splitlines())
+        + "\n"
+    )
+    dev_dir = manifests_dir / "dev"
+    dev_dir.mkdir()
+    (dev_dir / "caddy.yaml").write_text(
+        "# header comment, preserved untouched\n"
+        "apiVersion: v1\n"
+        "kind: ConfigMap\n"
+        "metadata:\n"
+        "  name: caddy-dev-caddyfile\n"
+        "data:\n"
+        "  Caddyfile: |\n"
+        "    stale placeholder content\n"
+        "---\n"
+        "apiVersion: apps/v1\n"
+        "kind: Deployment\n"
+        "metadata:\n"
+        "  name: caddy-dev\n"
+    )
+    monkeypatch.setattr(sync_platform, "REPO_ROOT", tmp_path)
+
+
+def test_compute_dev_caddy_change_regenerates_from_the_production_caddyfile(tmp_path, monkeypatch):
+    _dev_caddy_fixture(tmp_path, monkeypatch, "sso.libre365.example.org {\n    reverse_proxy keycloak.libre365.svc.cluster.local:80\n}\n")
+    platform = _platform("libre365.example.org", {"sso": "sso"})
+
+    changes = sync_platform.compute_dev_caddy_change(platform)
+
+    assert len(changes) == 1
+    desired = changes[0].desired
+    assert "http://sso.libre365.example.org {" in desired
+    assert "stale placeholder content" not in desired
+    assert "header comment, preserved untouched" in desired
+    assert "kind: Deployment" in desired
+
+
+def test_compute_test_defaults_emits_domain_base_and_subdomains():
+    """tests/integration/conftest.py's DomainRoutingAdapter/public_url
+    fixtures read DOMAIN_BASE/DOMAIN_SUBDOMAINS from here instead of a
+    second, hard-coded copy of the domain (see docs/oidc.md) - this is
+    what makes that possible."""
+    platform = _onboarding_platform("libre365.example.org")
+    platform["services"] = {}
+
+    change = sync_platform.compute_test_defaults_changes(platform)[0]
+
+    namespace = {}
+    exec(change.desired, namespace)
+    assert namespace["DOMAIN_BASE"] == "libre365.example.org"
+    assert namespace["DOMAIN_SUBDOMAINS"]["matrix"] == "matrix"
+
+
+def test_compute_dev_caddy_change_regenerates_for_a_different_base_domain(tmp_path, monkeypatch):
+    _dev_caddy_fixture(tmp_path, monkeypatch, "sso.libre365.example.org {\n    reverse_proxy keycloak.libre365.svc.cluster.local:80\n}\n")
+    platform = _platform("new-base.example.net", {"sso": "sso"})
+
+    changes = sync_platform.compute_dev_caddy_change(platform)
+
+    assert "http://sso.new-base.example.net {" in changes[0].desired
+    assert "libre365.example.org" not in changes[0].desired
