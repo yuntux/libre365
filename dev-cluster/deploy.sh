@@ -272,6 +272,16 @@ helm upgrade --install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
   -f infra/k8s/helm-values/synapse.yaml -f infra/k8s/helm-values/dev/synapse.yaml
 helm upgrade --install element-web ananace-charts/element-web -n "$NAMESPACE" \
   -f infra/k8s/helm-values/element-web.yaml -f infra/k8s/helm-values/dev/element-web.yaml
+# seafile-mysql/seafile-memcached: the real seafile-charts/ce chart has no
+# bundled database or cache of its own (found by actually running this
+# script, then verifying the chart's real source) - see
+# infra/k8s/helm-values/seafile-mysql.yaml's header for the full story.
+# Installed before `seafile` itself since it depends on both by hostname.
+helm upgrade --install seafile-mysql bitnami/mysql -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/seafile-mysql.yaml -f infra/k8s/helm-values/dev/seafile-mysql.yaml
+helm upgrade --install seafile-memcached bitnami/memcached -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/seafile-memcached.yaml -f infra/k8s/helm-values/dev/seafile-memcached.yaml
+kubectl apply -f infra/k8s/manifests/seafile-extra-env.yaml
 helm upgrade --install seafile seafile-charts/ce -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seafile.yaml -f infra/k8s/helm-values/dev/seafile.yaml
 helm upgrade --install onlyoffice onlyoffice/docs -n "$NAMESPACE" \
