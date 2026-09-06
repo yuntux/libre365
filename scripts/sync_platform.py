@@ -180,6 +180,69 @@ def compute_domain_changes(platform: dict) -> list[Change]:
     return changes
 
 
+# Subdomain keys that legitimately have NO Caddyfile site block: `registry`
+# is a container-registry hostname (pulled by kubelet, never browsed/proxied),
+# and `livekit` has no Kubernetes deployment anywhere in this repository
+# (see visio-meet.yaml/element-call.yaml's own comments — out of scope for
+# this project). Every other domain in platform.yaml is expected to be
+# reachable through Caddy (../k8s/manifests/caddy.yaml) — see
+# infra/k8s/helm-values/README.md, "Public entry point: Caddy".
+DOMAINS_WITHOUT_CADDY_SITE = {"registry", "livekit"}
+
+
+def check_domain_coverage(platform: dict) -> list[str]:
+    """Guards against exactly the kind of gap found by manual review once
+    already (5 domains declared in platform.yaml with no matching Caddyfile
+    site block, and Ingress objects nobody could reach): every subdomain not
+    in DOMAINS_WITHOUT_CADDY_SITE must appear as a Caddyfile site address in
+    infra/k8s/manifests/caddy.yaml, and in the Caddy Service's external-dns
+    hostname annotation. Returns a list of human-readable problems (empty if
+    none) — checked unconditionally (both `sync_platform.py` and
+    `--check`), since this is a structural consistency guarantee, not
+    something to silently "fix" by generating content none of this script's
+    other functions know how to write (a Caddyfile site block is
+    hand-authored, not generated)."""
+    domains = platform.get("domains")
+    if not domains:
+        return []
+
+    expected = {
+        key: subdomain
+        for key, subdomain in domains["subdomains"].items()
+        if key not in DOMAINS_WITHOUT_CADDY_SITE
+    }
+
+    caddy_text = (REPO_ROOT / "infra/k8s/manifests/caddy.yaml").read_text()
+    # Site addresses are lines like `sso.libre365.example.org {` or
+    # `matrix.libre365.example.org:8448 {` inside the Caddyfile ConfigMap
+    # block — the `:port` suffix (if any) is irrelevant to domain coverage.
+    site_addresses = set(re.findall(r"^\s*([a-zA-Z0-9.-]+(?::\d+)?)\s*\{", caddy_text, re.MULTILINE))
+    site_domains = {addr.split(":")[0] for addr in site_addresses}
+
+    annotation_match = re.search(
+        r'external-dns\.alpha\.kubernetes\.io/hostname:\s*"([^"]*)"', caddy_text
+    )
+    annotated_domains = set(annotation_match.group(1).split(",")) if annotation_match else set()
+
+    problems = []
+    for key, subdomain in expected.items():
+        fqdn = f"{subdomain}.{domains['base']}"
+        if fqdn not in site_domains:
+            problems.append(
+                f"platform.yaml declares domains.subdomains.{key} ({fqdn}) but no "
+                "matching Caddyfile site block was found in infra/k8s/manifests/caddy.yaml "
+                "(add one, or add its key to DOMAINS_WITHOUT_CADDY_SITE in "
+                "scripts/sync_platform.py if it's genuinely not meant to be reachable through Caddy)"
+            )
+        elif fqdn not in annotated_domains:
+            problems.append(
+                f"{fqdn} has a Caddyfile site block but is missing from the Caddy Service's "
+                "external-dns.alpha.kubernetes.io/hostname annotation in infra/k8s/manifests/caddy.yaml "
+                "(external-dns would never create its DNS record)"
+            )
+    return problems
+
+
 def compute_compose_changes(platform: dict) -> list[Change]:
     compose_path = REPO_ROOT / "dev-cluster" / "grommunio-dev" / "docker-compose.yml"
     text = compose_path.read_text()
@@ -409,6 +472,17 @@ def main() -> int:
     args = parser.parse_args()
 
     platform = load_platform()
+
+    # Structural consistency, not drift: checked unconditionally (apply and
+    # --check alike), since a missing Caddyfile site block or a missing
+    # external-dns hostname entry isn't something this script can generate
+    # by itself (both are hand-authored) - only flag it loudly.
+    domain_problems = check_domain_coverage(platform)
+    if domain_problems:
+        print("Domain coverage problem(s) between platform.yaml and infra/k8s/manifests/caddy.yaml:", file=sys.stderr)
+        for problem in domain_problems:
+            print(f"  - {problem}", file=sys.stderr)
+        return 1
 
     changes: list[Change] = []
     changes += compute_compose_changes(platform)
