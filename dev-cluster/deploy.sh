@@ -282,7 +282,20 @@ helm upgrade --install seaweedfs seaweedfs/seaweedfs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seaweedfs.yaml -f infra/k8s/helm-values/dev/seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n "$NAMESPACE" \
   -f infra/k8s/helm-values/peertube.yaml -f infra/k8s/helm-values/dev/peertube.yaml
+# --skip-schema-validation: this chart's own bundled values.schema.json
+# (every published version through 0.2.1, the one pinned here) has a real
+# authoring bug - its "service" schema nests "required": ["type"] one
+# level too deep, inside "properties" instead of alongside it, which makes
+# "required" look like a property needing its own sub-schema instead of
+# the JSON Schema "required" keyword. Helm validates the schema itself
+# against the JSON Schema metaschema before even looking at our values, so
+# this fails unconditionally regardless of what's in novu.yaml - found by
+# actually running this script (helm-template-validate CI job's own run,
+# then confirmed against the exact pinned tag's real values.schema.json on
+# github.com/Nova-Edge/novu-chart). Not something a values file can work
+# around.
 helm upgrade --install novu "$NOVU_CHART" --version "$NOVU_CHART_VERSION" -n "$NAMESPACE" \
+  --skip-schema-validation \
   -f infra/k8s/helm-values/novu.yaml -f infra/k8s/helm-values/dev/novu.yaml
 helm upgrade --install external-dns external-dns/external-dns -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-dns.yaml -f infra/k8s/helm-values/dev/external-dns.yaml
