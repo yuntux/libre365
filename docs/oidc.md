@@ -46,7 +46,7 @@ all fixed on this branch:
 
 | Component | Finding | Fix |
 |---|---|---|
-| **Gokapi** | `GOKAPI_OAUTH_CLIENT_ID` was set, but no `GOKAPI_OAUTH_CLIENT_SECRET` was ever wired to a real secret — no matching `ExternalSecret` existed at all. | Added `gokapi-oidc-secret` `ExternalSecret` (`infra/k8s/manifests/external-secrets.yaml`, sourced from `libre365/gokapi`/`oidc-client-secret` in OpenBao); `gokapi.yaml` already referenced it by name. |
+| **Gokapi** | `GOKAPI_OAUTH_CLIENT_ID` was set, but no `GOKAPI_OAUTH_CLIENT_SECRET` was ever wired to a real secret — no matching `ExternalSecret` existed at all. | Added `gokapi-oidc-secret` `ExternalSecret` (`infra/k8s/manifests/external-secrets.yaml`, sourced from `libre365/gokapi`/`oidc-client-secret` in OpenBao); `gokapi.yaml` already referenced it by name. **Superseded**: Gokapi was later bumped from `v1.9.6` to `v2.2.4` (see "Gokapi's OIDC config isn't an env var anymore" below) — the secret and ExternalSecret are unchanged, but they now feed a setup-wizard bootstrap script instead of a `GOKAPI_OAUTH_CLIENT_SECRET` env var directly. |
 | **Seafile** | `ENABLE_OAUTH`/`OAUTH_CLIENT_ID` were set with no `OAUTH_CLIENT_SECRET` at all — the OAuth token exchange could never complete. | Added `OAUTH_CLIENT_SECRET` (`secretKeyRef` → `seafile-oidc-secret`) to `seafile.yaml`, and the matching `ExternalSecret`. |
 | **PeerTube** | The `openid_connect` plugin block had a `client_id` but no `client_secret` at all. | Added a `client_secret` block (`existingSecret: peertube-oidc-secret`) to `peertube.yaml`, and the matching `ExternalSecret`. **[UNCERTAIN]**: the community chart's exact field shape for injecting a Secret into a plugin setting isn't independently confirmed — see that file's own comment; verify against the real chart before deploying. |
 | **Visio (LaSuite Meet)** | Full app-side OIDC config (`OIDC_RP_CLIENT_ID: "visio-meet"`, etc.) in `visio-meet.yaml`, but no `visio-meet` Keycloak client existed anywhere — the realm would reject every login attempt. | Added the `visio-meet` client to `keycloak_realm/defaults/main.yml` (redirect URI inferred from mozilla-django-oidc's default callback path, `/oidc/callback/` — LaSuite Meet is a Django app, per that file's env var naming convention; not independently confirmed against LaSuite Meet's own source), plus `visio-meet-oidc-secret`. |
@@ -93,6 +93,54 @@ application — the application never talks to Keycloak directly in either
 case. `check_oidc_coverage()`'s `OIDC_CLIENT_APP_FILES` mapping points
 these two client_ids at their gate's helm-values file rather than the
 application's, which is where `check_oidc_coverage()` looks for them.
+
+## Gokapi's OIDC config isn't an env var anymore (v1.9.6 → v2.2.4)
+
+Raised during a branding review (Gokapi's `custom.css` theming turned out
+to need a version this repo wasn't pinned to - see
+`infra/k8s/manifests/gokapi.yaml`'s header): bumping to the latest stable
+release (`v2.2.4`) also changes how OIDC gets configured at all. Checked
+against the real source at both tags, and against a **locally built
+`v2.2.4` binary** (`go generate && go build`, then real HTTP requests
+against it in a sandboxed test):
+
+- `v1.9.6` reads `GOKAPI_OAUTH_PROVIDER`/`GOKAPI_OAUTH_ISSUER_URL`/
+  `GOKAPI_OAUTH_CLIENT_ID`/`GOKAPI_OAUTH_CLIENT_SECRET` as plain env vars
+  at every startup - simple, but that version also has no theming
+  mechanism at all (the reason for the bump in the first place).
+- `v2.0.0` (changelog: "Upgrade path: Requires v1.9.6 as base") replaced
+  this with a one-time setup wizard
+  (`internal/configuration/setup/Setup.go`) that persists everything to
+  `config.json` on first boot. None of the `GOKAPI_OAUTH_*` env vars exist
+  in `v2.2.4`'s `Environment` struct at all anymore - checked directly in
+  the source, not inferred from the docs.
+- That setup wizard is **unauthenticated by design on first boot**
+  ("No auth required on initial setup", `Setup.go`'s own comment) - it's
+  meant to be completed immediately after container start, before the
+  instance is reachable from the internet, not filled in later through a
+  public URL.
+- The encryption level **numbering changed** between the two versions
+  (`internal/encryption/Encryption.go`): `v1.9.6`'s level `3` meant true
+  end-to-end encryption; in `v2.x`, level `3` is `FullEncryptionStored`
+  (the server holds the key - not zero-knowledge) and level `5` is the
+  actual `EndToEndEncryption` equivalent. Keeping the old numeric value
+  across this upgrade would have silently downgraded real E2EE to
+  server-side encryption-at-rest — study 1.8's explicit requirement.
+
+Automated (not left as a manual step, consistent with this repo's
+Ansible-automated Grommunio cert issuance) via
+`infra/k8s/manifests/gokapi.yaml`'s `gokapi-setup-bootstrap` initContainer:
+it runs the same `f0rc3/gokapi` image, checks whether `config.json`
+already exists on the shared PVC (idempotent, same pattern as
+`grommunio_cert`'s `creates:`), and if not, starts Gokapi's setup
+webserver, POSTs the exact JSON payload `Setup.go`'s `toConfiguration()`
+expects (reconstructed by reading every `getFormValue*` call in that
+file, **verified by actually running it against the built binary** and
+inspecting the resulting `config.json` - not just read from source and
+assumed correct), and lets Gokapi shut the setup server down on its own.
+Because this runs as an initContainer, it completes before the
+Service/Ingress ever exist for that pod - the "unauthenticated on first
+boot" window Gokapi's own design assumes is never exposed publicly.
 
 ## Automated regression coverage
 

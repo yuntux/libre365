@@ -2,27 +2,168 @@
 # No known official Helm chart for Gokapi (Forceu/Gokapi): raw manifest
 # Deployment + Service + PVC, derived from the official `f0rc3/gokapi` image.
 #
+# Version pinned to v2.2.4 (latest stable at the time of writing) - a
+# review pass on v1.9.6 found the earlier version had no native theming
+# mechanism at all (see the branding note below) AND no way to configure
+# OIDC non-interactively via GOKAPI_OAUTH_* env vars, which v1.9.6 DID
+# support. v2.0.0 (changelog: "Upgrade path: Requires v1.9.6 as base")
+# replaced that entirely with a one-time setup wizard
+# (internal/configuration/setup/Setup.go) that persists everything to
+# config.json - checked against the real v2.2.4 source AND a locally
+# built binary (go generate + go build, real HTTP requests against it) to
+# confirm the exact JSON wire format `initContainer` below submits;
+# see docs/oidc.md for the full story.
+#
 # 1.8 L.311-312 — two mandatory conditions at deployment time:
-#   1. Explicitly enable encryption level 3 (E2EE) — this is NOT Gokapi's default
-#      behavior.
-#   2. DO NOT ENABLE the "File Request" feature (upload by an external third party
-#      with no account): it bypasses E2EE even if level 3 is otherwise active (1.8
-#      L.304, L.312).
+#   1. Explicitly enable true end-to-end encryption - this is NOT Gokapi's
+#      default. The encryption level NUMBERING changed between v1.9.6 and
+#      v2.x (verified against internal/encryption/Encryption.go at the
+#      pinned tag): v1.9.6's level 3 meant "true E2EE" via
+#      GOKAPI_ENCRYPTION_LEVEL=3, but in v2.x level 3 is
+#      "FullEncryptionStored" (server holds the key - NOT zero-knowledge);
+#      the setup payload below uses `encrypt_sel: "5"`
+#      (`encryption.EndToEndEncryption`), the actual equivalent. Blindly
+#      keeping the old numeric value across this upgrade would have
+#      silently downgraded real E2EE to server-side encryption-at-rest.
+#   2. DO NOT ENABLE the "File Request" feature (upload by an external third
+#      party with no account): it bypasses E2EE even when full encryption is
+#      otherwise active (1.8 L.304, L.312). v1.9.6 had a single
+#      GOKAPI_FILE_REQUEST_ENABLED toggle; v2.x replaced it with a
+#      per-API-key/user permission (`ApiPermManageFileRequests`, granular
+#      permissions added in v2.0.0) - there is no longer a single env var
+#      to disable it globally, but since no user/API key created by the
+#      bootstrap below is ever granted that permission, the net effect
+#      (no one can create a File Request) is the same by omission, not by
+#      an explicit flag.
 # Native OIDC toward Keycloak (1.8 L.303, L.306) — MANDATORY to use Gokapi's
 # up-to-date Keycloak documentation at deployment time (a previous configuration
 # example allowed unauthorized access, see 1.8 L.306).
 #
-# Tasmane branding: NOT done here. An earlier version mounted a `custom.css`
-# at /app/custom/, which does nothing on the pinned v1.9.6 - checked against
-# the real Forceu/Gokapi source (internal/webserver/Webserver.go): that
-# version has no such folder/mechanism at all (its only hook,
-# helper.FolderExists("static"), replaces Gokapi's ENTIRE static file
-# server wholesale, with no per-file fallback to the embedded originals -
-# unsafe to use for a one-file override). Colors are injected via Caddy's
-# html_inject instead (infra/k8s/manifests/caddy.yaml's depot.<domain> site
-# block, infra/k8s/manifests/caddy-injection.yaml's gokapi-branding.html) -
-# needs no cooperation from Gokapi's own file layout at all.
+# Tasmane branding: colors are injected via Caddy's html_inject
+# (infra/k8s/manifests/caddy.yaml's depot.<domain> site block,
+# infra/k8s/manifests/caddy-injection.yaml's gokapi-branding.html) rather
+# than v2.x's native /app/custom/custom.css mechanism - both are real
+# options as of this version, but the Caddy route was already built,
+# validated, and needs no coordination with Gokapi's own file layout
+# across upgrades; left as-is rather than duplicating the same branding
+# two ways. See caddy-injection.yaml's own comment for why it was chosen
+# over custom.css in the first place (written against v1.9.6, before this
+# version bump - still the simpler mechanism now).
 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gokapi-setup-bootstrap
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: gokapi
+data:
+  # Runs as an initContainer (same image as the main container) BEFORE
+  # Gokapi ever serves real traffic: v2.x's one-time setup wizard
+  # (internal/configuration/setup/Setup.go) is UNAUTHENTICATED on first
+  # boot by design ("No auth required on initial setup" - checked against
+  # the real source) - the initContainer completing it here, before the
+  # Service/Ingress ever exist for this Deployment's pod, is what makes
+  # that safe rather than racing an anonymous request against the public
+  # internet.
+  #
+  # Idempotent (checks for an existing config.json first, matching this
+  # repo's other bootstrap automation, e.g.
+  # infra/ansible/roles/grommunio_cert's `creates:`), so it's a no-op after
+  # the very first successful run - config.json then lives on the same PVC
+  # as the app's data, surviving every pod restart/rollout.
+  #
+  # The exact JSON wire format below (`[{"name": ..., "value": ...}, ...]`,
+  # POSTed to /setup/setupResult) is Setup.go's own internal, undocumented
+  # form-submission contract, not a stable public API - reconstructed by
+  # reading every `getFormValue*(formObjects, "...")` call in that file
+  # and VERIFIED by actually building the pinned v2.2.4 tag from source
+  # (go generate + go build) and running this exact script against the
+  # real binary in a sandboxed test, confirming config.json comes out with
+  # the expected Method/Encryption.Level/OAuth fields - not just read from
+  # the source and assumed correct.
+  bootstrap.sh: |
+    #!/bin/sh
+    set -eu
+
+    CONFIG_FILE="${GOKAPI_CONFIG_DIR}/config.json"
+
+    if [ -f "$CONFIG_FILE" ]; then
+      echo "config.json already exists at $CONFIG_FILE, skipping setup bootstrap (idempotent)"
+      exit 0
+    fi
+
+    /app/gokapi &
+    GOKAPI_PID=$!
+
+    echo "Waiting for the setup webserver to accept connections..."
+    i=0
+    while [ "$i" -lt 30 ]; do
+      if curl -sf "http://127.0.0.1:${GOKAPI_PORT}/setup/start" > /dev/null 2>&1; then
+        break
+      fi
+      i=$((i + 1))
+      sleep 1
+    done
+
+    cat > /tmp/setup_payload.json <<PAYLOAD
+    [
+      {"name": "dbtype_sel", "value": "0"},
+      {"name": "sqlite_location", "value": "gokapi.sqlite"},
+      {"name": "redis_location", "value": ""},
+      {"name": "redis_prefix", "value": ""},
+      {"name": "redis_user", "value": ""},
+      {"name": "redis_password", "value": ""},
+      {"name": "redis_ssl_sel", "value": "false"},
+      {"name": "auth_username", "value": ""},
+      {"name": "auth_pw", "value": ""},
+      {"name": "oauth_provider", "value": "${GOKAPI_OAUTH_ISSUER}"},
+      {"name": "oauth_id", "value": "${GOKAPI_OAUTH_CLIENT_ID}"},
+      {"name": "oauth_secret", "value": "${GOKAPI_OAUTH_CLIENT_SECRET}"},
+      {"name": "oauth_recheck_interval", "value": "12"},
+      {"name": "oauth_admin_user", "value": "${GOKAPI_ADMIN_EMAIL}"},
+      {"name": "oauth_only_registered_users", "value": "false"},
+      {"name": "oauth_restrict_groups", "value": "false"},
+      {"name": "oauth_allowed_groups", "value": ""},
+      {"name": "oauth_scope_groups", "value": ""},
+      {"name": "auth_header_admin", "value": ""},
+      {"name": "auth_headerkey", "value": ""},
+      {"name": "auth_header_only_registered_users", "value": "false"},
+      {"name": "port", "value": "${GOKAPI_PORT}"},
+      {"name": "localhost_sel", "value": "false"},
+      {"name": "public_name", "value": "Gokapi"},
+      {"name": "url", "value": "${GOKAPI_PUBLIC_URL}"},
+      {"name": "url_redirection", "value": ""},
+      {"name": "ssl_sel", "value": "false"},
+      {"name": "logip_sel", "value": "false"},
+      {"name": "showfilename_sel", "value": "true"},
+      {"name": "authentication_sel", "value": "1"},
+      {"name": "storage_sel_image", "value": "local"},
+      {"name": "storage_sel", "value": "local"},
+      {"name": "storage_sel_proxy", "value": "false"},
+      {"name": "s3_bucket", "value": ""},
+      {"name": "s3_region", "value": ""},
+      {"name": "s3_api", "value": ""},
+      {"name": "s3_secret", "value": ""},
+      {"name": "s3_endpoint", "value": ""},
+      {"name": "enc_pw", "value": ""},
+      {"name": "cleare2e", "value": "false"},
+      {"name": "encrypt_sel", "value": "5"}
+    ]
+    PAYLOAD
+
+    echo "Submitting non-interactive setup..."
+    RESPONSE=$(curl -sf -X POST -H "Content-Type: application/json" --data @/tmp/setup_payload.json "http://127.0.0.1:${GOKAPI_PORT}/setup/setupResult")
+    echo "Setup response: $RESPONSE"
+
+    wait "$GOKAPI_PID" 2>/dev/null || true
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+      echo "Bootstrap failed: $CONFIG_FILE was not created" >&2
+      exit 1
+    fi
+    echo "Gokapi bootstrap complete: $CONFIG_FILE"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,24 +181,19 @@ spec:
       labels:
         app.kubernetes.io/name: gokapi
     spec:
-      containers:
-        - name: gokapi
-          image: f0rc3/gokapi:v1.9.6
-          ports:
-            - containerPort: 53842
+      initContainers:
+        - name: gokapi-setup-bootstrap
+          image: f0rc3/gokapi:v2.2.4
+          command: ["/bin/sh", "/etc/gokapi-bootstrap/bootstrap.sh"]
           env:
-            # 1.8 L.302 — encryption level 3 = true E2EE, to be enabled
-            # EXPLICITLY (not the default).
-            - name: GOKAPI_ENCRYPTION_LEVEL
-              value: "3"
-            # 1.8 L.304 — File Request deliberately disabled: do not set
-            # GOKAPI_FILE_REQUEST_ENABLED=true here.
-            - name: GOKAPI_FILE_REQUEST_ENABLED
-              value: "false"
+            - name: GOKAPI_CONFIG_DIR
+              value: "/app/config"
+            - name: GOKAPI_DATA_DIR
+              value: "/app/data"
+            - name: GOKAPI_PORT
+              value: "53842"
             # 1.7/1.8 L.303 — Native OIDC toward Keycloak
-            - name: GOKAPI_OAUTH_PROVIDER
-              value: "keycloak"
-            - name: GOKAPI_OAUTH_ISSUER_URL
+            - name: GOKAPI_OAUTH_ISSUER
               value: "https://sso.libre365.example.org/realms/libre365"
             - name: GOKAPI_OAUTH_CLIENT_ID
               value: "gokapi"
@@ -66,8 +202,37 @@ spec:
                 secretKeyRef:
                   name: gokapi-oidc-secret
                   key: client-secret
+            # Whichever Keycloak user logs in with this email first becomes
+            # Gokapi's initial super-admin (Setup.go's `oauth_admin_user`) -
+            # must correspond to a real user in the realm. Domain-derived,
+            # not a fixed literal - patched by scripts/sync_platform.py the
+            # same way every other admin@<domain> reference in this repo is
+            # (see _BARE_DOMAIN_PATTERNS).
+            - name: GOKAPI_ADMIN_EMAIL
+              value: "admin@libre365.example.org"
             - name: GOKAPI_PUBLIC_URL
               value: "https://depot.libre365.example.org"
+          volumeMounts:
+            - name: gokapi-data
+              mountPath: /app/data
+              subPath: data
+            - name: gokapi-config
+              mountPath: /app/config
+              subPath: config
+            - name: gokapi-setup-bootstrap
+              mountPath: /etc/gokapi-bootstrap
+      containers:
+        - name: gokapi
+          image: f0rc3/gokapi:v2.2.4
+          ports:
+            - containerPort: 53842
+          env:
+            - name: GOKAPI_CONFIG_DIR
+              value: "/app/config"
+            - name: GOKAPI_DATA_DIR
+              value: "/app/data"
+            - name: GOKAPI_PORT
+              value: "53842"
           resources:
             requests:
               cpu: "250m"
@@ -78,10 +243,24 @@ spec:
           volumeMounts:
             - name: gokapi-data
               mountPath: /app/data
+              subPath: data
+            - name: gokapi-config
+              mountPath: /app/config
+              subPath: config
       volumes:
         - name: gokapi-data
           persistentVolumeClaim:
             claimName: gokapi-data
+        - name: gokapi-config
+          # Same PVC as gokapi-data, different subPath - config.json
+          # (written once by the initContainer above) must persist across
+          # every pod restart/rollout exactly like the uploaded files do.
+          persistentVolumeClaim:
+            claimName: gokapi-data
+        - name: gokapi-setup-bootstrap
+          configMap:
+            name: gokapi-setup-bootstrap
+            defaultMode: 0o555
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

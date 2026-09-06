@@ -181,7 +181,14 @@ services:
       tag_path: .image.tag
 
   gokapi:
-    version: "v1.9.6" # study 1.8
+    # v2.2.4 (latest stable) - bumped from v1.9.6 after a review pass found
+    # the older version had no native theming mechanism and, more
+    # importantly, no way to configure OIDC non-interactively (v2.0.0
+    # replaced GOKAPI_OAUTH_* env vars with a one-time setup wizard) -
+    # automated instead via infra/k8s/manifests/gokapi.yaml's
+    # gokapi-setup-bootstrap initContainer, verified against a locally
+    # built v2.2.4 binary. See that file's header and docs/oidc.md.
+    version: "v2.2.4" # study 1.8
     ports: { GOKAPI_PORT: 53842 }
     compose:
       image: f0rc3/gokapi

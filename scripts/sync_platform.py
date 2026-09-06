@@ -155,6 +155,13 @@ _BARE_DOMAIN_PATTERNS = {
     REPO_ROOT / "infra/k8s/helm-values/external-dns.yaml": [
         r'(domainFilters:\s*\n\s*-\s*)\S+()',
     ],
+    REPO_ROOT / "infra/k8s/manifests/gokapi.yaml": [
+        # GOKAPI_ADMIN_EMAIL's value ("admin@<base>") - a bare-base-domain
+        # pattern, not a subdomain one (sub_domain() already handles every
+        # "<subdomain>.<base>" occurrence in this same file, e.g. the
+        # Ingress host).
+        r'(value:\s*"admin@)[^"]*(")',
+    ],
 }
 
 # Every file containing a subdomain-prefixed public domain name (see
