@@ -1,0 +1,32 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values.
+# Seafile has no -100/-2000 sizing overlay (see seafile.yaml header: sizing driven by
+# stored data volume, not user count) — this file plays the same "applied second, on
+# top" role for the dev tier.
+#
+# Usage:
+#   helm upgrade --install seafile seafile-charts/seafile-ce -n libre365-dev \
+#     -f seafile.yaml -f dev/seafile.yaml
+#
+# Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are
+# exactly the ones already used in seafile.yaml.
+
+# Already single-node in the base file (Community edition, 1.4 L.141); restated here
+# for clarity as this overlay stands in place of any sizing consideration.
+replicaCount: 1
+
+# Base file requests 2 cores / 8Gi (sized for real data volume + sync traffic, 1.4
+# L.136) — far more than a local dev instance with a handful of test files needs.
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1"
+    memory: "2Gi"
+
+# mysql.enabled / memcached.enabled (base file) are left untouched: they are
+# functional requirements of Seafile CE, not HA/clustering-only toggles, and no
+# `mysql.primary.resources` / `memcached.resources` key is attested anywhere in this
+# repo for this specific community chart, so none is guessed here — left at the
+# chart's own defaults (unverifiable third-party schema, no network access to confirm).

@@ -14,10 +14,10 @@ pipeline targeting Kubernetes.
 | Automated, regular scanning of container images (Trivy/Grype) | 5.2 (L.777) | `.github/workflows/cve-scan.yml` — Trivy, daily + on push |
 | Subscription to each building block's official security feeds | 5.2 (L.778) | **Not covered by GitHub Actions** — still needs tooling, see "What's missing" below |
 | Centralized alerting (scan + vendor monitoring) | 5.2 (L.779) | Partial: `cve-scan.yml` publishes SARIF to GitHub's **Security** tab (Code Scanning), which serves as a dashboard for the scan side only — no merging with vendor monitoring (not automated, see above) |
-| Automated tracking of new releases (images + IaC dependencies), Renovate/Dependabot-style | 5.3 (L.783) | `renovate.json` — Docker images (`docker-compose/`, `infra/k8s/helm-values/`), Terraform providers (`infra/terraform/`), connector npm dependencies (`connectors/*/`) |
+| Automated tracking of new releases (images + IaC dependencies), Renovate/Dependabot-style | 5.3 (L.783) | `renovate.json` — Docker images (`dev-cluster/`, `infra/k8s/helm-values/`), Terraform providers (`infra/terraform/`), connector npm dependencies (`connectors/*/`) |
 | New version detected → triggers the cycle rather than being applied directly | 5.3 (L.784) | `renovate.json`: no `automerge` rule on application version updates — every detection produces a PR to review, not a direct deployment |
-| Ephemeral staging environment automatically created from IaC | 5.4.1 (L.789) | `.github/workflows/ephemeral-staging.yml` — **simplified**: starts `docker-compose` rather than a Kubernetes environment provisioned by `infra/terraform` + `infra/k8s` (see the justification in the comment at the top of the file and the "What's missing" section) |
-| Representative test dataset (no production data) | 5.4.2 (L.790) | Default `docker-compose/` configuration (`.env.example`), no connection to production data |
+| Ephemeral staging environment automatically created from IaC | 5.4.1 (L.789) | `.github/workflows/ephemeral-staging.yml` — **simplified**: starts an ephemeral k3d cluster with the production Helm charts (`dev-cluster/deploy.sh`, reusing `infra/k8s/`) plus `docker-compose` for the one brick with no Kubernetes counterpart (`grommunio-dev`), rather than a real Terraform/Ansible-provisioned staging cluster (see the justification in the comment at the top of the file and the "What's missing" section) |
+| Representative test dataset (no production data) | 5.4.2 (L.790) | Default `dev-cluster/` configuration (Helm base values, `dev-cluster/grommunio-dev/.env.example`), no connection to production data |
 | CI/CD pipeline orchestrating the cycle without manual intervention up to validation | 5.4.3 (L.791) | `ephemeral-staging.yml` chains startup → health wait → test replay → report publication without manual intervention; only the workflow's **trigger** is manual for now (`workflow_dispatch`), see "What's missing" |
 | Library of automated test scenarios (mail, files, co-editing, video/chat, tasks, SSO) | 5.5 (L.795) | `tests/integration/` (`pytest` suite, `smoke` marker) — maintained separately, referenced without being duplicated by `ephemeral-staging.yml` |
 | Automatic replay against ephemeral staging on every new version detected | 5.5 (L.796) | `ephemeral-staging.yml` runs `pytest -m smoke` against the started environment; automatic triggering from a Renovate PR is not wired up (see "What's missing") |
@@ -26,7 +26,7 @@ pipeline targeting Kubernetes.
 
 ## Files created
 
-- `.github/workflows/lint-and-test.yml` — continuous quality baseline (Terraform, Ansible, Helm values, Python connectors, docker-compose), triggered on every PR/push. This isn't directly a numbered requirement of chapter 5, but it's the foundation that makes the rest of the cycle reliable (a broken image or manifest must not reach ephemeral staging).
+- `.github/workflows/lint-and-test.yml` — continuous quality baseline (Terraform, Ansible, Helm values, Python connectors, docker-compose, raw k8s manifests), triggered on every PR/push. This isn't directly a numbered requirement of chapter 5, but it's the foundation that makes the rest of the cycle reliable (a broken image or manifest must not reach ephemeral staging).
 - `.github/workflows/cve-scan.yml` — study 5.2.
 - `renovate.json` — study 5.3.
 - `.github/workflows/ephemeral-staging.yml` — study 5.4 and 5.5.
@@ -49,8 +49,9 @@ Staging environment destroyed
 ```
 
 What is delivered here stops at a simplified version, testable in GitHub
-Actions CI, on `docker-compose` rather than Kubernetes. Still to be built, in
-dependency order:
+Actions CI on an ephemeral k3d cluster (created and destroyed within the
+runner) rather than a real staging cluster provisioned by
+`infra/terraform`/`infra/ansible`. Still to be built, in dependency order:
 
 1. **Automatic triggering from Renovate** — today
    `ephemeral-staging.yml` only launches via manual `workflow_dispatch`. To
@@ -61,31 +62,37 @@ dependency order:
    this workflow with the affected building block and version as
    parameters.
 
-2. **Real Kubernetes provisioning of ephemeral staging** — replacing the
-   `docker compose up -d` startup with:
+2. **Real (Proxmox-backed) provisioning of ephemeral staging** — the
+   ephemeral-staging workflow now already runs a real Helm deployment of
+   `infra/k8s/helm-values/` (via `dev-cluster/deploy.sh`, k3d instead of a
+   real cluster), which closes the gap this section used to describe
+   between chart-level config and what CI actually exercises. What remains:
    - a `terraform apply` (or OpenTofu) targeting a dedicated
-     staging namespace/cluster, from `infra/terraform/`;
+     staging namespace/cluster on the real Proxmox infrastructure, from
+     `infra/terraform/`, instead of an ephemeral k3d cluster local to the
+     runner;
    - running the Ansible playbooks from `infra/ansible/` for application
      configuration (Keycloak realms, Matrix domain, etc.) on this
-     environment;
-   - a Helm deployment of the `infra/k8s/helm-values/` values with the
-     targeted building block's image overridden to the new version, the
-     other building blocks staying at their current versions (an explicit
-     requirement of 5.4.1);
+     environment (k3d/dev-cluster skips this — see `dev-cluster/README.md`);
+   - overriding only the targeted building block's image to the new
+     version on the real staging cluster, the other building blocks staying
+     at their current (production-pinned) versions, rather than
+     `dev-cluster/deploy.sh`'s current all-at-`platform.yaml`-versions
+     behavior (an explicit requirement of 5.4.1);
    - a destruction step (`terraform destroy` / namespace deletion) that
      guarantees the environment is genuinely ephemeral, even if prior steps
-     fail.
+     fail — `dev-cluster/destroy.sh` already does the k3d-local equivalent.
 
    This assumes network access from GitHub Actions runners to the target
    infrastructure (self-hosted runners, or a VPN/peering link to the
    Proxmox/Kubernetes environment described in chapter 4), which is beyond
    the reach of a standard hosted GitHub runner.
 
-3. **Representative test dataset at the Kubernetes level** — the
-   docker-compose version relies on the default dev configuration; a real
-   Kubernetes staging setup would need a dedicated, replayable test dataset
-   (anonymized dump or application fixtures), to be loaded after the Helm
-   deployment and before replaying the scenarios.
+3. **Representative test dataset at the real-cluster level** — the k3d
+   version relies on the default Helm base values (dev/test scale); a real
+   staging setup on the Proxmox/Kubernetes target would need a dedicated,
+   replayable test dataset (anonymized dump or application fixtures), to be
+   loaded after the Helm deployment and before replaying the scenarios.
 
 4. **Promotion decision** — the study calls for a promotion that is "manual
    or automated depending on the criticality of the building block

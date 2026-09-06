@@ -1,0 +1,62 @@
+# Component: presence-aggregator — in-house connector, unified presence
+# aggregator (study, chapter 2.8). No Helm chart: small in-house
+# Python/FastAPI service (connectors/presence-aggregator), built locally by
+# k3d's dev workflow rather than published to a registry — raw Deployment +
+# Service, following the same style as infra/k8s/manifests/gokapi.yaml.
+#
+# Image built locally (`k3d image import`) and never pulled from a registry —
+# see dev-cluster/README.md for the build/import step run before `kubectl apply`.
+# replicas: 1 — dev tier only, fast iteration over availability ("durcir en
+# dev pour aller plus vite").
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: presence-aggregator
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: presence-aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: presence-aggregator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: presence-aggregator
+    spec:
+      containers:
+        - name: presence-aggregator
+          image: libre365/presence-aggregator:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4003
+          env:
+            - name: PORT
+              value: "4003"
+            # Synapse is a Helm release in this namespace — in-cluster
+            # Service DNS name, same as used by infra/k8s/manifests/caddy.yaml.
+            - name: SYNAPSE_URL
+              value: "http://synapse.libre365.svc.cluster.local:8008"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: presence-aggregator
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: presence-aggregator
+spec:
+  selector:
+    app.kubernetes.io/name: presence-aggregator
+  ports:
+    - port: 4003
+      targetPort: 4003

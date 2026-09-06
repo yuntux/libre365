@@ -17,7 +17,7 @@ block/connector.
 | Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code) |
 | Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/` |
 | Unified search | 2.2 | `connectors/unified-search/` |
-| Portal / Caddy HTML injection | 2.3 | `infra/k8s/helm-values/caddy.yaml`, `infra/k8s/manifests/caddy-injection.yaml` |
+| Portal / Caddy HTML injection | 2.3 | `infra/k8s/manifests/caddy.yaml` (sole public entry point, no Ingress Controller/cert-manager needed - see `infra/k8s/helm-values/README.md`), `infra/k8s/manifests/caddy-injection.yaml` |
 | Chat/video continuity (Matrix ↔ video conferencing widget) | 2.4 | `connectors/matrix-visio-widget/` |
 | Native application onboarding | 2.5 | `docs/onboarding/` |
 | Disabling OnlyOffice chat | 2.6 | `infra/k8s/helm-values/onlyoffice.yaml` (`document.permissions.chat`) |
@@ -30,7 +30,8 @@ block/connector.
 | GAL over CardDAV | 2.13 | `infra/ansible/playbooks/grommunio.yml` (`GAL_ENABLED`) |
 | Room booking | 2.14 | No code — native Grommunio behavior, documented (`docs/room-booking.md`) |
 | Proxmox / Kubernetes infrastructure | 4.1–4.7 | `infra/terraform/`, `infra/k8s/` |
-| Single source of versions/ports (docker-compose ↔ Helm ↔ tests) | 4.1 (rebuildable IaC, without drift) | `platform.yaml`, `scripts/sync_platform.py` |
-| Dev/staging/prod environments | 4.6 | `docker-compose/`, `infra/k8s/helm-values/*-{dev,staging,prod}.yaml` |
+| Single source of versions/ports/domains (docker-compose ↔ Helm ↔ tests) | 4.1 (rebuildable IaC, without drift) | `platform.yaml`, `scripts/sync_platform.py` |
+| DNS zone population (A/AAAA records) | 4.2/4.4 (not a numbered study requirement) | `infra/k8s/helm-values/external-dns.yaml` (OVH provider — see that file's header comment for what to verify before deploying) |
+| Dev/staging/prod environments | 4.6 | `dev-cluster/` (k3d, reuses `infra/k8s/helm-values/` + `infra/k8s/helm-values/dev/` hardening overlays, plus `dev-cluster/grommunio-dev/` docker-compose for the one brick k3d can't host) |
 | CVE monitoring / version monitoring / ephemeral staging | 5.2–5.5 | `.github/workflows/` |
 | Durable integration tests | 5.5 | `tests/integration/` |

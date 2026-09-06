@@ -43,8 +43,14 @@ postgresql:
     database: keycloak
     existingSecret: keycloak-postgres-secret
 
+# Disabled: Caddy (../manifests/caddy.yaml) is the sole public HTTP(S) entry
+# point (see its header comment) - this native Ingress object would need an
+# Ingress Controller this repo doesn't deploy, and would duplicate Caddy's
+# own reverse-proxy routing to this same Service. hostname/tls kept as
+# documentation of where this chart expects to be reached; kept in sync
+# with platform.yaml's `domains` by the same sync_platform.py patcher.
 ingress:
-  enabled: true
+  enabled: false
   ingressClassName: ""
   hostname: sso.libre365.example.org
   tls: true

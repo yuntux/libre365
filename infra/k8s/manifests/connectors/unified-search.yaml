@@ -1,0 +1,67 @@
+# Component: unified-search — in-house connector, unified search via
+# real-time fan-out (study, chapter 2.2). No Helm chart: small in-house
+# Python/FastAPI service (connectors/unified-search), built locally by k3d's
+# dev workflow rather than published to a registry — raw Deployment + Service,
+# following the same style as infra/k8s/manifests/gokapi.yaml.
+#
+# Image built locally (`k3d image import`) and never pulled from a registry —
+# see dev-cluster/README.md for the build/import step run before `kubectl apply`.
+# replicas: 1 — dev tier only, fast iteration over availability ("durcir en
+# dev pour aller plus vite").
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unified-search
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: unified-search
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: unified-search
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: unified-search
+    spec:
+      containers:
+        - name: unified-search
+          image: libre365/unified-search:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4002
+          env:
+            - name: PORT
+              value: "4002"
+            # Seafile/Synapse/Vikunja are Helm releases in this namespace —
+            # in-cluster Service DNS names, same as used by
+            # infra/k8s/manifests/caddy.yaml.
+            - name: SEAFILE_URL
+              value: "http://seafile.libre365.svc.cluster.local:80"
+            - name: SYNAPSE_URL
+              value: "http://synapse.libre365.svc.cluster.local:8008"
+            - name: VIKUNJA_URL
+              value: "http://vikunja.libre365.svc.cluster.local:80"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unified-search
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: unified-search
+spec:
+  selector:
+    app.kubernetes.io/name: unified-search
+  ports:
+    - port: 4002
+      targetPort: 4002

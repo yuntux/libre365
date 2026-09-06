@@ -72,8 +72,8 @@ python -m app.batch                                         # batch mode, single
 
 ## Docker
 
-Build context is this directory (self-contained), matching
-`docker-compose/docker-compose.yml`'s `context: ../connectors/peertube-ingest`:
+Build context is this directory (self-contained), matching how
+`dev-cluster/deploy.sh` builds and imports this image into the local k3d cluster:
 
 ```bash
 cd connectors/peertube-ingest

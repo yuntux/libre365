@@ -44,8 +44,11 @@ buckets:
 # out of scope for this k8s repository).
 existingSecret: minio-root-credentials
 
+# Disabled (both blocks): Caddy (../manifests/caddy.yaml) is the sole
+# public entry point - see keycloak.yaml's ingress comment for the full
+# rationale.
 ingress:
-  enabled: true
+  enabled: false
   ingressClassName: ""
   hosts:
     - s3.libre365.example.org
@@ -55,7 +58,7 @@ ingress:
         - s3.libre365.example.org
 
 consoleIngress:
-  enabled: true
+  enabled: false
   ingressClassName: ""
   hosts:
     - minio-console.libre365.example.org

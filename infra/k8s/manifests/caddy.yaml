@@ -15,6 +15,21 @@
 #   xcaddy build --with github.com/lolPants/caddy2-html-injection-plugin
 # (module name to check/adjust depending on the community plugin adopted at build
 # time — several HTML injection plugins exist for Caddy 2, see study L.408).
+#
+# Caddy is the SOLE public HTTP(S) entry point for every service in
+# platform.yaml's `domains` list (this Caddyfile now covers all of them,
+# Synapse/MinIO/Novu included — see the bottom of this file). This is a
+# deliberate simplification: every Helm chart in infra/k8s/helm-values/ also
+# ships its own native Kubernetes `ingress:`/`consoleIngress:` block, but no
+# Ingress Controller (nginx-ingress, Traefik...) is deployed anywhere in
+# this repository to satisfy those objects, and cert-manager is unnecessary
+# here — Caddy obtains and renews TLS certificates automatically for any
+# bare-domain site address (no `http://` prefix, no `tls off`), a built-in
+# feature ("Automatic HTTPS"), not something bolted on separately. Those
+# per-chart `ingress:` blocks are therefore explicitly disabled
+# (`enabled: false`) in every values file — see each file's own comment.
+# Re-enabling one instead of routing through Caddy would need a real
+# Ingress Controller deployed first (not currently in scope).
 
 apiVersion: v1
 kind: ConfigMap
@@ -100,6 +115,48 @@ data:
     sso.libre365.example.org {
         reverse_proxy keycloak.libre365.svc.cluster.local:80
     }
+
+    # Matrix client API (study 1.2) — same domain as the chart's own
+    # `matrix.serverName` (see synapse.yaml), so federation traffic from
+    # other homeservers reaches this same hostname by default (Matrix
+    # servers try `https://<server_name>:8448/` directly when no
+    # `.well-known/matrix/server` delegation is published — none is here,
+    # so no well-known handling is added on this :443 block).
+    matrix.libre365.example.org {
+        reverse_proxy synapse.libre365.svc.cluster.local:8008
+    }
+
+    # Matrix federation (server-to-server, study 1.2) — separate site
+    # address (same hostname, port 8448): Caddy's automatic HTTPS applies
+    # per site address regardless of port, so this gets its own certificate
+    # exactly like the :443 block above. Requires containerPort 8448 to
+    # also be exposed on this Deployment/Service (see below).
+    matrix.libre365.example.org:8448 {
+        reverse_proxy synapse.libre365.svc.cluster.local:8448
+    }
+
+    # MinIO S3 API (study 2.12) — no injection (API traffic, not a browsed
+    # application).
+    s3.libre365.example.org {
+        reverse_proxy minio.libre365.svc.cluster.local:9000
+    }
+
+    # MinIO web console (study 2.12) — no injection (administration UI, not
+    # part of the cross-cutting application bar's audience).
+    minio-console.libre365.example.org {
+        reverse_proxy minio.libre365.svc.cluster.local:9001
+    }
+
+    # Novu notification center (study 2.1) — no injection (consumed by the
+    # in-house connectors and Novu's own UI, not embedded in the portal bar).
+    # "novu-api" assumes the chart's common <release>-<subchart> naming for
+    # its api component (unverified against a live template of
+    # novuhq/helm-charts from the sandboxed environment this was authored
+    # in — same assumption already documented for the k3d dev cluster in
+    # dev-cluster/lib-expose.sh).
+    notifications.libre365.example.org {
+        reverse_proxy novu-api.libre365.svc.cluster.local:3000
+    }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -126,6 +183,9 @@ spec:
           ports:
             - containerPort: 80
             - containerPort: 443
+            # Matrix federation (study 1.2) - see the
+            # matrix.libre365.example.org:8448 Caddyfile block above.
+            - containerPort: 8448
           resources:
             requests:
               cpu: "200m"
@@ -153,6 +213,21 @@ kind: Service
 metadata:
   name: caddy
   namespace: libre365
+  annotations:
+    # Consumed by external-dns (../helm-values/external-dns.yaml, `sources:
+    # [service]`) to create/maintain the A/AAAA records for every hostname
+    # this Service actually fronts - the DNS-zone-population half of what
+    # Caddy's own Automatic HTTPS does NOT do (it only obtains/renews
+    # certificates once a domain already resolves here). Kept as a hand-
+    # maintained list matching the Caddyfile's site addresses above (add a
+    # hostname here whenever a new one is added there) - each domain
+    # literal is still patched by scripts/sync_platform.py like every other
+    # occurrence in this file, since this is plain text within a file
+    # already in DOMAIN_TARGET_FILES.
+    # Single line, no spaces after the commas: external-dns splits this
+    # value on "," without necessarily trimming whitespace, so a folded
+    # multi-line scalar here would risk a leading-space-prefixed hostname.
+    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org"
 spec:
   selector:
     app.kubernetes.io/name: caddy
@@ -163,4 +238,7 @@ spec:
     - name: https
       port: 443
       targetPort: 443
+    - name: matrix-federation
+      port: 8448
+      targetPort: 8448
   type: LoadBalancer

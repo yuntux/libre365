@@ -1,0 +1,130 @@
+# Component: Caddy — reverse proxy for the k3d DEV cluster only (study 2.3).
+#
+# NOT a reuse of infra/k8s/manifests/caddy.yaml: that manifest requires a
+# custom image built with xcaddy (HTML injection plugin, internal registry -
+# see its header comment), which cannot be built or pulled from this local
+# dev cluster. This is the same simplification the dev/test tier already
+# used before this cluster existed (a plain docker-compose Caddy service,
+# since removed along with the rest of the dev/test docker-compose bricks
+# it fronted): a plain `caddy:2.8.4-alpine` image with a sub-path reverse
+# proxy, WITHOUT the HTML injection plugin — enough to reach every brick
+# through one entry point while developing, without reproducing the
+# production portal behavior.
+#
+# Backend hostnames below are the in-cluster Service DNS names created by
+# each brick's own Helm release / raw manifest (see
+# infra/k8s/manifests/connectors/*.yaml and dev-cluster/deploy.sh for exactly
+# how each release is named) — kept aligned with the names already used in
+# the production infra/k8s/manifests/caddy.yaml Caddyfile.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: caddy-dev-caddyfile
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: caddy-dev
+data:
+  Caddyfile: |
+    {
+        admin off
+    }
+
+    :80 {
+        redir / /chat/ 302
+
+        handle_path /chat/* {
+            reverse_proxy element-web.libre365.svc.cluster.local:80
+        }
+
+        handle_path /keycloak/* {
+            reverse_proxy keycloak.libre365.svc.cluster.local:80
+        }
+
+        handle_path /matrix/* {
+            reverse_proxy synapse.libre365.svc.cluster.local:8008
+        }
+
+        handle_path /files/* {
+            reverse_proxy seafile.libre365.svc.cluster.local:80
+        }
+
+        handle_path /office/* {
+            reverse_proxy onlyoffice.libre365.svc.cluster.local:80
+        }
+
+        handle_path /tasks/* {
+            reverse_proxy vikunja.libre365.svc.cluster.local:80
+        }
+
+        handle_path /video/* {
+            reverse_proxy peertube.libre365.svc.cluster.local:9000
+        }
+
+        handle_path /s3/* {
+            reverse_proxy minio.libre365.svc.cluster.local:9000
+        }
+
+        handle {
+            respond "libre365 k3d dev portal - see dev-cluster/README.md for the per-service ports" 200
+        }
+
+        log {
+            output stdout
+            format console
+        }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy-dev
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: caddy-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: caddy-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: caddy-dev
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:2.8.4-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: caddyfile
+              mountPath: /etc/caddy/Caddyfile
+              subPath: Caddyfile
+      volumes:
+        - name: caddyfile
+          configMap:
+            name: caddy-dev-caddyfile
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy-dev
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: caddy-dev
+spec:
+  selector:
+    app.kubernetes.io/name: caddy-dev
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

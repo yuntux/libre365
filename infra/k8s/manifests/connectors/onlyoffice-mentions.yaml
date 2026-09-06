@@ -1,0 +1,72 @@
+# Component: onlyoffice-mentions — in-house connector, OnlyOffice Document
+# Server mention event handler (study, chapter 2.7). No Helm chart: small
+# in-house Python/FastAPI service (connectors/onlyoffice-mentions), built
+# locally by k3d's dev workflow rather than published to a registry — raw
+# Deployment + Service, following the same style as
+# infra/k8s/manifests/gokapi.yaml.
+#
+# Image built locally (`k3d image import`) and never pulled from a registry —
+# see dev-cluster/README.md for the build/import step run before `kubectl apply`.
+# replicas: 1 — dev tier only, fast iteration over availability ("durcir en
+# dev pour aller plus vite").
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: onlyoffice-mentions
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: onlyoffice-mentions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: onlyoffice-mentions
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: onlyoffice-mentions
+    spec:
+      containers:
+        - name: onlyoffice-mentions
+          image: libre365/onlyoffice-mentions:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4004
+          env:
+            - name: PORT
+              value: "4004"
+            # Novu is a Helm release in this namespace (infra/k8s/helm-values/
+            # novu.yaml + dev/novu.yaml) — in-cluster Service DNS name.
+            # "novu-api" assumes the chart's common <release>-<subchart>
+            # naming for its api component (unverified against a live
+            # template in this sandbox — see dev-cluster/lib-expose.sh).
+            # Port 3000 matches Novu's documented self-hosted API default.
+            - name: NOVU_API_URL
+              value: "http://novu-api.libre365.svc.cluster.local:3000"
+            # OnlyOffice Document Server is a Helm release in this namespace —
+            # in-cluster Service DNS name, same as used by
+            # infra/k8s/manifests/caddy.yaml.
+            - name: ONLYOFFICE_URL
+              value: "http://onlyoffice.libre365.svc.cluster.local:80"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: onlyoffice-mentions
+  namespace: libre365
+  labels:
+    app.kubernetes.io/name: onlyoffice-mentions
+spec:
+  selector:
+    app.kubernetes.io/name: onlyoffice-mentions
+  ports:
+    - port: 4004
+      targetPort: 4004

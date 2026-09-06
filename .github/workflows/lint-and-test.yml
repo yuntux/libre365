@@ -189,18 +189,67 @@ jobs:
       - name: docker compose config
         run: |
           set -e
-          compose_file="docker-compose/docker-compose.yml"
+          compose_file="dev-cluster/grommunio-dev/docker-compose.yml"
           if [ ! -f "$compose_file" ]; then
             echo "::notice::$compose_file not present yet - job skipped."
             exit 0
           fi
           docker compose -f "$compose_file" config
 
+  k8s-manifests-validate:
+    name: k8s manifests schema validation
+    runs-on: ubuntu-latest
+    # Structural/schema validation without needing a live cluster -
+    # complements helm-values-yamllint above (which only checks generic YAML
+    # syntax, not that a manifest is a structurally valid Kubernetes object)
+    # for the raw manifests introduced by the k3d dev cluster
+    # (infra/k8s/manifests/connectors/, infra/k8s/manifests/dev/) plus the
+    # pre-existing ones.
+    #
+    # Uses kubeconform rather than `kubectl apply --dry-run=client`: the
+    # latter still performs API discovery against a live server even in
+    # dry-run mode (confirmed by this job's own first, failing version -
+    # `kubectl apply --dry-run=client --validate=false` on a GitHub-hosted
+    # runner with no cluster still fails with "connect: connection
+    # refused"), so it cannot validate manifests fully offline. kubeconform
+    # is a standalone schema validator built for exactly this: it ships/
+    # fetches the upstream Kubernetes JSON schemas itself and never talks to
+    # a cluster.
+    #
+    # Helm charts themselves (infra/k8s/helm-values/) aren't
+    # `helm template`-able here: several are third-party charts hosted on
+    # repos this environment has no guaranteed access to in a locked-down CI
+    # runner - out of scope for this job, see dev-cluster/README.md for the
+    # caveats already documented around those charts.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for infra/k8s/manifests
+        id: check
+        run: |
+          if [ -d "infra/k8s/manifests" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::infra/k8s/manifests not present yet - job skipped."
+          fi
+
+      - name: Install kubeconform
+        if: steps.check.outputs.present == 'true'
+        run: |
+          curl -sSL -o kubeconform.tgz "https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz"
+          tar xzf kubeconform.tgz kubeconform
+          sudo mv kubeconform /usr/local/bin/kubeconform
+
+      - name: kubeconform on every raw manifest
+        if: steps.check.outputs.present == 'true'
+        run: kubeconform -strict -summary $(find infra/k8s/manifests -name '*.yaml')
+
   platform-drift-check:
     name: Version/port drift (platform.yaml)
     runs-on: ubuntu-latest
     # platform.yaml (repo root) is the single source of truth for the image
-    # tags and ports shared by docker-compose/ AND infra/k8s/helm-values/
+    # tags and ports shared by dev-cluster/grommunio-dev/ AND infra/k8s/helm-values/
     # (see its header). This job guarantees that none of these consuming
     # files was hand-edited without going back through
     # `scripts/sync_platform.py` — otherwise the dev/test tier and the

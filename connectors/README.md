@@ -61,8 +61,9 @@ uvicorn app.main:app --host 0.0.0.0 --port <default-port> --loop uvloop
 ## Docker build
 
 Each `Dockerfile` is self-contained — build context is the connector's own
-directory, matching `docker-compose/docker-compose.yml`'s
-`context: ../connectors/<name>`:
+directory, matching how `dev-cluster/deploy.sh` builds and imports each
+image into the local k3d cluster (`docker build -t libre365/<name>:dev
+connectors/<name>`, see `infra/k8s/manifests/connectors/*.yaml`):
 
 ```bash
 cd connectors/notification-hub

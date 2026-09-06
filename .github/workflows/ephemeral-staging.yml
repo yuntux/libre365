@@ -6,16 +6,18 @@ name: Ephemeral staging (manual)
 # Explicit choice (to also document in docs/ci-cd.md): the study describes
 # an EPHEMERAL staging environment provisioned from the Kubernetes/Terraform
 # IaC definition (chapter 4), with a dedicated test dataset and an automatic
-# trigger on every new version detected (5.3/5.4). Reproducing that full
-# Kubernetes provisioning from a GitHub Actions runner would mean hosting an
-# ephemeral cluster, which is outside the scope of this task (node creation,
-# ingress, DNS, volumes...): for now this workflow is therefore limited to
-# starting the docker-compose environment (dev/test scale, cf. chapter 4.6)
-# as a functional, CI-testable substitute. It validates the CYCLE (startup ->
-# wait for health -> replay scenarios -> report -> promotion decision)
-# independently of the real provisioner; pointing this same cycle at a real
-# ephemeral Kubernetes environment (via infra/terraform + infra/k8s) is a
-# separate effort, cf. docs/ci-cd.md.
+# trigger on every new version detected (5.3/5.4). Reproducing the real
+# Proxmox/Terraform provisioning from a GitHub Actions runner is outside the
+# scope of this task - but as of the k3d dev cluster migration (chapter 4.6,
+# dev-cluster/), this workflow now starts the SAME thing a developer runs
+# locally: an ephemeral k3d cluster with the production Helm charts
+# (dev-cluster/deploy.sh, Novu included), plus grommunio-dev on
+# docker-compose for the one brick with no Kubernetes counterpart worth
+# reusing (see dev-cluster/README.md). This gets much closer to the study's intent
+# (chart-level config exercised, not a parallel compose-only definition)
+# than the previous docker-compose-only substitute, while still not being
+# the real Proxmox/Terraform provisioner; pointing this cycle at that real
+# provisioner remains a separate effort, cf. docs/ci-cd.md.
 #
 # Manual trigger (workflow_dispatch) here rather than automatic on Renovate
 # detection (5.3): having a Renovate PR trigger this directly is not wired
@@ -31,9 +33,10 @@ on:
         description: >-
           Component whose new version is to be validated (e.g. synapse,
           seafile, onlyoffice, vikunja, keycloak, grommunio). Informational
-          for now: the dev docker-compose starts the whole stack, targeting
-          the update at a single image will be wired up once per-component
-          Kubernetes staging exists (cf. docs/ci-cd.md).
+          for now: dev-cluster/deploy.sh starts every brick, targeting the
+          update at a single image (bumping just its platform.yaml entry
+          and re-running the affected `helm upgrade`) will be wired up
+          separately (cf. docs/ci-cd.md).
         required: true
         type: string
       version:
@@ -46,25 +49,22 @@ permissions:
 
 jobs:
   recette-ephemere:
-    name: Ephemeral staging docker-compose (${{ inputs.brique }} @ ${{ inputs.version }})
+    name: Ephemeral staging k3d + docker-compose (${{ inputs.brique }} @ ${{ inputs.version }})
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check for the docker-compose environment
+      - name: Check for the dev environment definitions
         id: check
         run: |
-          if [ ! -f "docker-compose/docker-compose.yml" ]; then
-            echo "::error::docker-compose/docker-compose.yml missing - cannot start the ephemeral staging environment."
+          if [ ! -f "dev-cluster/grommunio-dev/docker-compose.yml" ] || [ ! -x "dev-cluster/deploy.sh" ]; then
+            echo "::error::dev-cluster/grommunio-dev/docker-compose.yml or dev-cluster/deploy.sh missing - cannot start the ephemeral staging environment."
             exit 1
           fi
           echo "present=true" >> "$GITHUB_OUTPUT"
 
-      - name: Start the environment (component=${{ inputs.brique }}, version=${{ inputs.version }})
-        working-directory: docker-compose
-        env:
-          RECETTE_BRIQUE: ${{ inputs.brique }}
-          RECETTE_VERSION: ${{ inputs.version }}
+      - name: Start grommunio-dev (docker-compose)
+        working-directory: dev-cluster/grommunio-dev
         run: |
           # Test dataset represented here by the default configuration of
           # the dev docker-compose (5.4, point 2: "not real production
@@ -77,8 +77,8 @@ jobs:
           fi
           docker compose up -d
 
-      - name: Wait for the services to be healthy
-        working-directory: docker-compose
+      - name: Wait for grommunio-dev to be healthy
+        working-directory: dev-cluster/grommunio-dev
         run: |
           script="scripts/wait-for-healthy.sh"
           if [ ! -x "$script" ] && [ ! -f "$script" ]; then
@@ -88,10 +88,27 @@ jobs:
           chmod +x "$script" || true
           "$script"
 
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Start every other brick (k3d, dev-cluster/deploy.sh)
+        run: ./dev-cluster/deploy.sh
+
+      - name: Wait for the k3d workloads to be ready
+        run: |
+          kubectl config use-context k3d-libre365-dev
+          kubectl wait --for=condition=Available deployment --all -n libre365 --timeout=600s
+          kubectl wait --for=condition=Ready pod --all -n libre365 --timeout=600s
+
       - name: Show the state of the services on failure
         if: failure()
-        working-directory: docker-compose
-        run: docker compose ps && docker compose logs --tail=200
+        run: |
+          docker compose -f dev-cluster/grommunio-dev/docker-compose.yml ps && docker compose -f dev-cluster/grommunio-dev/docker-compose.yml logs --tail=200
+          kubectl get pods -n libre365 -o wide || true
+          kubectl describe pods -n libre365 || true
 
       - name: Install the integration tests' dependencies
         working-directory: tests/integration
@@ -135,5 +152,6 @@ jobs:
 
       - name: Stop the environment (ephemeral staging cleanup)
         if: always()
-        working-directory: docker-compose
-        run: docker compose down -v
+        run: |
+          ./dev-cluster/destroy.sh || true
+          docker compose -f dev-cluster/grommunio-dev/docker-compose.yml down -v
