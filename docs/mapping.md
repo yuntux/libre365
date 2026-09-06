@@ -36,4 +36,6 @@ block/connector.
 | OS security hardening (fail2ban, SSH) | not a numbered study requirement — closes a gap noted during review | `infra/ansible/roles/os_hardening/` |
 | Dev/staging/prod environments | 4.6 | `dev-cluster/` (k3d, reuses `infra/k8s/helm-values/` + `infra/k8s/helm-values/dev/` hardening overlays, plus `dev-cluster/grommunio-dev/` docker-compose for the one brick k3d can't host) |
 | CVE monitoring / version monitoring / ephemeral staging | 5.2–5.5 | `.github/workflows/` |
+| Vendor security feeds (Grommunio, Synapse, Element, Seafile, OnlyOffice, Vikunja, Keycloak, Caddy) | 5.2 (L.778) | `.github/workflows/security-feeds.yml`, `scripts/security_feeds.py` |
 | Durable integration tests | 5.5 | `tests/integration/` |
+| Single consolidated dashboard (CVE, versions, staging results, production monitoring) | 5.6 | `.github/workflows/dashboard.yml`, `scripts/build_dashboard.py` (see `docs/ci-cd.md` for the production-monitoring caveat) |

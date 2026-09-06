@@ -12,8 +12,8 @@ pipeline targeting Kubernetes.
 |---|---|---|
 | Cross-cutting long-term monitoring of the stack (5.1) | 5.1 (L.771-773) | All the workflows below + `docs/mapping.md` |
 | Automated, regular scanning of container images (Trivy/Grype) | 5.2 (L.777) | `.github/workflows/cve-scan.yml` — Trivy, daily + on push |
-| Subscription to each building block's official security feeds | 5.2 (L.778) | **Not covered by GitHub Actions** — still needs tooling, see "What's missing" below |
-| Centralized alerting (scan + vendor monitoring) | 5.2 (L.779) | Partial: `cve-scan.yml` publishes SARIF to GitHub's **Security** tab (Code Scanning), which serves as a dashboard for the scan side only — no merging with vendor monitoring (not automated, see above) |
+| Subscription to each building block's official security feeds | 5.2 (L.778) | `.github/workflows/security-feeds.yml` — polls each component's official GitHub releases Atom feed (`scripts/security_feeds.py`) and opens a GitHub Issue, labeled `security`, for each new entry |
+| Centralized alerting (scan + vendor monitoring) | 5.2 (L.779) | `cve-scan.yml` publishes SARIF to GitHub's **Security** tab (Code Scanning); `security-feeds.yml`'s issues and both of these feed into `dashboard.yml` (5.6) below |
 | Automated tracking of new releases (images + IaC dependencies), Renovate/Dependabot-style | 5.3 (L.783) | `renovate.json` — Docker images (`dev-cluster/`, `infra/k8s/helm-values/`), Terraform providers (`infra/terraform/`), connector npm dependencies (`connectors/*/`) |
 | New version detected → triggers the cycle rather than being applied directly | 5.3 (L.784) | `renovate.json`: no `automerge` rule on application version updates — every detection produces a PR to review, not a direct deployment |
 | Ephemeral staging environment automatically created from IaC | 5.4.1 (L.789) | `.github/workflows/ephemeral-staging.yml` — **simplified**: starts an ephemeral k3d cluster with the production Helm charts (`dev-cluster/deploy.sh`, reusing `infra/k8s/`) plus `docker-compose` for the one brick with no Kubernetes counterpart (`grommunio-dev`), rather than a real Terraform/Ansible-provisioned staging cluster (see the justification in the comment at the top of the file and the "What's missing" section) |
@@ -22,7 +22,7 @@ pipeline targeting Kubernetes.
 | Library of automated test scenarios (mail, files, co-editing, video/chat, tasks, SSO) | 5.5 (L.795) | `tests/integration/` (`pytest` suite, `smoke` marker) — maintained separately, referenced without being duplicated by `ephemeral-staging.yml` |
 | Automatic replay against ephemeral staging on every new version detected | 5.5 (L.796) | `ephemeral-staging.yml` runs `pytest -m smoke` against the started environment; automatic triggering from a Renovate PR is not wired up (see "What's missing") |
 | Results report driving the promotion decision | 5.5 (L.797) | `ephemeral-staging.yml` publishes `tests/integration/report.html` (pytest-html) as a GitHub Actions artifact and fails the workflow if a `smoke` scenario fails |
-| Single dashboard (CVE, versions, staging results, production monitoring) | 5.6 (L.801-802) | **Not covered** — GitHub's Security tab only covers the CVE scan side; no consolidated dashboard for versions/staging/monitoring, see "What's missing" |
+| Single dashboard (CVE, versions, staging results, production monitoring) | 5.6 (L.801-802) | `.github/workflows/dashboard.yml` (`scripts/build_dashboard.py`), published to GitHub Pages — CVE/version/staging sections are live; production health status is reported as unavailable rather than fabricated (this repository has no operating production tenant), see "What's missing" |
 
 ## Files created
 
@@ -30,6 +30,8 @@ pipeline targeting Kubernetes.
 - `.github/workflows/cve-scan.yml` — study 5.2.
 - `renovate.json` — study 5.3.
 - `.github/workflows/ephemeral-staging.yml` — study 5.4 and 5.5.
+- `.github/workflows/security-feeds.yml` (`scripts/security_feeds.py`) — study 5.2 (L.778).
+- `.github/workflows/dashboard.yml` (`scripts/build_dashboard.py`) — study 5.6.
 - `docs/ci-cd.md` — this document.
 
 ## What's missing for full end-to-end Kubernetes automation
@@ -106,21 +108,25 @@ runner) rather than a real staging cluster provisioned by
    GitHub environment with required reviewers) before any production
    deployment.
 
-5. **Single cross-cutting dashboard (5.6)** — consolidating in one place:
-   CVE alerts (today only in GitHub's Security tab), current vs. available
-   versions per building block (scattered between the Renovate dashboard and
-   the values files), the results of the latest staging runs (the
-   `rapport-recette-*` artifacts from `ephemeral-staging.yml`, not
-   aggregated), and production technical monitoring (out of scope for this
-   CI repository). This requires a dedicated steering tool (e.g. an internal
-   dashboard fed by the GitHub API + a monitoring tool such as
-   Prometheus/Grafana), distinct from the chapter 2 user notification center
-   (5.6, L.802).
+5. ~~**Single cross-cutting dashboard (5.6)**~~ — done: `dashboard.yml`
+   (`scripts/build_dashboard.py`), published to GitHub Pages, consolidates
+   CVE alerts (Code Scanning API), `security-feeds.yml`'s open issues,
+   current vs. latest-known versions (`platform.yaml` vs. each component's
+   GitHub releases feed), and the latest `ephemeral-staging.yml` run.
+   Remaining gap: **production technical monitoring** has no data source at
+   all — this repository has no operating production tenant to poll, so
+   that section of the dashboard reports itself as unavailable rather than
+   showing fabricated numbers. A real deployment would need to point it at
+   its own monitoring stack (e.g. Prometheus/Grafana), distinct from the
+   chapter 2 user notification center (5.6, L.802).
 
-6. **Monitoring vendor security feeds (5.2, L.778)** — subscribing to the
-   security mailing lists / RSS feeds / GitHub Security Advisories of each
-   building block (Grommunio, Synapse/Element, Seafile, OnlyOffice, Vikunja,
-   Keycloak, Caddy), independent of the Trivy scan. Not implemented: a
-   simple first step would be to enable GitHub Security Advisories on the
-   tracked upstream repositories (when they are GitHub repositories) and
-   aggregate them into the same dashboard as point 5 above.
+6. ~~**Monitoring vendor security feeds (5.2, L.778)**~~ — done:
+   `security-feeds.yml` polls the official GitHub releases Atom feed of
+   each of the 7 named components (Grommunio, Synapse, Element, Seafile,
+   OnlyOffice, Vikunja, Keycloak, Caddy — Synapse and Element tracked
+   separately) and opens a `security`-labeled issue per new entry,
+   deduplicated across runs via a marker in the issue body. Caveat: a
+   release-notes feed is a proxy for "official security feed", not a
+   dedicated security-advisory channel — a maintainer with an actual
+   security mailing-list subscription for a given component can swap its
+   URL in `scripts/security_feeds.py`'s `FEEDS` list.
