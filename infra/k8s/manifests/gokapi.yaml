@@ -2,39 +2,24 @@
 # No known official Helm chart for Gokapi (Forceu/Gokapi): raw manifest
 # Deployment + Service + PVC, derived from the official `f0rc3/gokapi` image.
 #
-# Version pinned to v2.2.4 (latest stable at the time of writing) - a
-# review pass on v1.9.6 found the earlier version had no native theming
-# mechanism at all (see the branding note below) AND no way to configure
-# OIDC non-interactively via GOKAPI_OAUTH_* env vars, which v1.9.6 DID
-# support. v2.0.0 (changelog: "Upgrade path: Requires v1.9.6 as base")
-# replaced that entirely with a one-time setup wizard
-# (internal/configuration/setup/Setup.go) that persists everything to
-# config.json - checked against the real v2.2.4 source AND a locally
-# built binary (go generate + go build, real HTTP requests against it) to
-# confirm the exact JSON wire format `initContainer` below submits;
-# see docs/oidc.md for the full story.
+# Version pinned to v2.2.4. OIDC is configured non-interactively via a
+# one-time setup wizard (internal/configuration/setup/Setup.go) that
+# persists everything to config.json; the `initContainer` below submits
+# that setup payload over HTTP. See docs/oidc.md for the full story.
 #
 # 1.8 L.311-312 — two mandatory conditions at deployment time:
 #   1. Explicitly enable true end-to-end encryption - this is NOT Gokapi's
-#      default. The encryption level NUMBERING changed between v1.9.6 and
-#      v2.x (verified against internal/encryption/Encryption.go at the
-#      pinned tag): v1.9.6's level 3 meant "true E2EE" via
-#      GOKAPI_ENCRYPTION_LEVEL=3, but in v2.x level 3 is
-#      "FullEncryptionStored" (server holds the key - NOT zero-knowledge);
-#      the setup payload below uses `encrypt_sel: "5"`
-#      (`encryption.EndToEndEncryption`), the actual equivalent. Blindly
-#      keeping the old numeric value across this upgrade would have
-#      silently downgraded real E2EE to server-side encryption-at-rest.
+#      default. The setup payload below uses `encrypt_sel: "5"`
+#      (`encryption.EndToEndEncryption`), the level that actually means
+#      zero-knowledge E2EE (level 3 is `FullEncryptionStored`, server
+#      holds the key - not the same thing).
 #   2. DO NOT ENABLE the "File Request" feature (upload by an external third
 #      party with no account): it bypasses E2EE even when full encryption is
-#      otherwise active (1.8 L.304, L.312). v1.9.6 had a single
-#      GOKAPI_FILE_REQUEST_ENABLED toggle; v2.x replaced it with a
-#      per-API-key/user permission (`ApiPermManageFileRequests`, granular
-#      permissions added in v2.0.0) - there is no longer a single env var
-#      to disable it globally, but since no user/API key created by the
-#      bootstrap below is ever granted that permission, the net effect
-#      (no one can create a File Request) is the same by omission, not by
-#      an explicit flag.
+#      otherwise active (1.8 L.304, L.312). This is a per-API-key/user
+#      permission (`ApiPermManageFileRequests`) rather than a single global
+#      toggle - since no user/API key created by the bootstrap below is
+#      ever granted that permission, the net effect (no one can create a
+#      File Request) holds by omission.
 # Native OIDC toward Keycloak (1.8 L.303, L.306) — MANDATORY to use Gokapi's
 # up-to-date Keycloak documentation at deployment time (a previous configuration
 # example allowed unauthorized access, see 1.8 L.306).
@@ -42,13 +27,9 @@
 # Tasmane branding: colors are injected via Caddy's html_inject
 # (infra/k8s/manifests/caddy.yaml's depot.<domain> site block,
 # infra/k8s/manifests/caddy-injection.yaml's gokapi-branding.html) rather
-# than v2.x's native /app/custom/custom.css mechanism - both are real
-# options as of this version, but the Caddy route was already built,
-# validated, and needs no coordination with Gokapi's own file layout
-# across upgrades; left as-is rather than duplicating the same branding
-# two ways. See caddy-injection.yaml's own comment for why it was chosen
-# over custom.css in the first place (written against v1.9.6, before this
-# version bump - still the simpler mechanism now).
+# than Gokapi's native /app/custom/custom.css mechanism - the Caddy route
+# needs no coordination with Gokapi's own file layout across upgrades. See
+# caddy-injection.yaml's own comment for the full rationale.
 
 apiVersion: v1
 kind: ConfigMap

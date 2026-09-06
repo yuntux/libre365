@@ -29,17 +29,12 @@ backend:
     OIDC_OP_TOKEN_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/token"
     OIDC_OP_USER_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/userinfo"
     # Required by suitenumerique/meet's own settings.py (django-configurations
-    # `values.Value`, no default) - missing entirely before this review pass,
-    # which would have made the backend fail at startup the moment OIDC was
-    # actually exercised, not just misconfigured.
+    # `values.Value`, no default).
     OIDC_OP_JWKS_ENDPOINT: "https://sso.libre365.example.org/realms/libre365/protocol/openid-connect/certs"
     OIDC_RP_CLIENT_ID: "visio-meet"
     # Client secret from visio-meet-oidc-secret (external-secrets.yaml,
-    # OpenBao-sourced) - the Keycloak client itself ("visio-meet") didn't
-    # exist at all until a review pass added it
-    # (infra/ansible/roles/keycloak_realm/defaults/main.yml); this env var
-    # previously pointed at a vaguely-named "oidc-client-secrets" secret
-    # that was never actually declared anywhere as an ExternalSecret.
+    # OpenBao-sourced) - matches the "visio-meet" Keycloak client declared
+    # in infra/ansible/roles/keycloak_realm/defaults/main.yml.
     OIDC_RP_CLIENT_SECRET:
       valueFrom:
         secretKeyRef:

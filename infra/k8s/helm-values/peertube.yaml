@@ -28,47 +28,31 @@ config:
   webserver:
     hostname: "videos.libre365.example.org"
   # 2.12 L.583 — ActivityPub federation disabled: strictly internal use.
-  # `prevent_search_indexation` (previously here) does not exist anywhere in
-  # PeerTube's real config schema (checked production.yaml.example at both
-  # the previously-pinned v6.3.2 and the current v8.2.4 - no such key under
-  # `federation:`, `search:`, or `instance:`, which uses `robots:` for
-  # crawler control instead) - a review pass found it fabricated and
-  # removed it rather than leave a silently-ignored key. `federate_unlisted`
-  # is real and unchanged across both versions.
   federation:
     videos:
       federate_unlisted: false
 
-  # 2.12 L.581-582 — default "internal" visibility (not publicly listed, but
-  # visible to any authenticated user of the instance): a review pass
-  # confirmed via PeerTube's own privacy enum source
-  # (packages/models/src/videos/video-privacy.enum.ts, identical at v6.3.2
-  # and v8.2.4) that this is level 4 (INTERNAL), not 3 (PRIVATE - visible
-  # only to the video's own owner account, which is not what 2.12 wants).
+  # 2.12 L.581-582 — default "internal" visibility (not publicly listed,
+  # but visible to any authenticated user of the instance): PeerTube's
+  # privacy enum is 1=public, 2=unlisted, 3=private (owner only),
+  # 4=internal (any authenticated instance user), 5=password-protected.
   defaults:
     publish:
-      privacy: 4 # 1=public, 2=unlisted, 3=private (owner only), 4=internal (any authenticated instance user), 5=password-protected
+      privacy: 4
 
   # 1.7 — Keycloak SSO (official PeerTube OpenID Connect plugin,
-  # `peertube-plugin-auth-openidconnect`). [UNCERTAIN, escalated by a review
-  # pass rather than left as a silent guess]: confirmed via PeerTube's
-  # plugin API (registerSetting/settingsManager,
-  # support/doc/plugins/guide.md) that plugin settings are stored in its
-  # database, set through the admin UI or `PUT
-  # /api/v1/plugins/{npmName}/settings` - never through a config
-  # file/env var, and no real community Helm chart exposes a `plugins:`
-  # values block at all. This whole block is therefore NON-FUNCTIONAL as
-  # static Helm values: PeerTube would just ignore it. Fixing it for real
-  # needs the same shape as Gokapi's bootstrap (infra/k8s/manifests/
-  # gokapi.yaml's initContainer): a Job/initContainer that (1) installs
-  # `peertube-plugin-auth-openidconnect` via `POST /api/v1/plugins/install`
-  # and (2) PUTs its settings, both authenticated as the root account - not
-  # written here yet because, unlike Gokapi, this couldn't be verified
-  # end-to-end against a real running PeerTube instance in this pass (no
-  # local build/run attempted); tracked as follow-up work rather than
-  # shipped unverified. Client secret was already generated as
-  # peertube-oidc-secret (external-secrets.yaml, OpenBao-sourced), ready to
-  # be consumed by that future bootstrap Job.
+  # `peertube-plugin-auth-openidconnect`). [UNCERTAIN]: PeerTube plugin
+  # settings are stored in its database, set through the admin UI or `PUT
+  # /api/v1/plugins/{npmName}/settings` - not through a config file/env
+  # var, and no real community Helm chart exposes a `plugins:` values
+  # block. This block is therefore NON-FUNCTIONAL as static Helm values.
+  # Making it work needs the same shape as Gokapi's bootstrap
+  # (infra/k8s/manifests/gokapi.yaml's initContainer): a Job/initContainer
+  # that (1) installs `peertube-plugin-auth-openidconnect` via `POST
+  # /api/v1/plugins/install` and (2) PUTs its settings, both authenticated
+  # as the root account - tracked as follow-up work. The client secret is
+  # already generated as peertube-oidc-secret (external-secrets.yaml,
+  # OpenBao-sourced), ready to be consumed by that future bootstrap Job.
   # plugins:
   #   openid_connect:
   #     enabled: true

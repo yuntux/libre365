@@ -1,14 +1,8 @@
 # Component: Vikunja — task management (study 1.6 L.228-229)
-# Chart: a review pass found the previously-cited `vikunja/helm-charts`
-# (`go-vikunja/helm-charts`, `vikunja.github.io/helm-charts`) does not
-# actually exist upstream (git ls-remote returns not-found; the real
-# go-vikunja org only has vikunja/frontend/desktop repos, no Helm chart).
-# Vikunja's own CHANGELOG only ever references a THIRD-PARTY chart
-# collection (the old "k8s-at-home", now `bjw-s-labs/helm-charts`'s generic
-# app-template), not a Vikunja-dedicated chart - to be adapted to that
-# generic app-template chart, or a raw manifest, at deployment time; the
-# values shape below stays in the repository's own "chart-like" convention
-# in the meantime.
+# Chart: no Vikunja-dedicated Helm chart is published upstream. Values
+# below are written in the repository's own "chart-like" convention, to be
+# adapted to a generic app-template chart (e.g. `bjw-s-labs/helm-charts`)
+# or a raw manifest at deployment time.
 #
 # 1.6 L.229 — 2-4 cores / 4 GB RAM sizing sufficient for both 100 and 2000 users
 # (barring massive API/automation usage): no dedicated 100/2000 variant, a single
@@ -29,34 +23,23 @@ resources:
     cpu: "4"
     memory: "4Gi"
 
-# [UNCERTAIN, not verified end-to-end against a running Vikunja 2.x
-# instance in this pass - unlike Gokapi's bootstrap, this couldn't be
-# built/run locally]: a review pass found that Vikunja's CHANGELOG (tag
-# 1.0.0-rc0) explicitly marks the OpenID provider config format as
-# BREAKING - "config for auth providers now use a map instead of an array"
-# - confirmed by diffing pkg/modules/auth/openid/providers.go between
-# 0.24.3 (array, `PROVIDERS_0_...`) and current (map keyed by an arbitrary
-# provider key, `PROVIDERS_<key>_...`, renamed below from `_0_` to
-# `_LIBRE365_`). Vikunja's own generated config docs additionally state
-# that a provider key must first be declared in a mounted `config.yml` for
-# its environment-variable overrides to be recognized AT ALL - a pure-env-
-# var setup (no config file, as below) may therefore not be sufficient on
-# its own since this version. Because no real Helm chart for Vikunja could
-# be confirmed to exist at all (see this file's header comment), there is
-# no verified chart field name to mount that config.yml stub through
-# either - flagged here rather than guessing an unconfirmed chart schema
-# on top of an already-unconfirmed chart; whichever raw manifest/generic
-# chart is actually adopted at deployment time must mount a `config.yml`
-# containing at least `auth: {openid: {providers: {libre365: {}}}}`
-# alongside these env vars.
+# [UNCERTAIN]: Vikunja's OpenID provider config is a map keyed by an
+# arbitrary provider key (`PROVIDERS_<key>_...`, "libre365" below), not a
+# numeric index. Vikunja's generated config docs state that a provider key
+# must also be declared in a mounted `config.yml` for its environment-
+# variable overrides to be recognized at all - a pure-env-var setup (as
+# below, no config file) may not be sufficient on its own. Since no real
+# Helm chart for Vikunja exists to confirm a field name for mounting a
+# config.yml stub through, this is flagged rather than guessed: whichever
+# raw manifest/generic chart is adopted at deployment time must mount a
+# `config.yml` containing at least
+# `auth: {openid: {providers: {libre365: {}}}}` alongside these env vars.
 
 env:
   VIKUNJA_SERVICE_PUBLICURL: "https://taches.libre365.example.org"
   VIKUNJA_SERVICE_ENABLECALDAV: "true" # 1.6 table — native calendar integration
-  # 1.7 — Keycloak SSO (native Vikunja OIDC). Provider key "libre365"
-  # matches infra/k8s/manifests/vikunja-config.yaml's config.yml stub - see
-  # this file's env vars comment above for why both are needed since
-  # Vikunja >= 1.0.0-rc0.
+  # 1.7 — Keycloak SSO (native Vikunja OIDC). Provider key "libre365" must
+  # match the config.yml stub mounted per the comment above.
   VIKUNJA_AUTH_OPENID_ENABLED: "true"
   VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_NAME: "Libre365 SSO"
   VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_AUTHURL: "https://sso.libre365.example.org/realms/libre365"

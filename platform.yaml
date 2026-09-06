@@ -144,10 +144,8 @@ services:
       tag_path: .image.tag
 
   element_call:
-    # study 1.3 - pinned to the latest real tag published at
-    # ghcr.io/element-hq/element-call at the time of writing (verified via
-    # the registry's own tag list, not just the upstream git tags - ghcr.io
-    # does publish a versioned image per git tag here).
+    # study 1.3 - matches the real tag published at
+    # ghcr.io/element-hq/element-call.
     version: "v0.25.0"
     compose: null # no dedicated docker-compose service: Element Call is
       # exercised via the MatrixRTC widget embedded in Element Web (1.3), not
@@ -160,8 +158,8 @@ services:
   element_call_auth:
     # ghcr.io/element-hq/lk-jwt-service - Element Call's own dedicated
     # LiveKit JWT auth service (element-call.yaml's authService.image), a
-    # separate upstream repo/image from element-call itself and therefore
-    # versioned independently; pinned to its own latest real tag.
+    # separate upstream repo/image from element-call itself, versioned
+    # independently.
     version: "0.6.0"
     compose: null
     helm:
@@ -173,9 +171,8 @@ services:
     # study 1.3 - LaSuite Meet (Django backend + frontend), no dedicated
     # docker-compose service at this stage (not yet wired into the dev tier:
     # to add if the Matrix<->Visio widget connector, 2.4, needs local
-    # testing). `version` applies to both images, published together - real
-    # upstream (Docker Hub lasuite/meet-backend + lasuite/meet-frontend)
-    # confirmed to publish matching version tags for both.
+    # testing). `version` applies to both images, published together on
+    # Docker Hub (lasuite/meet-backend + lasuite/meet-frontend).
     version: "v1.30.0"
     compose: null
     helm_images:
@@ -187,24 +184,13 @@ services:
         tag_path: frontend.image.tag
 
   seafile:
-    # study 1.4 - 11.0.13 was 2 major versions behind (v13.0.25 confirmed as
-    # the real latest stable release via haiwen/seafile-server's own tags,
-    # with a matching, actually-pullable seafileltd/seafile-mc:13.0.25
-    # Docker Hub tag). Safe to declare directly here because this repo
-    # provisions FRESH deployments, not in-place upgrades of an
-    # already-running instance: OAuth/OnlyOffice config keys
-    # (OAUTH_CLIENT_ID/SECRET/PROVIDER_DOMAIN/AUTHORIZATION_URL/TOKEN_URL/
-    # USER_INFO_URL, OFFICE_SERVER_TYPE, ONLYOFFICE_APIJS_URL/JWT_SECRET)
-    # are byte-for-byte unchanged between 11.0.13 and 13.0.25 (verified
-    # against seahub's real oauth/onlyoffice settings source at both tags).
-    # An already-running 11.0.13 instance, by contrast, CANNOT jump
-    # straight here: Seafile's own upgrade scripts
-    # (scripts/upgrade/upgrade_11.0_12.0.sh, upgrade_12.0_13.0.sh) are
-    # written as sequential, one-major-version-at-a-time, interactive
-    # database migrations (db_update_helper.py) with no combined 11.0->13.0
-    # path - going through 12.0.x first is mandatory for an in-place
-    # upgrade, note this if/when this platform.yaml value is ever bumped
-    # again on a live deployment rather than a fresh one.
+    # study 1.4. This repo provisions FRESH deployments, not in-place
+    # upgrades of an already-running instance: on an already-running
+    # instance, Seafile's own upgrade scripts
+    # (scripts/upgrade/upgrade_11.0_12.0.sh, upgrade_12.0_13.0.sh) require
+    # going through each major version in sequence (no combined jump) -
+    # keep that in mind if this value is ever bumped on a live deployment
+    # rather than a fresh one.
     version: "13.0.25"
     ports: { SEAFILE_PORT: 8082 }
     compose:
@@ -229,17 +215,11 @@ services:
       tag_path: .image.tag
 
   vikunja:
-    # study 1.6 - 0.24.3 was well behind the real latest stable release
-    # (v2.6.0, confirmed via go-vikunja/vikunja's own CHANGELOG.md and git
-    # tags, with a matching, actually-pullable vikunja/vikunja:2.6.0 Docker
-    # Hub tag). The version-scheme jump (0.x -> 1.x -> 2.x) is a
-    # renumbering, not a rearchitecture (same Go/xorm/Postgres backend,
-    # automatic DB migrations, no sequential-upgrade requirement found in
-    # the changelog) - safe to bump directly, UNLIKE the OpenID provider
-    # config format, which the changelog explicitly marks BREAKING at
-    # 1.0.0-rc0 and which required real changes in vikunja.yaml (see that
-    # file's own comments) alongside this version bump.
-    version: "2.6.0" # no "v" prefix - confirmed as the real vikunja/vikunja Docker Hub tag
+    # study 1.6 - matches the real vikunja/vikunja Docker Hub tag (no "v"
+    # prefix). Since 1.0.0-rc0, the OpenID provider config uses a map keyed
+    # by an arbitrary provider name rather than a numeric index - see
+    # vikunja.yaml's own comments for what that means for this deployment.
+    version: "2.6.0"
     ports: { VIKUNJA_PORT: 3456 }
     compose:
       image: vikunja/vikunja
@@ -249,14 +229,11 @@ services:
       tag_path: .image.tag
 
   gokapi:
-    # v2.2.4 (latest stable) - bumped from v1.9.6 after a review pass found
-    # the older version had no native theming mechanism and, more
-    # importantly, no way to configure OIDC non-interactively (v2.0.0
-    # replaced GOKAPI_OAUTH_* env vars with a one-time setup wizard) -
-    # automated instead via infra/k8s/manifests/gokapi.yaml's
-    # gokapi-setup-bootstrap initContainer, verified against a locally
-    # built v2.2.4 binary. See that file's header and docs/oidc.md.
-    version: "v2.2.4" # study 1.8
+    # study 1.8 - OIDC is configured non-interactively via
+    # infra/k8s/manifests/gokapi.yaml's gokapi-setup-bootstrap
+    # initContainer (Gokapi's one-time setup wizard writes config.json, no
+    # GOKAPI_OAUTH_* env vars). See that file's header and docs/oidc.md.
+    version: "v2.2.4"
     ports: { GOKAPI_PORT: 53842 }
     compose:
       image: f0rc3/gokapi
@@ -279,15 +256,10 @@ services:
       tag_path: .image.tag
 
   peertube:
-    # study 2.12 - v6.3.2 was 2 major versions behind (v8.2.4 confirmed as
-    # the real latest stable release, with a matching chocobozzz/peertube
-    # Docker Hub "-bookworm" tag following the same convention as the
-    # previously-pinned one). NOT a drop-in bump: a review pass found the
-    # OpenID Connect plugin config block in peertube.yaml was already
-    # non-functional (PeerTube plugin settings are DB-backed, not static
-    # config - see that file's own comment) regardless of version, and one
-    # of the two federation keys set there doesn't exist in PeerTube's real
-    # config schema at either version - both fixed alongside this bump.
+    # study 2.12 - matches the real chocobozzz/peertube Docker Hub
+    # "-bookworm" tag. PeerTube plugin settings (including the OpenID
+    # Connect plugin) are DB-backed, not static config - see
+    # peertube.yaml's own comment.
     version: "v8.2.4-bookworm"
     ports: { PEERTUBE_PORT: 9002 }
     compose:
