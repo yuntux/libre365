@@ -19,6 +19,17 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 CLUSTER_NAME="libre365-dev"
 NAMESPACE="libre365"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
+# Host CPU architecture in the naming every tool downloaded below actually
+# uses (Go/Docker convention: "amd64"/"arm64", not uname -m's own
+# "x86_64"/"aarch64") - found necessary running this script on an ARM64 VM
+# (e.g. an Apple Silicon Mac's Ubuntu VM): unrelated to which hypervisor
+# runs that VM (Apple's own Virtualization.framework, in that case) - this
+# is purely about the CPU instructions the VM's own Linux kernel executes.
+case "$(uname -m)" in
+  x86_64) HOST_ARCH="amd64" ;;
+  aarch64 | arm64) HOST_ARCH="arm64" ;;
+  *) HOST_ARCH="$(uname -m)" ;; # unmapped - passed through as-is, a download further below will just 404 loudly rather than silently fetching the wrong binary.
+esac
 # Keep in sync by hand with platform.yaml's services.keycloak.version -
 # scripts/sync_platform.py patches infra/k8s/manifests/keycloak.yaml's
 # `spec.image` tag, but not this shell variable (see that file's header
@@ -69,7 +80,7 @@ if ! command -v kubectl >/dev/null 2>&1; then
   elif curl -fsS --connect-timeout 5 https://dl.k8s.io >/dev/null 2>&1; then
     echo "    kubectl: not found, pkg.k8s.io unreachable - installing the binary directly from dl.k8s.io instead"
     kubectl_version="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
-    curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/${kubectl_version}/bin/linux/amd64/kubectl"
+    curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/${kubectl_version}/bin/linux/${HOST_ARCH}/kubectl"
     sudo install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl
     rm -f /tmp/kubectl
   elif command -v snap >/dev/null 2>&1; then
@@ -90,11 +101,31 @@ if ! command -v k3d >/dev/null 2>&1; then
 fi
 
 echo "==> 2/14 grommunio-dev (docker-compose, study 4.6 - not part of the k3d cluster, see dev-cluster/README.md's 'Why grommunio-dev stays on docker-compose')"
+# grommunio/gromox-core only ever publishes linux/amd64 images (verified via
+# the Docker Hub API, see platform.yaml's grommunio_dev entry) - on a
+# non-amd64 host (ARM64, e.g. an Apple Silicon Mac's Ubuntu VM) Docker can
+# only run it through QEMU user-mode emulation, which needs the host
+# kernel's binfmt_misc to have an interpreter registered for the foreign
+# architecture; without it, the container fails immediately with
+# `exec /init: exec format error` rather than falling back to (slower)
+# emulation on its own. Skipped entirely on an amd64 host, and skipped here
+# too if some other mechanism (a distro package, a previous manual run of
+# this same command) already registered it - `tonistiigi/binfmt` itself is
+# idempotent, but checking first avoids the extra `docker run --privileged`
+# on every single re-run of this script.
+if [ "${HOST_ARCH}" != "amd64" ] && [ ! -e /proc/sys/fs/binfmt_misc/qemu-x86_64 ]; then
+  echo "    non-amd64 host (${HOST_ARCH}): registering QEMU emulation for linux/amd64 images (tonistiigi/binfmt)"
+  docker run --privileged --rm tonistiigi/binfmt --install all
+fi
 if [ ! -f dev-cluster/grommunio-dev/.env ]; then
   cp dev-cluster/grommunio-dev/.env.example dev-cluster/grommunio-dev/.env
 fi
 docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
-dev-cluster/grommunio-dev/scripts/wait-for-healthy.sh
+# Emulated boot (non-amd64 host, see above) takes noticeably longer than
+# native - supervisord starts ~18 internal services one by one - so this
+# step alone gets a longer allowance than wait-for-healthy.sh's own 600s
+# default would otherwise give the WHOLE stack collectively further down.
+dev-cluster/grommunio-dev/scripts/wait-for-healthy.sh 900
 
 echo "==> 3/14 k3d cluster"
 if k3d cluster list -o json 2>/dev/null | grep -q "\"name\":\"${CLUSTER_NAME}\""; then
