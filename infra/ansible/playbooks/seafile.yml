@@ -12,6 +12,8 @@
   hosts: seafile
   connection: local
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
   vars:
     seafile_namespace: "seafile"
     seafile_configmap: "seahub-settings"

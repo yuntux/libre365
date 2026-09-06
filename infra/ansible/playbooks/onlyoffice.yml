@@ -14,6 +14,8 @@
   hosts: onlyoffice
   connection: local
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
   vars:
     onlyoffice_namespace: "onlyoffice"
     # Study 2.6, line ~469: "document.permissions.chat: false [...] distinct
