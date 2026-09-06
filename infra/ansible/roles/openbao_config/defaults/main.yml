@@ -1,0 +1,23 @@
+---
+# openbao_config role — see README.md for the full rationale.
+
+openbao_config_addr: "http://openbao.libre365.svc.cluster.local:8200"
+
+# Root/admin token used to bootstrap the Kubernetes auth method and the
+# `external-secrets` policy - never committed in plaintext, see README.md.
+# openbao_root_token: "{{ vault_openbao_root_token }}"
+
+# The Kubernetes API server External Secrets Operator's ServiceAccount
+# token will be validated against - the in-cluster API server, reachable
+# from any pod (and, for this role, from wherever kubectl's current
+# context points).
+openbao_config_kubernetes_host: "https://kubernetes.default.svc:443"
+
+openbao_config_external_secrets_namespace: libre365
+openbao_config_external_secrets_service_account: external-secrets
+openbao_config_external_secrets_policy_name: external-secrets
+openbao_config_external_secrets_role_ttl: "1h"
+
+# KV v2 mount path - matches ../../k8s/manifests/external-secrets-store.yaml's
+# `path: secret`.
+openbao_config_kv_mount: secret

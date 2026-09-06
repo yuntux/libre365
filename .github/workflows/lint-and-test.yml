@@ -243,7 +243,13 @@ jobs:
 
       - name: kubeconform on every raw manifest
         if: steps.check.outputs.present == 'true'
-        run: kubeconform -strict -summary $(find infra/k8s/manifests -name '*.yaml')
+        # -ignore-missing-schemas: this directory also carries
+        # ExternalSecret/ClusterSecretStore CRDs (external-secrets.io) that
+        # kubeconform has no built-in schema for - skipped rather than
+        # failed, since kubeconform can only validate structure, not fetch
+        # a CRD's schema from a live cluster (which would defeat the
+        # "fully offline" point of using kubeconform at all, see above).
+        run: kubeconform -strict -ignore-missing-schemas -summary $(find infra/k8s/manifests -name '*.yaml')
 
   platform-drift-check:
     name: Version/port drift (platform.yaml)

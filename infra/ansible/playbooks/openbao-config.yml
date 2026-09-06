@@ -1,0 +1,14 @@
+---
+# Bootstraps OpenBao's Kubernetes auth method for External Secrets
+# Operator (study 4.5) - see ../roles/openbao_config/README.md for the
+# full rationale and prerequisites (OpenBao must already be initialized
+# and unsealed - a manual step, deliberately not automated here).
+#
+# API-driven, like playbooks/keycloak-realm.yml - runs against
+# control_apis (no SSH connection needed).
+- name: "OpenBao Kubernetes auth method + external-secrets policy/role (study 4.5)"
+  hosts: control_apis
+  connection: local
+  gather_facts: false
+  roles:
+    - openbao_config

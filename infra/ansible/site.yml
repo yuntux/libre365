@@ -1,9 +1,12 @@
 ---
 # Master playbook — includes the per-component playbooks in functional
 # dependency order: OS hardening first (applies to the raw VMs before
-# anything is configured on top of them), then Keycloak (central SSO the
-# other components depend on, study 1.7), then Grommunio (independent of
-# the application SSO, see playbooks/grommunio.yml), then the containerized
+# anything is configured on top of them), then the OpenBao/secrets wiring
+# (study 4.5 - assumes OpenBao and External Secrets Operator are already
+# Helm-deployed and OpenBao already initialized/unsealed, see
+# roles/openbao_config/README.md), then Keycloak (central SSO the other
+# components depend on, study 1.7), then Grommunio (independent of the
+# application SSO, see playbooks/grommunio.yml), then the containerized
 # components consuming the already-created OIDC clients (Matrix, Seafile,
 # OnlyOffice).
 #
@@ -17,17 +20,20 @@
 - name: "0. Baseline OS hardening (fail2ban, SSH — closes a gap noted during review)"
   import_playbook: playbooks/os-hardening.yml
 
-- name: "1. Keycloak realm and OIDC clients (central SSO — study 1.7)"
+- name: "1. OpenBao Kubernetes auth method + external-secrets policy/role (study 4.5)"
+  import_playbook: playbooks/openbao-config.yml
+
+- name: "2. Keycloak realm and OIDC clients (central SSO — study 1.7)"
   import_playbook: playbooks/keycloak-realm.yml
 
-- name: "2. Grommunio appliance VM (CardDAV GAL, web admin disabled — study 1.1, 2.13)"
+- name: "3. Grommunio appliance VM (CardDAV GAL, web admin disabled — study 1.1, 2.13)"
   import_playbook: playbooks/grommunio.yml
 
-- name: "3. Matrix/Synapse domain and OIDC provider (study 1.2)"
+- name: "4. Matrix/Synapse domain and OIDC provider (study 1.2)"
   import_playbook: playbooks/matrix.yml
 
-- name: "4. Seafile (authenticated sharing, OnlyOffice connector — study 1.4, 2.11)"
+- name: "5. Seafile (authenticated sharing, OnlyOffice connector — study 1.4, 2.11)"
   import_playbook: playbooks/seafile.yml
 
-- name: "5. OnlyOffice (chat disabled by default — study 2.6)"
+- name: "6. OnlyOffice (chat disabled by default — study 2.6)"
   import_playbook: playbooks/onlyoffice.yml
