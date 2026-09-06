@@ -112,3 +112,14 @@ Separate from account setup: `connectors/thunderbird-filelink-gokapi/` is a
 Thunderbird WebExtension implementing the `cloudFile` API so large
 attachments are uploaded to Gokapi instead of sent inline — see that
 connector's own README. It has no bearing on account autoconfiguration.
+
+**Mail autoconfig cannot also deploy this extension** — a common point of
+confusion, since Mozilla names two unrelated mechanisms similarly: the
+`config-v1.1.xml` autoconfig above only ever describes mail server settings
+(its schema has no notion of "extension to install"); deploying an extension
+fleet-wide is Thunderbird's separate enterprise **policy engine**
+(`policies.json`, `ExtensionSettings`). See
+`connectors/thunderbird-filelink-gokapi/README.md`'s "Fleet-wide deployment"
+section for the ready-to-deploy `policies.json` template and what remains a
+manual/workstation-management step (packaging the `.xpi`, pushing
+`policies.json` itself via GPO/MDM/distribution folder).

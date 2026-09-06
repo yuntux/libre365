@@ -25,7 +25,7 @@ block/connector.
 | Unified presence | 2.8 | `connectors/presence-aggregator/` |
 | Video conferencing button from Grommunio | 2.9 | `docs/visio-invite.md` (reusable link, no connector at this stage) |
 | Seafile ↔ Vikunja link | 2.10 | No code — documented usage (`docs/vikunja-seafile.md`) |
-| Gokapi Filelink (Thunderbird) | 2.11 | `connectors/thunderbird-filelink-gokapi/` |
+| Gokapi Filelink (Thunderbird) | 2.11 | `connectors/thunderbird-filelink-gokapi/` (fleet-wide deployment: `policies.json`, see its README) |
 | Video platform (PeerTube + MinIO) | 2.12 | `infra/k8s/helm-values/peertube.yaml`, `infra/k8s/helm-values/minio.yaml`, `connectors/peertube-ingest/` |
 | GAL over CardDAV | 2.13 | `infra/ansible/playbooks/grommunio.yml` (`GAL_ENABLED`) |
 | Room booking | 2.14 | No code — native Grommunio behavior, documented (`docs/room-booking.md`) |

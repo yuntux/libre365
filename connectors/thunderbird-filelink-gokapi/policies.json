@@ -1,0 +1,10 @@
+{
+  "policies": {
+    "ExtensionSettings": {
+      "gokapi-filelink@libre365.example.org": {
+        "installation_mode": "force_installed",
+        "install_url": "https://onboarding.libre365.example.org/extensions/gokapi-filelink.xpi"
+      }
+    }
+  }
+}
