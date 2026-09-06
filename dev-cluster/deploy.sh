@@ -35,6 +35,16 @@ esac
 # `spec.image` tag, but not this shell variable (see that file's header
 # comment on why the operator install isn't automated the same way).
 KEYCLOAK_VERSION="26.7.3"
+# Novu has no official Helm chart at all (verified: novuhq/helm-charts, the
+# repo this used to point at, does not exist on GitHub, and its gh-pages
+# index.yaml 404s - found by actually running this script). The closest
+# thing is this community, explicitly "not officially supported by the
+# Novu team" chart, published as an OCI artifact (no index.yaml repo to
+# `helm repo add` at all) - kept as a shell variable, same pattern as
+# KEYCLOAK_VERSION above, since OCI references are pinned by `--version` at
+# install time, not resolved through a repo's own index.
+NOVU_CHART="oci://ghcr.io/nova-edge/charts/novu"
+NOVU_CHART_VERSION="0.2.1"
 
 echo "==> 1/14 Prerequisites (docker, kubectl, helm, k3d)"
 # Installs whatever is missing, using each project's own official install
@@ -142,7 +152,8 @@ echo "==> 5/14 Helm repos (see infra/k8s/helm-values/README.md)"
 helm repo add ananace-charts https://ananace.gitlab.io/charts >/dev/null
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null
 helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm >/dev/null
-helm repo add novu https://novuhq.github.io/helm-charts >/dev/null
+# Novu: no `helm repo add` here at all - see $NOVU_CHART/$NOVU_CHART_VERSION's
+# own comment above (OCI artifact, not an index.yaml-based repo).
 # seafile-charts/onlyoffice/peertube-helm repos are marked "to be confirmed"
 # in infra/k8s/helm-values/README.md (no single identified official chart at
 # the time of writing) - added best-effort here; if a repo add fails because
@@ -209,7 +220,7 @@ helm upgrade --install seaweedfs seaweedfs/seaweedfs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seaweedfs.yaml -f infra/k8s/helm-values/dev/seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n "$NAMESPACE" \
   -f infra/k8s/helm-values/peertube.yaml -f infra/k8s/helm-values/dev/peertube.yaml
-helm upgrade --install novu novu/novu -n "$NAMESPACE" \
+helm upgrade --install novu "$NOVU_CHART" --version "$NOVU_CHART_VERSION" -n "$NAMESPACE" \
   -f infra/k8s/helm-values/novu.yaml -f infra/k8s/helm-values/dev/novu.yaml
 helm upgrade --install external-dns external-dns/external-dns -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-dns.yaml -f infra/k8s/helm-values/dev/external-dns.yaml

@@ -117,7 +117,7 @@ instead of a separate cascade file.
 | SeaweedFS | `seaweedfs` (official, in-tree chart) | https://seaweedfs.github.io/seaweedfs/helm |
 | PeerTube | community chart `peertube` | https://peertube-helm.github.io/charts (to be confirmed) |
 | Caddy | no dedicated chart — raw manifest (`../manifests/caddy.yaml`), custom xcaddy image with an HTML injection plugin | — |
-| Novu | `novu` (official Novu chart) | https://novuhq.github.io/helm-charts |
+| Novu | no official chart exists at all (verified: `novuhq/helm-charts` doesn't exist, its gh-pages 404s) — community chart `Nova-Edge/novu-chart`, low-adoption, explicitly not officially supported by the Novu team | OCI artifact, not an index.yaml repo: `oci://ghcr.io/nova-edge/charts/novu`, pinned by `--version` (see `novu.yaml`'s own header) |
 | external-dns | `external-dns` (kubernetes-sigs) | https://kubernetes-sigs.github.io/external-dns/ |
 | OpenBao | `openbao` (OpenBao project) | https://openbao.github.io/openbao-helm/ (not independently verified from this sandbox — see `openbao.yaml`'s own header comment) |
 | External Secrets Operator | `external-secrets` (external-secrets project, CNCF) | https://charts.external-secrets.io |
@@ -136,9 +136,9 @@ image carries the same caveat — see that file's header comment.
 helm repo add ananace-charts https://ananace.gitlab.io/charts
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm
-helm repo add novu https://novuhq.github.io/helm-charts
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 helm repo update
+# Novu: no `helm repo add` - see its table row above, it's an OCI artifact.
 
 # Namespace
 kubectl apply -f ../manifests/namespace.yaml
@@ -147,7 +147,7 @@ kubectl apply -f ../manifests/namespace.yaml
 helm upgrade --install seafile seafile-charts/seafile-ce -n libre365 -f seafile.yaml
 helm upgrade --install seaweedfs seaweedfs/seaweedfs -n libre365 -f seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n libre365 -f peertube.yaml
-helm upgrade --install novu novu/novu -n libre365 -f novu.yaml
+helm upgrade --install novu oci://ghcr.io/nova-edge/charts/novu --version 0.2.1 -n libre365 -f novu.yaml
 helm upgrade --install element-web ananace-charts/matrix-element-web -n libre365 -f element-web.yaml
 helm upgrade --install keycloak-postgres bitnami/postgresql -n libre365 -f keycloak-postgres.yaml
 

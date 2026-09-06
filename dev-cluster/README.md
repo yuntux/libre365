@@ -34,7 +34,7 @@ something that doesn't exist in production.
 ## Novu runs the real chart here, not a mock
 
 An earlier version of this dev tier used a lightweight HTTP mock for Novu
-instead of the real `novu` chart (the reference stack — api/worker/ws/web +
+instead of a real chart (the reference stack — api/worker/ws/web +
 MongoDB + Redis — felt disproportionate for a mock whose only job was to
 expose the `POST /v1/events/trigger` shape the connectors call). That mock
 only validated that the connectors call the right endpoint with the right
@@ -43,13 +43,18 @@ retries, the actual notification center UI), which is a real gap given that
 everything else on this cluster runs its actual production chart. Now that
 the k3d cluster already pays the cost of running real Helm charts for every
 other brick, the same trade-off applies to Novu: `helm upgrade --install
-novu novu/novu -f novu.yaml -f dev/novu.yaml` (see `deploy.sh`), hardened
-like every other brick (single replica per component instead of 2, see
+novu oci://ghcr.io/nova-edge/charts/novu --version 0.2.1 -f novu.yaml -f
+dev/novu.yaml` (see `deploy.sh` - no official Novu chart exists at all,
+this is the closest community one, see `infra/k8s/helm-values/novu.yaml`'s
+own header for the full story), hardened like every other brick (single
+replica per component instead of 2, see
 `../infra/k8s/helm-values/dev/novu.yaml`). The connectors that call it
 (`notification-hub`, `onlyoffice-mentions`) reach it through the in-cluster
 Service DNS name like any other brick — see
-`infra/k8s/manifests/connectors/*.yaml`, and the caveat there about that
-Service's exact name not being verifiable from this sandboxed environment.
+`infra/k8s/manifests/connectors/*.yaml`; unlike most other Service-name
+assumptions in this repo, this one IS verified against this chart's real
+`_helpers.tpl`/`values.yaml` (`novu-api`:3000, `novu-web`:4200 with the
+`novu` release name used here), not guessed.
 
 ## Dev-speed hardening ("durcir en dev pour aller plus vite")
 

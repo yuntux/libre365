@@ -20,11 +20,12 @@
 # Chart used: official `oauth2-proxy/oauth2-proxy`
 #   Helm repo: https://oauth2-proxy.github.io/manifests
 #
-# [UNCERTAIN] "novu-web" assumes the chart's common <release>-<subchart>
-# naming for its web component and its default port (4200) - unverified
-# against a live template of novuhq/helm-charts from this sandboxed
-# environment, same category of assumption already flagged for
-# "novu-api" in caddy.yaml.
+# "novu-web":4200 IS verified against the real chart actually used
+# (Nova-Edge/novu-chart - see infra/k8s/helm-values/novu.yaml's own header
+# for why "novuhq/helm-charts" doesn't exist at all): its
+# `templates/_helpers.tpl` defines `novu.web.fullname` as `<release>-web`,
+# and `values.yaml` defaults `web.port` to 4200 - both confirmed, not
+# guessed, same verification already done for "novu-api" in caddy.yaml.
 
 replicaCount: 2
 

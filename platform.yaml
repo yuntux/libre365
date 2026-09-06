@@ -308,18 +308,28 @@ services:
       # synchronize).
 
   novu:
-    # study 2.1 - production notification hub (official Helm chart), also
-    # deployed as-is (with the infra/k8s/helm-values/dev/novu.yaml
-    # dev-hardening overlay) on the k3d dev cluster - see
-    # dev-cluster/README.md. No docker-compose service (Novu was never meant
-    # to run outside Kubernetes here; a hand-rolled HTTP mock used to fill
-    # that gap in docker-compose, replaced once the k3d dev cluster made a
-    # real chart deployment available - see the description of the whole
-    # dev tier for the tradeoff this closed). The official Novu chart
-    # manages the images of its sub-components (api/worker/ws/web) itself,
-    # with no single usable `image.tag` field here: not synchronized by this
-    # script — the chart version (`--version` on `helm upgrade`) remains the
-    # reference to pin separately on the day of the actual deployment.
+    # study 2.1 - production notification hub, also deployed as-is (with
+    # the infra/k8s/helm-values/dev/novu.yaml dev-hardening overlay) on the
+    # k3d dev cluster - see dev-cluster/README.md. No docker-compose service
+    # (Novu was never meant to run outside Kubernetes here; a hand-rolled
+    # HTTP mock used to fill that gap in docker-compose, replaced once the
+    # k3d dev cluster made a real chart deployment available - see the
+    # description of the whole dev tier for the tradeoff this closed).
+    #
+    # [CORRECTED] Novu has NO official Helm chart at all - found while
+    # actually running dev-cluster/deploy.sh ("novuhq/helm-charts" 404s, no
+    # such repository exists under the novuhq GitHub org). The chart
+    # actually used (see infra/k8s/helm-values/novu.yaml's own header) is
+    # Nova-Edge/novu-chart, a low-adoption community project that itself
+    # disclaims official Novu support, published as an OCI artifact -
+    # pinned by NOVU_CHART/NOVU_CHART_VERSION shell variables in
+    # dev-cluster/deploy.sh (same pattern as KEYCLOAK_VERSION there), not
+    # here: OCI references are pinned by `--version` at install time, not
+    # resolved through a repo's own index the way every other chart's
+    # `helm repo add` + implicit-latest works.
+    # This chart manages the images of its sub-components (api/worker/ws/
+    # web) itself, with no single usable `image.tag` field here either: not
+    # synchronized by this script.
     ports: { NOVU_API_PORT: 13000 }
     compose: null
     helm: null

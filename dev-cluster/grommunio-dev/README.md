@@ -82,7 +82,7 @@ cluster instead - see `../dev-cluster/README.md` for its own port mapping.
 | Orchestrator (this file) | Docker Compose, single host, only `grommunio-dev` | Kubernetes (Helm per building block), horizontal scaling and HA | 4.4 |
 | Orchestrator (everything else) | k3d local Kubernetes cluster reusing the production Helm charts/values, see `../dev-cluster/README.md` | Kubernetes (Helm per building block), horizontal scaling and HA | 4.4 |
 | Grommunio (mail/calendar) | `grommunio/gromox-core` container (image described as "not production-ready" by the vendor itself) | Dedicated Proxmox appliance VM, outside Kubernetes | 4.3 |
-| Notification center (Novu) | Real `novu/novu` chart on the k3d dev cluster, with a dev-hardening overlay (single replica per component) - see `../dev-cluster/README.md` | Full Novu stack (`novu/api` + `novu/worker` + `novu/ws` + MongoDB + Redis), see `https://docs.novu.co/self-hosting` | 2.1 |
+| Notification center (Novu) | Real community chart (`Nova-Edge/novu-chart` - no official Novu chart exists, see `../infra/k8s/helm-values/novu.yaml`) on the k3d dev cluster, with a dev-hardening overlay (single replica per component) - see `../dev-cluster/README.md` | Full Novu stack (`novu/api` + `novu/worker` + `novu/ws` + MongoDB + Redis), see `https://docs.novu.co/self-hosting` | 2.1 |
 | Secrets | In cleartext in `.env` (explicit "dev only" values) | Dedicated vault (Vault or equivalent), never in cleartext in the repository | 4.5 |
 | TLS / certificates | Absent (plain HTTP on localhost) | End-to-end TLS | 4.2, 4.4 |
 | Backup/restore | Local Docker volume, no backup strategy (disposable environment) | Application backups + Proxmox Backup Server snapshots | 4.7 |

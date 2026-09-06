@@ -215,11 +215,14 @@ data:
 
     # Novu notification center (study 2.1) — no injection (consumed by the
     # in-house connectors and Novu's own UI, not embedded in the portal bar).
-    # "novu-api" assumes the chart's common <release>-<subchart> naming for
-    # its api component (unverified against a live template of
-    # novuhq/helm-charts from the sandboxed environment this was authored
-    # in — same assumption already documented for the k3d dev cluster in
-    # dev-cluster/lib-expose.sh).
+    # "novu-api" IS verified (not guessed) against the real chart actually
+    # used - Nova-Edge/novu-chart, a community chart, since no official
+    # Novu chart exists at all (see infra/k8s/helm-values/novu.yaml's own
+    # header for the full story): its templates/_helpers.tpl defines
+    # `novu.api.fullname` as `<release>-api`, confirmed to produce exactly
+    # "novu-api" with the release name used here - same verification
+    # already documented for the k3d dev cluster in
+    # dev-cluster/lib-expose.sh.
     notifications.libre365.example.org {
         reverse_proxy novu-api.libre365.svc.cluster.local:3000
     }
@@ -227,10 +230,11 @@ data:
     # Novu's `web` ADMIN dashboard (template/workflow management) — a
     # separate surface from the API above, gated by Keycloak SSO via
     # oauth2-proxy (same pattern as the office.libre365.example.org block,
-    # see docs/oidc.md). "oauth2-proxy-novu"/"novu-web" both assume their
-    # respective chart's default naming convention, unverified from this
-    # sandboxed environment - same category of assumption as "novu-api"
-    # above.
+    # see docs/oidc.md). "novu-web" is verified the same way as "novu-api"
+    # above (`novu.web.fullname` -> `<release>-web`); "oauth2-proxy-novu" is
+    # this repo's own Helm release name (helm upgrade --install
+    # oauth2-proxy-novu ..., see dev-cluster/deploy.sh), not a chart-side
+    # naming assumption at all.
     notifications-admin.libre365.example.org {
         route /oauth2/* {
             reverse_proxy oauth2-proxy-novu.libre365.svc.cluster.local:4180
