@@ -1,0 +1,59 @@
+# Component: oauth2-proxy — Keycloak SSO gate in front of OnlyOffice
+# Document Server (study 1.7).
+#
+# OnlyOffice Document Server Community Edition has no standalone end-user
+# login screen of its own (JWT_ENABLED in onlyoffice.yaml only signs
+# individual document-open requests made by an already-trusted integrator
+# such as Seafile - it does nothing to stop an arbitrary browser from
+# hitting office.libre365.example.org directly). Since study 1.7 expects
+# every stack component to be "checked service by service" and gated by
+# Keycloak, and OnlyOffice can't do that natively, the gate is added at the
+# reverse-proxy layer instead: Caddy's `forward_auth` (infra/k8s/manifests/
+# caddy.yaml) sends every request here first; oauth2-proxy redirects an
+# unauthenticated browser to Keycloak (the "onlyoffice" client, see
+# infra/ansible/roles/keycloak_realm/defaults/main.yml) and only lets the
+# request through to Document Server once Keycloak has authenticated it.
+# This is in addition to, not instead of, the existing JWT document-level
+# signing - the two operate at different layers (can this browser reach the
+# app at all vs. is this specific document-open request valid).
+#
+# Chart used: official `oauth2-proxy/oauth2-proxy`
+#   Helm repo: https://oauth2-proxy.github.io/manifests
+#
+# [CONVENTION] `config.existingSecret` with keys `client-id`/`client-secret`/
+# `cookie-secret` is the official chart's own documented mechanism for
+# supplying these three values without putting them in values.yaml -
+# not independently re-verified against the exact chart version pinned in
+# platform.yaml from this sandboxed environment (no network access to
+# oauth2-proxy.github.io here) - cross-check against that chart's own
+# README before relying on it in a real deployment.
+
+replicaCount: 2
+
+config:
+  # client_id: "onlyoffice" — supplied via existingSecret below (key
+  # "client-id"), not as a plaintext value here, since the chart's
+  # existingSecret mechanism expects all three values (client-id,
+  # client-secret, cookie-secret) together in one Kubernetes Secret.
+  existingSecret: onlyoffice-oidc-secret
+
+extraArgs:
+  provider: keycloak-oidc
+  oidc-issuer-url: "https://sso.libre365.example.org/realms/libre365"
+  redirect-url: "https://office.libre365.example.org/oauth2/callback"
+  upstreams: "http://onlyoffice.libre365.svc.cluster.local:80"
+  email-domain: "*" # authorization stays with Keycloak realm membership, not an email allowlist
+  cookie-secure: "true"
+  reverse-proxy: "true" # trust Caddy's X-Forwarded-* headers (single hop, no public direct access to this Service)
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+service:
+  type: ClusterIP
+  port: 4180

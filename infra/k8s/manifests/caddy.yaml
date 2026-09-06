@@ -45,6 +45,18 @@ data:
         order html_inject before respond
     }
 
+    # Serves banner.css/banner.js (caddy-html-banner ConfigMap,
+    # infra/k8s/manifests/caddy-injection.yaml) at /libre365-banner/* on
+    # every site the injected banner appears on - imported into each of
+    # those site blocks below, matched before the reverse_proxy handling
+    # everything else on that same hostname.
+    (banner_assets) {
+        handle_path /libre365-banner/* {
+            root * /srv/banner-assets
+            file_server
+        }
+    }
+
     # Static onboarding portal (2.5 L.454-457) — no injection, standalone page
     onboarding.libre365.example.org {
         root * /srv/onboarding
@@ -67,45 +79,67 @@ data:
     # </body>, a DOM anchor point fragile to version upgrades (2.3 L.413) to be
     # revalidated on every update.
     chat.libre365.example.org {
-        reverse_proxy element-web.libre365.svc.cluster.local:80
-        html_inject {
-            selector "</body>"
-            file /etc/caddy/snippets/banner.html
-            position before
+        import banner_assets
+        handle {
+            reverse_proxy element-web.libre365.svc.cluster.local:80
+            html_inject {
+                selector "</body>"
+                file /etc/caddy/snippets/banner.html
+                position before
+            }
         }
     }
 
     files.libre365.example.org {
-        reverse_proxy seafile.libre365.svc.cluster.local:80
-        html_inject {
-            selector "</body>"
-            file /etc/caddy/snippets/banner.html
-            position before
+        import banner_assets
+        handle {
+            reverse_proxy seafile.libre365.svc.cluster.local:80
+            html_inject {
+                selector "</body>"
+                file /etc/caddy/snippets/banner.html
+                position before
+            }
         }
     }
 
     taches.libre365.example.org {
-        reverse_proxy vikunja.libre365.svc.cluster.local:80
-        html_inject {
-            selector "</body>"
-            file /etc/caddy/snippets/banner.html
-            position before
+        import banner_assets
+        handle {
+            reverse_proxy vikunja.libre365.svc.cluster.local:80
+            html_inject {
+                selector "</body>"
+                file /etc/caddy/snippets/banner.html
+                position before
+            }
         }
     }
 
     videos.libre365.example.org {
-        reverse_proxy peertube.libre365.svc.cluster.local:9000
-        html_inject {
-            selector "</body>"
-            file /etc/caddy/snippets/banner.html
-            position before
+        import banner_assets
+        handle {
+            reverse_proxy peertube.libre365.svc.cluster.local:9000
+            html_inject {
+                selector "</body>"
+                file /etc/caddy/snippets/banner.html
+                position before
+            }
         }
     }
 
     depot.libre365.example.org {
+        # Colors-only injection (Tasmane branding, study 1.8) - deliberately
+        # NOT the cross-app menu/search/notifications banner (banner.html):
+        # Gokapi is reachable by unauthenticated external third parties
+        # following a download link, who must never see the internal
+        # portal bar. See caddy-injection.yaml's gokapi-branding.html for
+        # why this replaced an earlier attempt at a Gokapi-side custom.css
+        # file (Gokapi has no such mechanism in the pinned v1.9.6).
         reverse_proxy gokapi.libre365.svc.cluster.local:80
-        # No injection on Gokapi: potential use by unauthenticated external third
-        # parties (download links), internal top bar not relevant here.
+        html_inject {
+            selector "</body>"
+            file /etc/caddy/snippets/gokapi-branding.html
+            position before
+        }
     }
 
     # Visio, Element Call, OnlyOffice, Keycloak, MinIO console: direct reverse proxy,
@@ -119,8 +153,27 @@ data:
         reverse_proxy element-call.libre365.svc.cluster.local:80
     }
 
+    # study 1.7/docs/oidc.md — OnlyOffice Document Server has no login
+    # screen of its own (its JWT only signs individual document-open
+    # requests from Seafile), so a Keycloak SSO gate is added here instead:
+    # /oauth2/* is routed to oauth2-proxy itself (login start + callback),
+    # everything else goes through forward_auth first (redirects an
+    # unauthenticated browser to Keycloak) before ever reaching Document
+    # Server. "oauth2-proxy-onlyoffice" assumes that Helm release name for
+    # infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml (unverified against
+    # an actual `helm install` from this sandboxed environment, same
+    # category of assumption already documented for "novu-api" below).
     office.libre365.example.org {
-        reverse_proxy onlyoffice.libre365.svc.cluster.local:80
+        route /oauth2/* {
+            reverse_proxy oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180
+        }
+        route {
+            forward_auth oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180 {
+                uri /oauth2/auth
+                copy_headers X-Auth-Request-User X-Auth-Request-Email
+            }
+            reverse_proxy onlyoffice.libre365.svc.cluster.local:80
+        }
     }
 
     sso.libre365.example.org {
@@ -167,6 +220,26 @@ data:
     # dev-cluster/lib-expose.sh).
     notifications.libre365.example.org {
         reverse_proxy novu-api.libre365.svc.cluster.local:3000
+    }
+
+    # Novu's `web` ADMIN dashboard (template/workflow management) — a
+    # separate surface from the API above, gated by Keycloak SSO via
+    # oauth2-proxy (same pattern as the office.libre365.example.org block,
+    # see docs/oidc.md). "oauth2-proxy-novu"/"novu-web" both assume their
+    # respective chart's default naming convention, unverified from this
+    # sandboxed environment - same category of assumption as "novu-api"
+    # above.
+    notifications-admin.libre365.example.org {
+        route /oauth2/* {
+            reverse_proxy oauth2-proxy-novu.libre365.svc.cluster.local:4180
+        }
+        route {
+            forward_auth oauth2-proxy-novu.libre365.svc.cluster.local:4180 {
+                uri /oauth2/auth
+                copy_headers X-Auth-Request-User X-Auth-Request-Email
+            }
+            reverse_proxy novu-web.libre365.svc.cluster.local:4200
+        }
     }
 ---
 apiVersion: v1
@@ -266,8 +339,15 @@ spec:
             - name: banner-snippet
               mountPath: /etc/caddy/snippets/banner.html
               subPath: banner.html
+            - name: gokapi-branding-snippet
+              mountPath: /etc/caddy/snippets/gokapi-branding.html
+              subPath: gokapi-branding.html
             - name: autoconfig
               mountPath: /srv/autoconfig/mail
+            - name: banner-assets
+              mountPath: /srv/banner-assets
+            - name: onboarding
+              mountPath: /srv/onboarding
       volumes:
         - name: caddyfile
           configMap:
@@ -275,9 +355,34 @@ spec:
         - name: banner-snippet
           configMap:
             name: caddy-html-banner
+        - name: gokapi-branding-snippet
+          configMap:
+            name: caddy-html-banner
+            items:
+              - key: gokapi-branding.html
+                path: gokapi-branding.html
         - name: autoconfig
           configMap:
             name: caddy-autoconfig
+        - name: banner-assets
+          # Same ConfigMap as banner-snippet above, restricted to the two
+          # keys served as static files (banner.html stays mounted
+          # separately, as a single file consumed by html_inject, not
+          # file_server).
+          configMap:
+            name: caddy-html-banner
+            items:
+              - key: banner.css
+                path: banner.css
+              - key: banner.js
+                path: banner.js
+        - name: onboarding
+          # Study 2.5 - generated by scripts/sync_platform.py, see
+          # infra/k8s/manifests/onboarding.yaml (the onboarding.<domain>
+          # Caddyfile site block at the top of this file already points
+          # `root` at this same path).
+          configMap:
+            name: onboarding-page
 ---
 apiVersion: v1
 kind: Service
@@ -298,7 +403,7 @@ metadata:
     # Single line, no spaces after the commas: external-dns splits this
     # value on "," without necessarily trimming whitespace, so a folded
     # multi-line scalar here would risk a leading-space-prefixed hostname.
-    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,autoconfig.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org"
+    external-dns.alpha.kubernetes.io/hostname: "onboarding.libre365.example.org,autoconfig.libre365.example.org,chat.libre365.example.org,files.libre365.example.org,taches.libre365.example.org,videos.libre365.example.org,depot.libre365.example.org,visio.libre365.example.org,call.libre365.example.org,office.libre365.example.org,sso.libre365.example.org,matrix.libre365.example.org,s3.libre365.example.org,minio-console.libre365.example.org,notifications.libre365.example.org,notifications-admin.libre365.example.org"
 spec:
   selector:
     app.kubernetes.io/name: caddy

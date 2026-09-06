@@ -21,6 +21,13 @@ _platform: "{{ lookup('file', playbook_dir + '/../../../platform.yaml') | from_y
 
 libre365_domain: "{{ _platform.domains.base }}"
 
+# Study: default/available UI languages (fr default, en available) - see
+# platform.yaml's own `locale` section and docs/i18n.md for which
+# components actually consume this today (currently just Keycloak's realm
+# internationalization, in roles/keycloak_realm/).
+libre365_locale_default: "{{ _platform.locale.default }}"
+libre365_locale_available: "{{ _platform.locale.available }}"
+
 keycloak_base_url: "https://{{ _platform.domains.subdomains.sso }}.{{ libre365_domain }}"
 keycloak_admin_realm: "master"
 keycloak_target_realm: "libre365"
@@ -29,10 +36,13 @@ keycloak_admin_user: "{{ vault_keycloak_admin_user | default('admin') }}"
 keycloak_admin_password: "{{ vault_keycloak_admin_password | default(omit) }}"
 
 grommunio_domain: "{{ _platform.domains.subdomains.mail }}.{{ libre365_domain }}"
+grommunio_autodiscover_domain: "{{ _platform.domains.subdomains.autodiscover }}.{{ libre365_domain }}"
 matrix_domain: "{{ _platform.domains.subdomains.matrix }}.{{ libre365_domain }}"
 seafile_domain: "{{ _platform.domains.subdomains.files }}.{{ libre365_domain }}"
 onlyoffice_domain: "{{ _platform.domains.subdomains.office }}.{{ libre365_domain }}"
 vikunja_domain: "{{ _platform.domains.subdomains.taches }}.{{ libre365_domain }}"
 gokapi_domain: "{{ _platform.domains.subdomains.depot }}.{{ libre365_domain }}"
 novu_domain: "{{ _platform.domains.subdomains.notifications }}.{{ libre365_domain }}"
+notifications_admin_domain: "{{ _platform.domains.subdomains.notifications_admin }}.{{ libre365_domain }}"
 peertube_domain: "{{ _platform.domains.subdomains.videos }}.{{ libre365_domain }}"
+visio_domain: "{{ _platform.domains.subdomains.visio }}.{{ libre365_domain }}"

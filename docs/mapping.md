@@ -6,20 +6,21 @@ block/connector.
 
 | Building block / topic | Study section | Location in the repository |
 |---|---|---|
-| Grommunio (mail/calendar) | 1.1 | `infra/terraform/grommunio.tf`, `infra/ansible/playbooks/grommunio.yml` |
-| Matrix / Synapse / Element | 1.2 | `infra/k8s/helm-values/synapse.yaml`, `infra/ansible/playbooks/matrix.yml` |
+| Grommunio (mail/calendar) | 1.1 | `infra/terraform/grommunio.tf`, `infra/ansible/playbooks/grommunio.yml`; TLS (issuance + renewal): `infra/ansible/playbooks/grommunio-cert.yml` |
+| Matrix / Synapse / Element | 1.2 | `infra/k8s/helm-values/synapse.yaml` (OIDC entirely chart-native — see `docs/oidc.md`) |
 | Video conferencing (DINUM/LiveKit) + Element Call | 1.3 | `infra/k8s/helm-values/visio.yaml`, `infra/k8s/helm-values/element-call.yaml` |
 | Seafile | 1.4 | `infra/k8s/helm-values/seafile.yaml` |
-| OnlyOffice Document Server | 1.5 | `infra/k8s/helm-values/onlyoffice.yaml` |
+| OnlyOffice Document Server | 1.5 | `infra/k8s/helm-values/onlyoffice.yaml`; SSO gate: `infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml` (see `docs/oidc.md`) |
 | Vikunja | 1.6 | `infra/k8s/helm-values/vikunja.yaml` |
 | Keycloak (SSO/MFA) | 1.7 | `infra/k8s/helm-values/keycloak.yaml`, `infra/ansible/playbooks/keycloak-realm.yml`, `connectors/keycloak-otp-spi/` |
-| Gokapi | 1.8 | `infra/k8s/helm-values/gokapi.yaml` |
+| UI language (fr default, en available) | not a numbered study requirement — added on request | `platform.yaml`'s `locale` section (single source), `infra/ansible/roles/keycloak_realm/` (only component actually wired so far — see `docs/i18n.md` for the full per-component breakdown, most still open) |
+| Gokapi | 1.8 | `infra/k8s/manifests/gokapi.yaml` (no official Helm chart, see that file's header; `v2.2.4`, OIDC/encryption configured non-interactively by the `gokapi-setup-bootstrap` initContainer — see `docs/oidc.md`; Tasmane branding via Caddy `html_inject` — `infra/k8s/manifests/caddy-injection.yaml`'s `gokapi-branding.html`, not a Gokapi-side file, see that file's comment for why) |
 | Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code); autoconfig/Autodiscover: `platform.yaml` (`autoconfig`/`autodiscover` subdomains), `infra/k8s/manifests/caddy.yaml` (`caddy-autoconfig` ConfigMap, Caddy-fronted) |
-| Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/` |
+| Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/`; admin dashboard SSO gate: `infra/k8s/helm-values/oauth2-proxy-novu.yaml` (see `docs/oidc.md`) |
 | Unified search | 2.2 | `connectors/unified-search/` |
-| Portal / Caddy HTML injection | 2.3 | `infra/k8s/manifests/caddy.yaml` (sole public entry point, no Ingress Controller/cert-manager needed - see `infra/k8s/helm-values/README.md`), `infra/k8s/manifests/caddy-injection.yaml` |
+| Portal / Caddy HTML injection | 2.3 | `infra/k8s/manifests/caddy.yaml` (sole public entry point, no Ingress Controller/cert-manager needed - see `infra/k8s/helm-values/README.md`), `infra/k8s/manifests/caddy-injection.yaml` (Tasmane graphic-charter branding via `banner.css`) |
 | Chat/video continuity (Matrix ↔ video conferencing widget) | 2.4 | `connectors/matrix-visio-widget/` |
-| Native application onboarding | 2.5 | `docs/onboarding/` |
+| Native application onboarding | 2.5 | `docs/onboarding/README.md` (design + rationale); generated content: `infra/k8s/manifests/onboarding.yaml` (`scripts/sync_platform.py`'s `compute_onboarding_changes()`) |
 | Disabling OnlyOffice chat | 2.6 | `infra/k8s/helm-values/onlyoffice.yaml` (`document.permissions.chat`) |
 | OnlyOffice mentions → notifications | 2.7 | `connectors/onlyoffice-mentions/` |
 | Unified presence | 2.8 | `connectors/presence-aggregator/` |

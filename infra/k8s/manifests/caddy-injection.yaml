@@ -42,3 +42,162 @@ data:
     </div>
     <script src="/libre365-banner/banner.js" defer></script>
     <link rel="stylesheet" href="/libre365-banner/banner.css">
+  # banner.css/banner.js were referenced by the snippet above from the very
+  # first version of this file but never actually existed anywhere in this
+  # repository (a 404 on every single page load) - added here, served by
+  # Caddy at /libre365-banner/* (see infra/k8s/manifests/caddy.yaml's
+  # `banner_assets` snippet), NOT injected inline, so a browser can cache
+  # them across every application the banner appears on.
+  banner.css: |
+    /* Tasmane graphic-charter tokens, from the firm's own Brand Guidelines
+       (color guide, page 4-7): primary/secondary/accent/surface/text roles
+       as the guide itself defines them, plus one extra token
+       (--libre365-brand-on-primary) this repo needs that the guide doesn't
+       name explicitly: the guide's own "text" color (Midnight Edition,
+       #0C141A) is designed for body copy on a LIGHT surface, not for
+       reading on top of the dark navy primary color the banner uses as its
+       background - white (also in the guide's palette, page 7) is what the
+       guide's own logo mark itself uses on that same navy circle (page 12),
+       so it's used here for the same purpose: text/icons ON the primary
+       color, not body text in general. Every other themed surface in this
+       repo (the `gokapi-branding.html` key below) reads from the same
+       tokens - update both together if the palette ever changes. */
+    :root {
+      --libre365-brand-primary: #2B3B58;   /* Madison - "appears in logo, used on primary CTA, used on headings" */
+      --libre365-brand-secondary: #F55364; /* Ripe Malinka */
+      --libre365-brand-accent: #FF6900;    /* Burtuqali Orange */
+      --libre365-brand-surface: #EEEEEE;   /* Off White */
+      --libre365-brand-text: #0C141A;      /* Midnight Edition - body text on a light surface */
+      --libre365-brand-on-primary: #FFFFFF; /* text/icons on top of --libre365-brand-primary (not a named role in the guide, see comment above) */
+    }
+
+    #libre365-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      /* Above every hosted application's own content, each application
+         otherwise staying in native full-screen navigation (2.3 L.417). */
+      z-index: 2147483000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      padding: 0 16px;
+      box-sizing: border-box;
+      background: var(--libre365-brand-primary);
+      color: var(--libre365-brand-on-primary);
+      font-family: "Aileron", system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+    }
+
+    #libre365-banner-menu {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #libre365-banner-menu a {
+      /* On the dark navy --libre365-brand-primary background, not
+         --libre365-brand-text (Midnight Edition is meant for light
+         surfaces - using it here would render near-invisible dark-on-dark
+         text). */
+      color: var(--libre365-brand-on-primary);
+      text-decoration: none;
+    }
+
+    #libre365-banner-menu a:hover {
+      color: var(--libre365-brand-secondary);
+    }
+
+    #libre365-banner-search,
+    #libre365-banner-notifications,
+    #libre365-banner-presence {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Pushes every application's own content below the fixed banner
+       instead of letting it render underneath. Scoped to the banner's own
+       host element rather than a global `body` rule, so this stylesheet
+       cannot fight each application's own layout beyond that one offset. */
+    body {
+      margin-top: 48px !important;
+    }
+  gokapi-branding.html: |
+    <!-- Tasmane branding for Gokapi (study 1.8) - colors ONLY, injected the
+         same way as banner.html above but on the depot.<domain> site block
+         alone, deliberately WITHOUT the cross-app menu/search/notifications
+         banner: Gokapi is reachable by unauthenticated external third
+         parties following a download link, who must never see the internal
+         portal bar (see caddy.yaml's depot.<domain> comment).
+
+         An earlier version of this branding tried to drop a `custom.css`
+         file into Gokapi's own /app/custom/ folder (infra/k8s/manifests/
+         gokapi.yaml's now-removed `gokapi-custom` ConfigMap) - checked
+         against the ACTUAL v1.9.6 source (Forceu/Gokapi, internal/
+         webserver/Webserver.go) during a later review: Gokapi has NO such
+         mechanism in this version at all. `helper.FolderExists("static")`
+         is the only hook - if present, it replaces Gokapi's ENTIRE static
+         file server wholesale (no per-file embedded fallback), and would
+         404 every Bootstrap/jQuery/icon asset it doesn't also fully
+         replicate; the docs' actual customization path is copying the
+         WHOLE `static`/`templates` folder out of the release tag and
+         maintaining it in lockstep with every Gokapi upgrade - a
+         maintenance burden and version-drift risk out of proportion to
+         "recolor the header". Injecting a `<style>` block via Caddy
+         instead needs no cooperation from Gokapi's own file layout at all
+         and cannot break its static assets.
+
+         Selectors below are verified against the ACTUAL rendered markup of
+         the exact `v1.9.6` tag pinned in platform.yaml (internal/webserver/
+         web/templates/html_header.tmpl, internal/webserver/web/static/css/
+         cover.css) - not guessed from Bootstrap's generic component names:
+         Gokapi's admin header uses Bootstrap's "cover" example structure
+         (`<header class="masthead">` + `<nav class="nav-masthead">`), NOT
+         the `.navbar` component (an earlier version's selector never
+         matched anything real) - and its `<body>` already carries
+         Bootstrap's own `bg-dark text-white` utility classes (`!important`
+         in Bootstrap 5), which is why the overrides below also need
+         `!important` and lean into a dark theme (the brand's navy primary
+         as the dark background) rather than fight it with a light one. -->
+    <style>
+      :root {
+        --libre365-brand-primary: #2B3B58;   /* Madison */
+        --libre365-brand-secondary: #F55364; /* Ripe Malinka */
+        --libre365-brand-accent: #FF6900;    /* Burtuqali Orange */
+        --libre365-brand-on-primary: #FFFFFF;
+      }
+      body {
+        background-color: var(--libre365-brand-primary) !important;
+      }
+      .nav-masthead .nav-link:hover,
+      .nav-masthead .nav-link:focus,
+      .nav-masthead .active {
+        border-bottom-color: var(--libre365-brand-accent);
+      }
+      .btn-primary {
+        /* Accent, not primary: the body background above is now the brand
+           primary color too - a primary-on-primary button would have no
+           contrast against it. */
+        background-color: var(--libre365-brand-accent) !important;
+        border-color: var(--libre365-brand-accent) !important;
+      }
+      .btn-primary:hover {
+        background-color: var(--libre365-brand-secondary) !important;
+        border-color: var(--libre365-brand-secondary) !important;
+      }
+    </style>
+  banner.js: |
+    // libre365 cross-cutting application banner (study 2.3) - client-side
+    // wiring is deliberately NOT implemented here: this file exists only
+    // so /libre365-banner/banner.js (referenced by banner.html above)
+    // stops 404ing on every page load. Populating #libre365-banner-menu,
+    // -search, -notifications and -presence (2.1/2.2/2.8) is separate,
+    // substantial feature work - see connectors/notification-hub/,
+    // connectors/unified-search/ and connectors/presence-aggregator/ for
+    // the backend APIs this would call.
+    (function () {
+      "use strict";
+    })();

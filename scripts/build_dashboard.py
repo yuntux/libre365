@@ -30,8 +30,6 @@ Usage:
         # sections; falls back to "data unavailable" per section otherwise.
 """
 
-from __future__ import annotations
-
 import argparse
 import html
 import json

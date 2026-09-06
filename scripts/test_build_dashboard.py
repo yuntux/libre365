@@ -10,8 +10,6 @@ test_security_feeds.py).
 Run with: pytest scripts/test_build_dashboard.py
 """
 
-from __future__ import annotations
-
 from build_dashboard import ComponentVersion, DashboardData, _normalize_version, render_html
 
 

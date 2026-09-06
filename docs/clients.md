@@ -87,6 +87,29 @@ hostnames (no OVH Terraform DNS resource exists for `mail` either, see that
 file's comment on line 58; `autodiscover` simply inherits the same
 pre-existing gap rather than introducing a new one).
 
+### TLS certificate (both hostnames above)
+
+Since Grommunio is not Caddy-fronted, it doesn't get Caddy's own Automatic
+HTTPS either — it needs its own certificate for `mail.<domain>` and
+`autodiscover.<domain>`. Grommunio's own setup wizard (`grommunio-setup`)
+offers built-in Let's Encrypt issuance backed by certbot (not `acme.sh` —
+verified against grommunio's own documentation), but its underlying command
+is plain non-interactive certbot, not something that requires the wizard —
+so `infra/ansible/playbooks/grommunio-cert.yml` (see
+`infra/ansible/roles/grommunio_cert/README.md`) automates **both** the
+initial multi-domain issuance and the ongoing renewal (`certbot.timer`), no
+manual step:
+
+```
+certbot certonly -n --standalone --agree-tos --register-unsafely-without-email \
+  --preferred-challenges http \
+  --cert-name="mail.libre365.example.org" \
+  -d "mail.libre365.example.org" -d "autodiscover.libre365.example.org" \
+  --pre-hook "systemctl stop gromox-http.service" \
+  --post-hook "systemctl start gromox-http.service" \
+  --deploy-hook /usr/share/grommunio-setup/grommunio-certbot-renew-hook
+```
+
 ### Apple Mail / Calendar / Contacts
 
 Per the study, Apple Mail/Calendar/Contacts connects the same way (EWS for

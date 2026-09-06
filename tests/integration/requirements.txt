@@ -7,4 +7,6 @@ pytest-html>=4.1,<5             # pass/fail results report per scenario (study 4
 requests>=2.31,<3
 responses>=0.25,<1              # HTTP mocking for black-box connector tests (test_connectors.py)
 PyJWT>=2.8,<3                   # generates the OnlyOffice Document Server config JWT
-python-keycloak>=3.9,<4         # OIDC client for the "password" grant (keycloak_token fixture)
+beautifulsoup4>=4.12,<5          # parses Keycloak's login form for test_sso_e2e.py's real
+                                 # browser-redirect login flow (no JS needed: Keycloak's
+                                 # default theme is a plain HTML form POST)

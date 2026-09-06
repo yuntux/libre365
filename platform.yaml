@@ -33,6 +33,27 @@
 # See docs/mapping.md for the link to the study office365-exit-study.md.
 
 # -----------------------------------------------------------------------------
+# UI language, single source of truth for every component that supports a
+# server-side default and/or a supported-locale list (Keycloak's realm
+# internationalization, currently the only one actually wired to this -
+# see infra/ansible/roles/keycloak_realm/). `default` is what a user sees
+# with no browser-language preference or before auto-detection kicks in;
+# `available` is the full list a user can switch to.
+#
+# NOT a claim that every component in this stack actually reads these
+# values yet: several (Element Web, Vikunja - both confirmed via their own
+# docs/config schemas) already auto-detect the browser's language on their
+# own with no server-side setting needed, and several others could not be
+# verified against a real config mechanism from this sandboxed environment
+# (no live instance, and vendor docs were not conclusive) - see
+# docs/i18n.md for the full per-component breakdown and what's actually
+# wired versus still open.
+# -----------------------------------------------------------------------------
+locale:
+  default: "fr"
+  available: ["fr", "en"]
+
+# -----------------------------------------------------------------------------
 # Generic images reused by several services in docker-compose (avoids
 # repeating/letting the same Postgres/Redis/MariaDB tag drift apart in
 # 3-5 different places in the file).
@@ -160,7 +181,14 @@ services:
       tag_path: .image.tag
 
   gokapi:
-    version: "v1.9.6" # study 1.8
+    # v2.2.4 (latest stable) - bumped from v1.9.6 after a review pass found
+    # the older version had no native theming mechanism and, more
+    # importantly, no way to configure OIDC non-interactively (v2.0.0
+    # replaced GOKAPI_OAUTH_* env vars with a one-time setup wizard) -
+    # automated instead via infra/k8s/manifests/gokapi.yaml's
+    # gokapi-setup-bootstrap initContainer, verified against a locally
+    # built v2.2.4 binary. See that file's header and docs/oidc.md.
+    version: "v2.2.4" # study 1.8
     ports: { GOKAPI_PORT: 53842 }
     compose:
       image: f0rc3/gokapi
@@ -335,4 +363,11 @@ domains:
     s3: s3 # MinIO API (study 2.12)
     minio_console: minio-console # MinIO console (study 2.12)
     notifications: notifications # Novu (study 2.1)
+    notifications_admin: notifications-admin # Novu admin dashboard (study 1.7/2.1)
+      # - Novu's own `web` UI (template/workflow management), gated by
+      # Keycloak SSO via the oauth2-proxy forward_auth gate in front of it
+      # (infra/k8s/helm-values/oauth2-proxy-novu.yaml) - separate from
+      # `notifications` above, which is the API consumed by the top-bar
+      # widget's own HMAC subscriberHash auth and must stay reachable
+      # without an interactive Keycloak login. See docs/oidc.md.
     registry: registry # Internal image registry (custom Caddy image, study 2.3)

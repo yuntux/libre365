@@ -37,14 +37,24 @@ synapse:
       enabled: true
       replicaCount: 1
 
-  # 1.7 — Federated SSO toward Keycloak, the component chosen for the whole stack.
+  # 1.7 — Federated SSO toward Keycloak, the component chosen for the whole
+  # stack. This chart-native block is the ONLY OIDC config for Synapse -
+  # infra/ansible/playbooks/matrix.yml used to render a second, disconnected
+  # OIDC config into a ConfigMap this chart never actually reads (found
+  # during review: that ConfigMap wasn't referenced by any `extraConfig`/
+  # volume anywhere), with a different, wrong client_id ("synapse" instead
+  # of the real Keycloak client "matrix-synapse" below) - removed rather
+  # than fixed twice. client-secret comes from synapse-oidc-secret
+  # (infra/k8s/manifests/external-secrets.yaml, sourced from OpenBao), the
+  # same ExternalSecret/OpenBao pattern every other OIDC client in this
+  # stack uses - never hand this value in plaintext.
   oidc:
     enabled: true
     providers:
       - idp_id: keycloak
         idp_name: "Libre365 SSO"
         issuer: "https://sso.libre365.example.org/realms/libre365"
-        client_id: "synapse"
+        client_id: "matrix-synapse"
         client_secret:
           secretName: synapse-oidc-secret
           secretKey: client-secret

@@ -40,12 +40,27 @@ config:
     publish:
       privacy: 3 # 1=public, 2=unlisted, 3=private (internal depending on instance config), 4=password-protected — to be confirmed against the exact PeerTube version
 
-  # 1.7 — Keycloak SSO (official PeerTube OpenID Connect plugin)
+  # 1.7 — Keycloak SSO (official PeerTube OpenID Connect plugin). Client
+  # secret from peertube-oidc-secret (external-secrets.yaml, OpenBao-
+  # sourced) - client_id was set with no client_secret at all found during
+  # a review pass. [UNCERTAIN]: this community chart's exact field shape
+  # for injecting a Kubernetes Secret into a plugin setting isn't
+  # independently confirmed (PeerTube plugin settings are normally
+  # persisted via its own admin API/database rather than a static config
+  # file - the whole `plugins:` block here was already flagged
+  # unconfirmed against the actual chart, see this file's header) -
+  # mirrors the existingSecret/existingSecretKey pattern this same file
+  # already uses for postgresql/redis as the most consistent guess given
+  # that pre-existing uncertainty; verify against the real chart at
+  # deployment time.
   plugins:
     openid_connect:
       enabled: true
       discover_url: "https://sso.libre365.example.org/realms/libre365/.well-known/openid-configuration"
       client_id: "peertube"
+      client_secret:
+        existingSecret: peertube-oidc-secret
+        existingSecretKey: client-secret
 
   signup:
     enabled: false # accounts provisioned via Keycloak SSO only

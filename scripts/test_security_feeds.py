@@ -9,8 +9,6 @@ every run.
 Run with: pytest scripts/test_security_feeds.py
 """
 
-from __future__ import annotations
-
 from datetime import datetime, timedelta, timezone
 
 from security_feeds import FeedEntry, collect_entries, parse_feed
