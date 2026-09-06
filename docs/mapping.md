@@ -14,7 +14,7 @@ block/connector.
 | Vikunja | 1.6 | `infra/k8s/helm-values/vikunja.yaml` |
 | Keycloak (SSO/MFA) | 1.7 | `infra/k8s/helm-values/keycloak.yaml`, `infra/ansible/playbooks/keycloak-realm.yml`, `connectors/keycloak-otp-spi/` |
 | Gokapi | 1.8 | `infra/k8s/helm-values/gokapi.yaml` |
-| Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code) |
+| Thunderbird / Apple Mail (client) | 1.9 | `docs/clients.md` (reference configuration, no server-side code); autoconfig/Autodiscover: `platform.yaml` (`autoconfig`/`autodiscover` subdomains), `infra/k8s/manifests/caddy.yaml` (`caddy-autoconfig` ConfigMap, Caddy-fronted) |
 | Unified notification center (Novu) | 2.1 | `infra/k8s/helm-values/novu.yaml`, `connectors/notification-hub/` |
 | Unified search | 2.2 | `connectors/unified-search/` |
 | Portal / Caddy HTML injection | 2.3 | `infra/k8s/manifests/caddy.yaml` (sole public entry point, no Ingress Controller/cert-manager needed - see `infra/k8s/helm-values/README.md`), `infra/k8s/manifests/caddy-injection.yaml` |
