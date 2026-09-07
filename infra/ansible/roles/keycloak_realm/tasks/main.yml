@@ -204,6 +204,18 @@
   when: not (item.public_client | default(false))
   register: keycloak_client_secrets
 
+# [ADDED] found live on a user's VM: `ansible.builtin.template` below
+# doesn't create missing parent directories itself - nothing in this role
+# ever created `keycloak_client_secrets_output_dir` beforehand, so the
+# very first run always failed here ("No such file or directory").
+- name: "Ensure the client secrets output directory exists (outside the versioned repository)"
+  ansible.builtin.file:
+    path: "{{ keycloak_client_secrets_output_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  run_once: true
+
 - name: "Write the client secrets on the controller (directory outside the versioned repository)"
   ansible.builtin.template:
     src: client-secret.env.j2
