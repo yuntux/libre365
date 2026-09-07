@@ -10,6 +10,12 @@
   hosts: control_apis
   connection: local
   gather_facts: false
+  # [ADDED] same fix as playbooks/keycloak-realm.yml's own comment: this
+  # role only shells out to `kubectl`/the OpenBao API as the invoking
+  # user - no local privileged action - ansible.cfg's global
+  # `become = True` (meant for the real remote-host playbooks) made it
+  # try to `sudo` locally for nothing.
+  become: false
   vars_files:
     - ../group_vars/all.yml
   roles:
