@@ -44,7 +44,14 @@
 # `proxy.headers: xforwarded` tell Keycloak to trust Caddy's forwarded
 # headers over plain HTTP internally, the Operator equivalent of the
 # Bitnami chart's `proxy: edge`.
-apiVersion: k8s.keycloak.org/v2alpha1
+#
+# [CORRECTED] `apiVersion` was `k8s.keycloak.org/v2alpha1` - found by
+# actually running dev-cluster/deploy.sh ("Warning: Please migrate to
+# v2beta1"), then confirming against the real, pinned CRD manifest
+# (keycloaks.k8s.keycloak.org-v1.yml at $KEYCLOAK_VERSION, see this
+# file's own header) that v2beta1 is the only version it actually serves
+# at all - v2alpha1 isn't in that CRD's spec.versions list anymore.
+apiVersion: k8s.keycloak.org/v2beta1
 kind: Keycloak
 metadata:
   name: keycloak
