@@ -1,0 +1,114 @@
+# Dev-only static PV/PVC pair for OnlyOffice's `ds-files`/`ds-runtime-config`
+# volumes, applied by dev-cluster/deploy.sh right before installing the
+# `onlyoffice` Helm release. Never applied in production (see
+# ../onlyoffice.yaml's header - production's own storage handling isn't a
+# k3d/dev-cluster concern this file touches).
+#
+# [CORRECTED] found by actually running dev-cluster/deploy.sh: OnlyOffice's
+# real chart (github.com/ONLYOFFICE/Kubernetes-Docs) hardcodes
+# `accessModes: [ReadWriteMany]` on both PVCs it creates for itself
+# (templates/pvc/ds-files.yaml and the equivalent ds-runtime-config one) -
+# not overridable via values.yaml - because `docservice` AND `converter`
+# (two independent Deployments) both mount the SAME volumes. The chart's
+# own default (`persistence.storageClass: "nfs"`) assumes a real
+# NFS-backed StorageClass, which a production cluster would provide but
+# k3d's own default `local-path` StorageClass explicitly refuses to
+# provision for ("failed to provision volume with StorageClass
+# 'local-path': NodePath only supports ReadWriteOnce and
+# ReadWriteOncePod (1.22+) access modes"), leaving both PVCs stuck
+# Pending forever and `docservice`/`converter` stuck Pending behind them.
+#
+# Standard k3d/single-node workaround, not a real multi-node RWX backend:
+# statically (not dynamically) provision hostPath-backed PVs that simply
+# DECLARE ReadWriteMany - access modes on a manually authored PV are
+# advisory (enforced by nothing but the scheduler's own bookkeeping); only
+# the dynamic `local-path` PROVISIONER itself refuses to hand out RWX
+# claims, and a static PV never goes through that provisioner at all. Paired
+# with `nodeAffinity` pinned to one specific node here, and with BOTH
+# `docservice`/`converter` Pods pinned to that SAME node via `nodeSelector`
+# in ../../helm-values/dev/onlyoffice.yaml (hostPath is node-local - every
+# Pod mounting it must physically land on the node whose disk it is).
+# `kubernetes.io/hostname` needs no manual `kubectl label` step (built into
+# every node already); the hostname value itself is deterministic from
+# dev-cluster/deploy.sh's own $CLUSTER_NAME ("libre365-dev" ->
+# "k3d-libre365-dev-agent-0"), confirmed live against this exact cluster's
+# own `kubectl describe pvc` output (`volume.kubernetes.io/selected-node:
+# k3d-libre365-dev-agent-0`).
+#
+# Referenced via `persistence.existingClaim` /
+# `persistence.runtimeConfig.existingClaim` in
+# ../../helm-values/dev/onlyoffice.yaml, the chart's own documented escape
+# hatch for supplying a pre-existing PVC instead of letting it create one.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: onlyoffice-ds-files-dev
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: ""
+  hostPath:
+    path: /var/lib/onlyoffice-dev/ds-files
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k3d-libre365-dev-agent-0
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: onlyoffice-ds-files-dev
+  namespace: libre365
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: onlyoffice-ds-files-dev
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: onlyoffice-ds-runtime-config-dev
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: ""
+  hostPath:
+    path: /var/lib/onlyoffice-dev/ds-runtime-config
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k3d-libre365-dev-agent-0
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: onlyoffice-ds-runtime-config-dev
+  namespace: libre365
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: onlyoffice-ds-runtime-config-dev
+  resources:
+    requests:
+      storage: 1Gi

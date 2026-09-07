@@ -37,3 +37,20 @@ converter:
     limits:
       cpu: "500m"
       memory: "1Gi"
+
+# [CORRECTED] found by actually running dev-cluster/deploy.sh: the chart's
+# own `ds-files`/`ds-runtime-config` PVCs hardcode `accessModes:
+# [ReadWriteMany]` (shared between `docservice` and `converter`), which
+# k3d's `local-path` StorageClass cannot provision at all - see
+# ../../manifests/dev/onlyoffice-storage.yaml's header for the full
+# story and the statically pre-provisioned PVCs this points at instead
+# (applied by dev-cluster/deploy.sh right before this release). Both
+# volumes are hostPath-backed on a single pinned node, so both
+# Deployments must land on that exact same node too.
+persistence:
+  existingClaim: onlyoffice-ds-files-dev
+  runtimeConfig:
+    existingClaim: onlyoffice-ds-runtime-config-dev
+
+nodeSelector:
+  kubernetes.io/hostname: k3d-libre365-dev-agent-0
