@@ -287,6 +287,23 @@ kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=openbao -n 
 # this well-known kubectl gotcha (each attempt is a fresh process, and the
 # cache TTL/staleness resolves itself within a few tries) - simpler and
 # more portable than reaching into kubectl's cache directory by hand.
+# [CORRECTED] a second, distinct race hits the exact same `apply` calls -
+# found by actually running this script: `kubectl apply -f
+# .../external-secrets-store.yaml` (a ClusterSecretStore, validated by
+# external-secrets' own ValidatingWebhookConfiguration) failed with "failed
+# calling webhook ... no endpoints available for service
+# external-secrets-webhook" on a fresh install, because the webhook pod
+# isn't Ready (and its Service has no registered Endpoints) yet in the
+# handful of seconds right after `helm upgrade --install external-secrets`
+# returns - unrelated to the discovery-cache race above (different error
+# text entirely), so the original grep only matching "ensure CRDs are
+# installed first" let this one fall straight through and abort the
+# script. Waiting for the webhook Deployment itself is the direct fix for
+# the common case; the retry loop's error-matching is also widened as a
+# safety net for the brief extra lag between the Deployment going Ready
+# and its Service actually gaining Endpoints (kube-proxy/endpoint
+# controller propagation, not instantaneous either).
+kubectl wait --for=condition=Available deployment/external-secrets-webhook -n "$NAMESPACE" --timeout=120s
 apply_with_crd_retry() {
   local file="$1" attempt
   for attempt in $(seq 1 10); do
@@ -294,11 +311,11 @@ apply_with_crd_retry() {
       cat /tmp/kubectl-apply-err >&2
       return 0
     fi
-    if ! grep -q "ensure CRDs are installed first" /tmp/kubectl-apply-err; then
+    if ! grep -qE "ensure CRDs are installed first|no endpoints available for service" /tmp/kubectl-apply-err; then
       cat /tmp/kubectl-apply-err >&2
       return 1
     fi
-    echo "    kubectl's discovery cache hasn't picked up the new CRD yet (attempt ${attempt}/10), retrying in 3s..."
+    echo "    kubectl's discovery cache or the external-secrets webhook isn't ready yet (attempt ${attempt}/10), retrying in 3s..."
     sleep 3
   done
   cat /tmp/kubectl-apply-err >&2
