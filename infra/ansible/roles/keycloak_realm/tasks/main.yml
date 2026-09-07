@@ -116,20 +116,48 @@
     status_code: 204
   no_log: true
 
-- name: "Explicitly enable WebAuthn and WebAuthn Passwordless in the browser flow"
+- name: "Copy the built-in browser flow into a custom one with WebAuthn enabled"
   community.general.keycloak_authentication:
     auth_keycloak_url: "{{ keycloak_base_url }}"
     auth_realm: "{{ keycloak_admin_realm }}"
     auth_username: "{{ keycloak_admin_user }}"
     auth_password: "{{ keycloak_admin_password }}"
     realm: "{{ keycloak_realm_name }}"
-    alias: "browser"
-    copy_from: "browser"
-    authentication_executions:
+    # [CORRECTED] found live on a user's VM: Keycloak rejects any
+    # execution added directly to a built-in flow ("It is illegal to add
+    # execution to a built in flow") - `alias: "browser"` (the SAME name
+    # as `copyFrom`) made the module treat the built-in flow as the
+    # target to manage in place (it already exists, so no copy happened)
+    # rather than creating a new one from it, and Keycloak then refused
+    # the resulting execution-add call outright. `alias` must name a NEW,
+    # non-built-in flow for `copyFrom` to actually copy into - the
+    # realm's `browser_flow` (set just below) is what then makes login
+    # actually use it instead of the untouched built-in "browser" flow.
+    alias: "{{ keycloak_realm_browser_flow_alias }}"
+    # [CORRECTED] found live on a user's VM: this module (unlike most
+    # other community.general.keycloak_* modules used elsewhere in this
+    # file) doesn't alias these two parameters to snake_case - confirmed
+    # against its own real "Unsupported parameters" error, which lists
+    # `copyFrom`/`authenticationExecutions` as the only accepted spelling.
+    copyFrom: "browser"
+    authenticationExecutions:
       - providerId: "webauthn-authenticator"
         requirement: "ALTERNATIVE"
       - providerId: "webauthn-authenticator-passwordless"
         requirement: "ALTERNATIVE"
+    state: present
+  no_log: true
+  when: keycloak_realm_webauthn_enabled | bool
+
+- name: "Point the realm's browser flow at the custom WebAuthn-enabled copy"
+  community.general.keycloak_realm:
+    auth_keycloak_url: "{{ keycloak_base_url }}"
+    auth_realm: "{{ keycloak_admin_realm }}"
+    auth_username: "{{ keycloak_admin_user }}"
+    auth_password: "{{ keycloak_admin_password }}"
+    id: "{{ keycloak_realm_name }}"
+    realm: "{{ keycloak_realm_name }}"
+    browser_flow: "{{ keycloak_realm_browser_flow_alias }}"
     state: present
   no_log: true
   when: keycloak_realm_webauthn_enabled | bool
