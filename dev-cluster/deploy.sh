@@ -117,6 +117,24 @@ if ! command -v k3d >/dev/null 2>&1; then
   echo "    k3d: not found, installing (k3d.io)"
   curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 fi
+# [ADDED] found live on a user's VM: step 10/14 below (provision-keycloak-dev.sh)
+# shells out to `ansible-playbook` to run the REAL infra/ansible/roles/
+# keycloak_realm role (not a dev-only duplicate - see that script's own
+# header) - never installed by this step even though every other tool this
+# script depends on is. Same version pin as CI's own `ansible-lint` job
+# (.github/workflows/lint-and-test.yml) so a contributor's dev cluster and
+# CI run the exact same Ansible against this repo's roles. `--user` (not a
+# venv) to keep this script dependency-free of any activation step in
+# later steps of the same shell; `--break-system-packages` as a fallback
+# for newer Debian/Ubuntu's PEP 668-protected system Python, only tried if
+# the plain install refuses to run at all.
+if ! command -v ansible-playbook >/dev/null 2>&1; then
+  echo "    ansible: not found, installing (pip, same version pin as CI's ansible-lint job)"
+  pip3 install --user "ansible-core>=2.15,<2.17" 2>/dev/null || \
+    pip3 install --user --break-system-packages "ansible-core>=2.15,<2.17"
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+ansible-galaxy collection install -r infra/ansible/requirements.yml >/dev/null
 
 echo "==> 2/14 grommunio-dev (docker-compose, study 4.6 - not part of the k3d cluster, see dev-cluster/README.md's 'Why grommunio-dev stays on docker-compose')"
 # grommunio/gromox-core only ever publishes linux/amd64 images (verified via
