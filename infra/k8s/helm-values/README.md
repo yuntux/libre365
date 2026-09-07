@@ -115,7 +115,8 @@ instead of a separate cascade file.
 | OnlyOffice Document Server | chart `docs` published by ONLYOFFICE itself — has no bundled PostgreSQL/Redis of its own (confirmed by actually running `dev-cluster/deploy.sh`), see `onlyoffice-postgres`/`onlyoffice-redis` below | https://download.onlyoffice.com/charts/stable ([UNCERTAIN], same reason as Seafile above - found via github.com/ONLYOFFICE/Kubernetes-Docs' own README, egress-blocked from independently fetching the index.yaml; the previous URL here, `onlyoffice.github.io/docs-cloud-chart`, was fabricated and 404s) |
 | OnlyOffice PostgreSQL | `postgresql` (bitnami) — standalone release, the `docs` chart above requires an externally-provisioned PostgreSQL | https://charts.bitnami.com/bitnami |
 | OnlyOffice Redis | `redis` (bitnami) — standalone release, same reason as OnlyOffice PostgreSQL above | https://charts.bitnami.com/bitnami |
-| Vikunja | no official chart confirmed to exist (see `vikunja.yaml`'s header) — "chart-like" values manifest, to be adapted to a generic app-template chart or a raw manifest | — |
+| Vikunja | `vikunja` (go-vikunja/helm-chart, published by the Vikunja project itself) — has no bundled database of its own (defaults to SQLite; confirmed by actually running `dev-cluster/deploy.sh`), see `vikunja-postgres` below | OCI artifact, not an index.yaml repo: `oci://ghcr.io/go-vikunja/helm-chart/vikunja`, pinned by `--version` (see `vikunja.yaml`'s own header) |
+| Vikunja PostgreSQL | `postgresql` (bitnami) — standalone release, the `vikunja` chart above requires an externally-provisioned database to avoid SQLite | https://charts.bitnami.com/bitnami |
 | Keycloak | no Helm chart — official Keycloak Operator CR (`../manifests/keycloak.yaml`), `bitnami/postgresql` for its now-standalone database | Operator: raw kubectl apply (see that file's header); Postgres: https://charts.bitnami.com/bitnami |
 | Gokapi | no official chart — raw manifest (`../manifests/gokapi.yaml`) | — |
 | SeaweedFS | `seaweedfs` (official, in-tree chart) | https://seaweedfs.github.io/seaweedfs/helm |
@@ -163,6 +164,8 @@ helm upgrade --install seafile seafile-charts/ce -n libre365 -f seafile.yaml
 helm upgrade --install seaweedfs seaweedfs/seaweedfs -n libre365 -f seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n libre365 -f peertube.yaml
 helm upgrade --install novu oci://ghcr.io/nova-edge/charts/novu --version 0.2.1 -n libre365 -f novu.yaml
+helm upgrade --install vikunja-postgres bitnami/postgresql -n libre365 -f vikunja-postgres.yaml
+helm upgrade --install vikunja oci://ghcr.io/go-vikunja/helm-chart/vikunja --version 2.3.0 -n libre365 -f vikunja.yaml
 helm upgrade --install element-web ananace-charts/element-web -n libre365 -f element-web.yaml
 helm upgrade --install keycloak-postgres bitnami/postgresql -n libre365 -f keycloak-postgres.yaml
 

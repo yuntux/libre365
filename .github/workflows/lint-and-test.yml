@@ -197,9 +197,11 @@ jobs:
         # b.yaml`; extra-args is one flag, e.g. novu's
         # --skip-schema-validation - see deploy.sh's own comment on that
         # release for why). NOT included: element-call.yaml/
-        # visio-meet.yaml/vikunja.yaml - documented in README.md as "no
-        # official chart confirmed to exist" placeholders, not actually
-        # `helm upgrade --install`-ed anywhere yet.
+        # visio-meet.yaml - documented in README.md as "no official chart
+        # confirmed to exist" placeholders, not actually `helm upgrade
+        # --install`-ed anywhere yet (vikunja.yaml WAS one of these too
+        # until this same class of bug got fixed for it - it has a real
+        # chart now, see vikunja.yaml's own header).
         run: |
           set -euo pipefail
           releases=(
@@ -221,6 +223,8 @@ jobs:
             "seaweedfs|seaweedfs/seaweedfs||seaweedfs.yaml,dev/seaweedfs.yaml"
             "peertube|peertube-helm/peertube||peertube.yaml,dev/peertube.yaml"
             "novu|oci://ghcr.io/nova-edge/charts/novu|0.2.1|novu.yaml,dev/novu.yaml|--skip-schema-validation"
+            "vikunja-postgres|bitnami/postgresql||vikunja-postgres.yaml,dev/vikunja-postgres.yaml"
+            "vikunja|oci://ghcr.io/go-vikunja/helm-chart/vikunja|2.3.0|vikunja.yaml,dev/vikunja.yaml"
             "external-dns|external-dns/external-dns||external-dns.yaml,dev/external-dns.yaml"
             "oauth2-proxy-onlyoffice|oauth2-proxy/oauth2-proxy||oauth2-proxy-onlyoffice.yaml"
             "oauth2-proxy-novu|oauth2-proxy/oauth2-proxy||oauth2-proxy-novu.yaml"

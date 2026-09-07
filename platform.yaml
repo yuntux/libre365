@@ -248,9 +248,13 @@ services:
 
   vikunja:
     # study 1.6 - matches the real vikunja/vikunja Docker Hub tag (no "v"
-    # prefix). Since 1.0.0-rc0, the OpenID provider config uses a map keyed
-    # by an arbitrary provider name rather than a numeric index - see
-    # vikunja.yaml's own comments for what that means for this deployment.
+    # prefix), and the real go-vikunja/helm-chart's own Chart.yaml
+    # appVersion. [CORRECTED] the previous comment here claimed the OpenID
+    # provider config uses a map keyed by an arbitrary provider name -
+    # found wrong by actually running dev-cluster/deploy.sh then verifying
+    # Vikunja's own config.yml.sample: `auth.openid.providers` is a LIST
+    # addressed by index (VIKUNJA_AUTH_OPENID_PROVIDERS_0_...) - see
+    # vikunja.yaml's own header for the full story.
     version: "2.6.0"
     ports: { VIKUNJA_PORT: 3456 }
     compose:
@@ -258,7 +262,13 @@ services:
     helm:
       file: infra/k8s/helm-values/vikunja.yaml
       image_repository: vikunja/vikunja
-      tag_path: .image.tag
+      # [CORRECTED] the real chart nests image.tag/image.repository under
+      # a top-level `vikunja:` key (see vikunja.yaml's own header) -
+      # tag_path adjusted accordingly (sync_platform.py's dot-path patcher
+      # supports arbitrary nesting depth, so this one IS compatible,
+      # unlike Seafile/OnlyOffice's combined-string/split-component
+      # schemas).
+      tag_path: vikunja.image.tag
 
   gokapi:
     # study 1.8 - OIDC is configured non-interactively via
