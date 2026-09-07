@@ -212,6 +212,20 @@ kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resour
 # exists at the pinned $KEYCLOAK_VERSION (verified: 200, unlike a guessed
 # "keycloaksamlclientscopes" filename, which 404s - there is no such CRD).
 kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/keycloaksamlclients.k8s.keycloak.org-v1.yml"
+# [CORRECTED] a FOURTH CRD, same story as samlclients above -
+# "Couldn't start informer for keycloakoidcclients.k8s.keycloak.org/
+# v2alpha1 resources ... 404 Not Found" - found live on a user's VM
+# hitting this exact CrashLoopBackOff right after the samlclients fix
+# above went in, since the operator only surfaces the NEXT missing CRD
+# once the previous one is fixed (each is checked at startup). This time
+# confirmed EXHAUSTIVELY rather than one guess at a time: the pinned
+# $KEYCLOAK_VERSION's kubernetes/ directory contains exactly four CRD
+# manifest files total (keycloaks, keycloakrealmimports,
+# keycloaksamlclients, keycloakoidcclients) plus kubernetes.yml/
+# kustomization.yml/a cluster-wide/ subdir - so these four `kubectl
+# apply` lines are now the complete, closed set for this operator
+# version, not another partial fix.
+kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/keycloakoidcclients.k8s.keycloak.org-v1.yml"
 kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/kubernetes.yml"
 # Real manifest (verified for 26.3.3): the "keycloak-operator" Deployment
 # declares no namespace of its own, so `kubectl apply` lands it in
