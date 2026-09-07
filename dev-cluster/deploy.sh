@@ -135,6 +135,16 @@ if ! command -v ansible-playbook >/dev/null 2>&1; then
   export PATH="$HOME/.local/bin:$PATH"
 fi
 ansible-galaxy collection install -r infra/ansible/requirements.yml >/dev/null
+# [ADDED] found live on a user's VM: step 12/14 below
+# (patch-coredns-hosts.sh) imports scripts/sync_platform.py, whose own
+# top-level `import qrcode` (used elsewhere in that module, for an
+# unrelated onboarding-QR-code feature) makes the WHOLE module fail to
+# import - "ModuleNotFoundError: No module named 'qrcode'" - if
+# scripts/requirements.txt was never installed, which nothing in this
+# script ever did. Installed with the same `--user`/`--break-system-
+# packages` fallback pattern as the ansible install just above.
+pip3 install --user -r scripts/requirements.txt 2>/dev/null || \
+  pip3 install --user --break-system-packages -r scripts/requirements.txt
 
 echo "==> 2/14 grommunio-dev (docker-compose, study 4.6 - not part of the k3d cluster, see dev-cluster/README.md's 'Why grommunio-dev stays on docker-compose')"
 # grommunio/gromox-core only ever publishes linux/amd64 images (verified via
