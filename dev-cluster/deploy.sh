@@ -447,9 +447,18 @@ helm_install onlyoffice-rabbitmq bitnami/rabbitmq -n "$NAMESPACE" \
 # that case - more likely plain resource contention, same recurring
 # pattern already seen on this VM), but a real gap either way: closing
 # it here removes one more variable rather than leaving it open.
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-postgres -n "$NAMESPACE" --timeout=120s
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-redis -n "$NAMESPACE" --timeout=120s
-kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-rabbitmq -n "$NAMESPACE" --timeout=120s
+# [CORRECTED] 120s was too tight - found live on a user's VM: a pod that
+# had to wait out a node's disk-pressure taint before it could even be
+# scheduled, THEN cold-pull its (uncached) image, took ~15 minutes total
+# from a completely idle cluster - `kubectl wait` doesn't distinguish "not
+# ready yet" from "will never be ready", so this timed out and aborted the
+# whole script (`set -euo pipefail`) even though the pod finished starting
+# on its own moments later. 600s covers a real cold pull + scheduling
+# delay on a modest dev VM without masking an actual stuck pod for long -
+# still fails loudly, just not on ordinary slowness.
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-postgres -n "$NAMESPACE" --timeout=600s
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-redis -n "$NAMESPACE" --timeout=600s
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-rabbitmq -n "$NAMESPACE" --timeout=600s
 # [CORRECTED] found by actually running this script: the chart's own
 # `ds-files`/`ds-runtime-config` PVCs hardcode `accessModes:
 # [ReadWriteMany]`, which k3d's `local-path` StorageClass cannot provision
