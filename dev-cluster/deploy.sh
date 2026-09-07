@@ -354,6 +354,14 @@ helm_install onlyoffice-postgres bitnami/postgresql -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-postgres.yaml -f infra/k8s/helm-values/dev/onlyoffice-postgres.yaml
 helm_install onlyoffice-redis bitnami/redis -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-redis.yaml -f infra/k8s/helm-values/dev/onlyoffice-redis.yaml
+# [CORRECTED] found by actually running this script: the chart's own
+# `ds-files`/`ds-runtime-config` PVCs hardcode `accessModes:
+# [ReadWriteMany]`, which k3d's `local-path` StorageClass cannot provision
+# - see infra/k8s/manifests/dev/onlyoffice-storage.yaml's header for the
+# full story. Applied before the release itself since the statically
+# pre-provisioned PVCs it references via `persistence.existingClaim` must
+# already exist.
+kubectl apply -f infra/k8s/manifests/dev/onlyoffice-storage.yaml
 helm_install onlyoffice onlyoffice/docs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice.yaml -f infra/k8s/helm-values/dev/onlyoffice.yaml
 # vikunja-postgres: the real go-vikunja/helm-chart `vikunja` chart has no

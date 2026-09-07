@@ -86,7 +86,16 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
     seafile) chart="seafile-charts/ce" ;;
     onlyoffice-postgres) chart="bitnami/postgresql" ;;
     onlyoffice-redis) chart="bitnami/redis" ;;
-    onlyoffice) chart="onlyoffice/docs" ;;
+    # [CORRECTED] found by actually running this script: the chart's own
+    # `ds-files`/`ds-runtime-config` PVCs hardcode `accessModes:
+    # [ReadWriteMany]`, which k3d's `local-path` StorageClass cannot
+    # provision - see infra/k8s/manifests/dev/onlyoffice-storage.yaml's
+    # header for the full story. Applied here too (not just deploy.sh)
+    # since this script can install `onlyoffice` standalone on a cluster
+    # where deploy.sh never ran that step - the statically pre-provisioned
+    # PVCs it references via `persistence.existingClaim` must already
+    # exist before the release itself.
+    onlyoffice) chart="onlyoffice/docs"; kubectl apply -f infra/k8s/manifests/dev/onlyoffice-storage.yaml ;;
     vikunja-postgres) chart="bitnami/postgresql" ;;
     # No `helm repo add vikunja` exists (never did - see deploy.sh's own
     # comment) - this is the real go-vikunja/helm-chart OCI artifact,
