@@ -95,28 +95,35 @@ done <<< "$DOMAINS"
 
 CURRENT_COREFILE=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
 
-if echo "$CURRENT_COREFILE" | grep -qF "$MARKER_BEGIN"; then
-  # Replace the existing entries between the markers (idempotent re-run) -
-  # they already live inside the pre-existing `hosts { ... }` block from a
-  # previous run, so no re-insertion relative to that block is needed.
-  NEW_COREFILE=$(python3 -c "
+# [CORRECTED] found live on a user's VM: a stale marker block from a
+# previous (pre-fix) run was sitting right after ".:53 {" - a plain
+# "replace between the markers in place" on a re-run just swapped its
+# CONTENT without relocating it into the real `hosts { ... }` block,
+# producing "Unknown directive '10.43.x.x'" (raw IP/hostname lines outside
+# any `hosts` block are not valid Corefile syntax at all). Always strip
+# any existing marker block first, unconditionally, then re-insert fresh
+# at the correct location inside the existing `hosts` block - idempotent
+# AND self-healing against a stale prior placement.
+STRIPPED_COREFILE=$(python3 -c "
 import sys
 begin, end = sys.argv[1], sys.argv[2]
-lines = sys.argv[3]
 text = sys.stdin.read()
-before, _, rest = text.partition(begin)
-_, _, after = rest.partition(end)
-sys.stdout.write(before + begin + '\n' + lines + end + after)
-" "$MARKER_BEGIN" "$MARKER_END" "$HOSTS_LINES" <<< "$CURRENT_COREFILE")
-else
-  # First run: merge our entries into the EXISTING `hosts ... { ... }`
-  # block's opening brace (k3d's own default `hosts /etc/coredns/NodeHosts
-  # { ttl 60; reload 15s; fallthrough }`) rather than declaring a second,
-  # separate `hosts` block - CoreDNS only allows one `hosts` plugin
-  # instantiation per server block. The plugin's own syntax allows a FILE
-  # argument and inline host entries side by side in the same block, so
-  # this is the plugin's intended, documented use - not a workaround.
-  NEW_COREFILE=$(python3 -c "
+if begin not in text:
+    sys.stdout.write(text)
+else:
+    before, _, rest = text.partition(begin)
+    _, _, after = rest.partition(end)
+    sys.stdout.write(before + after)
+" "$MARKER_BEGIN" "$MARKER_END" <<< "$CURRENT_COREFILE")
+
+# Merge our entries into the EXISTING `hosts ... { ... }` block's opening
+# brace (k3d's own default `hosts /etc/coredns/NodeHosts { ttl 60; reload
+# 15s; fallthrough }`) rather than declaring a second, separate `hosts`
+# block - CoreDNS only allows one `hosts` plugin instantiation per server
+# block. The plugin's own syntax allows a FILE argument and inline host
+# entries side by side in the same block, so this is the plugin's
+# intended, documented use - not a workaround.
+NEW_COREFILE=$(python3 -c "
 import re
 import sys
 begin, end = sys.argv[1], sys.argv[2]
@@ -128,8 +135,7 @@ if not match:
     sys.exit(1)
 idx = match.end()
 sys.stdout.write(text[:idx] + '\n' + begin + '\n' + lines + end + text[idx:])
-" "$MARKER_BEGIN" "$MARKER_END" "$HOSTS_LINES" <<< "$CURRENT_COREFILE")
-fi
+" "$MARKER_BEGIN" "$MARKER_END" "$HOSTS_LINES" <<< "$STRIPPED_COREFILE")
 
 kubectl create configmap coredns -n kube-system \
   --from-literal=Corefile="$NEW_COREFILE" \
