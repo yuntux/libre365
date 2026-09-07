@@ -219,9 +219,35 @@ echo "==> 7/14 Secrets: OpenBao + External Secrets Operator (dev mode, study 4.5
 # existingSecret (Keycloak, the Postgres-backed ones, etc.) needs this
 # done FIRST, or its pods just sit waiting for a Secret that doesn't exist
 # yet - harmless, but confusing to watch.
-helm upgrade --install openbao openbao/openbao -n "$NAMESPACE" \
+# [ADDED] found by actually running this script: a chart with hooks (a
+# pre-install/pre-upgrade Job, e.g. seafile/onlyoffice/vikunja's DB
+# migration or "stop the previous instance" scripts) that fails leaves
+# its Helm release stuck in "failed" state instead of cleanly absent - a
+# later re-run of `helm upgrade --install` on the very same release name
+# then treats it as a genuine UPGRADE and runs upgrade-only hooks meant
+# for an instance that was never actually running, which then fail too
+# ("pre-upgrade hooks failed: ... BackoffLimitExceeded"), forcing a manual
+# `helm uninstall --no-hooks` before every retry. This wrapper detects
+# that stuck state up front and clears it automatically, so a broken
+# previous attempt (this script's own earlier bugs, or a future one)
+# self-heals into a clean install on the next run instead of wedging.
+helm_install() {
+  local release="$1"
+  shift
+  local status
+  status="$(helm status "$release" -n "$NAMESPACE" 2>/dev/null | awk -F': ' '/^STATUS:/{print $2}' || true)"
+  case "$status" in
+    failed | pending-install | pending-upgrade | pending-rollback)
+      echo "    release '${release}' is stuck in '${status}' state from a previous run - uninstalling it first (--no-hooks) for a clean install"
+      helm uninstall "$release" -n "$NAMESPACE" --no-hooks || true
+      ;;
+  esac
+  helm upgrade --install "$release" "$@"
+}
+
+helm_install openbao openbao/openbao -n "$NAMESPACE" \
   -f infra/k8s/helm-values/openbao.yaml -f infra/k8s/helm-values/dev/openbao.yaml
-helm upgrade --install external-secrets external-secrets/external-secrets -n "$NAMESPACE" \
+helm_install external-secrets external-secrets/external-secrets -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-secrets.yaml -f infra/k8s/helm-values/dev/external-secrets.yaml
 # [CORRECTED] `kubectl rollout status` only supports the RollingUpdate
 # strategy - found by actually running this script: OpenBao's chart (a
@@ -274,23 +300,23 @@ apply_with_crd_retry infra/k8s/manifests/external-secrets.yaml
 ./dev-cluster/seed-openbao-dev-secrets.sh
 
 echo "==> 8/14 Helm releases (production values + dev/ hardening overlay, NOT the -100/-2000 sizing overlays)"
-helm upgrade --install keycloak-postgres bitnami/postgresql -n "$NAMESPACE" \
+helm_install keycloak-postgres bitnami/postgresql -n "$NAMESPACE" \
   -f infra/k8s/helm-values/keycloak-postgres.yaml -f infra/k8s/helm-values/dev/keycloak-postgres.yaml
-helm upgrade --install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
+helm_install synapse ananace-charts/matrix-synapse -n "$NAMESPACE" \
   -f infra/k8s/helm-values/synapse.yaml -f infra/k8s/helm-values/dev/synapse.yaml
-helm upgrade --install element-web ananace-charts/element-web -n "$NAMESPACE" \
+helm_install element-web ananace-charts/element-web -n "$NAMESPACE" \
   -f infra/k8s/helm-values/element-web.yaml -f infra/k8s/helm-values/dev/element-web.yaml
 # seafile-mysql/seafile-memcached: the real seafile-charts/ce chart has no
 # bundled database or cache of its own (found by actually running this
 # script, then verifying the chart's real source) - see
 # infra/k8s/helm-values/seafile-mysql.yaml's header for the full story.
 # Installed before `seafile` itself since it depends on both by hostname.
-helm upgrade --install seafile-mysql bitnami/mysql -n "$NAMESPACE" \
+helm_install seafile-mysql bitnami/mysql -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seafile-mysql.yaml -f infra/k8s/helm-values/dev/seafile-mysql.yaml
-helm upgrade --install seafile-memcached bitnami/memcached -n "$NAMESPACE" \
+helm_install seafile-memcached bitnami/memcached -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seafile-memcached.yaml -f infra/k8s/helm-values/dev/seafile-memcached.yaml
 kubectl apply -f infra/k8s/manifests/seafile-extra-env.yaml
-helm upgrade --install seafile seafile-charts/ce -n "$NAMESPACE" \
+helm_install seafile seafile-charts/ce -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seafile.yaml -f infra/k8s/helm-values/dev/seafile.yaml
 # onlyoffice-postgres/onlyoffice-redis: the real onlyoffice/docs chart has
 # no bundled database or cache of its own (found by actually running this
@@ -298,23 +324,23 @@ helm upgrade --install seafile seafile-charts/ce -n "$NAMESPACE" \
 # infra/k8s/helm-values/onlyoffice-postgres.yaml's header for the full
 # story. Installed before `onlyoffice` itself since its pre-install Job
 # (DB migration) depends on both by hostname.
-helm upgrade --install onlyoffice-postgres bitnami/postgresql -n "$NAMESPACE" \
+helm_install onlyoffice-postgres bitnami/postgresql -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-postgres.yaml -f infra/k8s/helm-values/dev/onlyoffice-postgres.yaml
-helm upgrade --install onlyoffice-redis bitnami/redis -n "$NAMESPACE" \
+helm_install onlyoffice-redis bitnami/redis -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-redis.yaml -f infra/k8s/helm-values/dev/onlyoffice-redis.yaml
-helm upgrade --install onlyoffice onlyoffice/docs -n "$NAMESPACE" \
+helm_install onlyoffice onlyoffice/docs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice.yaml -f infra/k8s/helm-values/dev/onlyoffice.yaml
 # vikunja-postgres: the real go-vikunja/helm-chart `vikunja` chart has no
 # bundled database of its own (defaults to SQLite) - see
 # infra/k8s/helm-values/vikunja-postgres.yaml's header for the full story.
 # Installed before `vikunja` itself since it depends on it by hostname.
-helm upgrade --install vikunja-postgres bitnami/postgresql -n "$NAMESPACE" \
+helm_install vikunja-postgres bitnami/postgresql -n "$NAMESPACE" \
   -f infra/k8s/helm-values/vikunja-postgres.yaml -f infra/k8s/helm-values/dev/vikunja-postgres.yaml
-helm upgrade --install vikunja "$VIKUNJA_CHART" --version "$VIKUNJA_CHART_VERSION" -n "$NAMESPACE" \
+helm_install vikunja "$VIKUNJA_CHART" --version "$VIKUNJA_CHART_VERSION" -n "$NAMESPACE" \
   -f infra/k8s/helm-values/vikunja.yaml -f infra/k8s/helm-values/dev/vikunja.yaml
-helm upgrade --install seaweedfs seaweedfs/seaweedfs -n "$NAMESPACE" \
+helm_install seaweedfs seaweedfs/seaweedfs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seaweedfs.yaml -f infra/k8s/helm-values/dev/seaweedfs.yaml
-helm upgrade --install peertube peertube-helm/peertube -n "$NAMESPACE" \
+helm_install peertube peertube-helm/peertube -n "$NAMESPACE" \
   -f infra/k8s/helm-values/peertube.yaml -f infra/k8s/helm-values/dev/peertube.yaml
 # --skip-schema-validation: this chart's own bundled values.schema.json
 # (every published version through 0.2.1, the one pinned here) has a real
@@ -328,10 +354,10 @@ helm upgrade --install peertube peertube-helm/peertube -n "$NAMESPACE" \
 # then confirmed against the exact pinned tag's real values.schema.json on
 # github.com/Nova-Edge/novu-chart). Not something a values file can work
 # around.
-helm upgrade --install novu "$NOVU_CHART" --version "$NOVU_CHART_VERSION" -n "$NAMESPACE" \
+helm_install novu "$NOVU_CHART" --version "$NOVU_CHART_VERSION" -n "$NAMESPACE" \
   --skip-schema-validation \
   -f infra/k8s/helm-values/novu.yaml -f infra/k8s/helm-values/dev/novu.yaml
-helm upgrade --install external-dns external-dns/external-dns -n "$NAMESPACE" \
+helm_install external-dns external-dns/external-dns -n "$NAMESPACE" \
   -f infra/k8s/helm-values/external-dns.yaml -f infra/k8s/helm-values/dev/external-dns.yaml
 
 echo "==> 9/14 Keycloak instance (Operator CR, not a Helm release)"
@@ -388,9 +414,9 @@ echo "==> 13/14 oauth2-proxy: Keycloak SSO gates for OnlyOffice/Novu (study 1.7)
 # fetch their OIDC discovery document from the realm's public domain at
 # startup and would otherwise fail before CoreDNS could resolve it (see
 # step 12/14 just above).
-helm upgrade --install oauth2-proxy-onlyoffice oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
+helm_install oauth2-proxy-onlyoffice oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
   -f infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml
-helm upgrade --install oauth2-proxy-novu oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
+helm_install oauth2-proxy-novu oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
   -f infra/k8s/helm-values/oauth2-proxy-novu.yaml
 
 echo "==> 14/14 Production caddy.yaml's Service + exposing services as NodePort"
