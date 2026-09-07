@@ -261,8 +261,13 @@
     # provisioning (study 2.3) - exercises connectors/unified-search's
     # `/portal/apps` fallback-to-default path for real in every test run,
     # rather than only in the unit tests that mock it.
+    # [CORRECTED] found live on a user's VM: `groups` takes a list of
+    # dicts (`elements: dict`, suboption `name`), not plain strings -
+    # confirmed against `ansible-doc community.general.keycloak_user` -
+    # a bare string list made Ansible's own arg-spec coercion fail
+    # ("dictionary requested, could not parse JSON or key=value").
     groups:
-      - "{{ (keycloak_realm_groups | selectattr('default', 'true') | first).name }}"
+      - name: "{{ (keycloak_realm_groups | selectattr('default', 'true') | first).name }}"
     state: present
   no_log: true
   when: keycloak_realm_test_user_enabled | bool
