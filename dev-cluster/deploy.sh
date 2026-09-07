@@ -379,6 +379,22 @@ helm_install onlyoffice-redis bitnami/redis -n "$NAMESPACE" \
 # full story.
 helm_install onlyoffice-rabbitmq bitnami/rabbitmq -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-rabbitmq.yaml -f infra/k8s/helm-values/dev/onlyoffice-rabbitmq.yaml
+# [ADDED] found live on a user's VM: `onlyoffice`'s pre-install Job
+# (DB migration) failed with "timed out waiting for the condition"
+# immediately after this RabbitMQ install, on a cluster busy upgrading
+# several other releases at once - none of the three dependencies above
+# had an explicit readiness wait before this point (unlike, e.g., the
+# openbao/external-secrets-webhook waits earlier in this script), so a
+# freshly-installed one (RabbitMQ here, Postgres/Redis on a first run)
+# could still be starting up when the pre-install Job tries to reach it.
+# Not confirmed as the root cause of that specific timeout (the
+# pre-install Job only touches Postgres, which was already running in
+# that case - more likely plain resource contention, same recurring
+# pattern already seen on this VM), but a real gap either way: closing
+# it here removes one more variable rather than leaving it open.
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-postgres -n "$NAMESPACE" --timeout=120s
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-redis -n "$NAMESPACE" --timeout=120s
+kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=onlyoffice-rabbitmq -n "$NAMESPACE" --timeout=120s
 # [CORRECTED] found by actually running this script: the chart's own
 # `ds-files`/`ds-runtime-config` PVCs hardcode `accessModes:
 # [ReadWriteMany]`, which k3d's `local-path` StorageClass cannot provision
