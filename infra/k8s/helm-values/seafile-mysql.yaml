@@ -29,6 +29,36 @@
 # - confirm with `kubectl get svc -n libre365 -l
 # app.kubernetes.io/instance=seafile-mysql` at deployment time.
 
+# [CORRECTED] found by actually running dev-cluster/deploy.sh (flagged
+# earlier as `seafile-mysql-0 Init:ImagePullBackOff` without a root cause
+# at the time - root-caused now): the chart's own default
+# `image.repository: bitnami/mysql` 404s outright. Confirmed directly
+# against the Docker Hub registry API: `bitnami/mysql` has ZERO tags
+# published at all (unlike bitnami/postgresql, bitnami/redis,
+# bitnami/memcached, which still carry hundreds of historical tags) -
+# same "moved behind Bitnami Secure Images" story as
+# ../manifests/keycloak.yaml's own header, just for a different image.
+# `bitnamilegacy/mysql` carries the exact same tag (confirmed: HTTP 200
+# on its manifest) - same fix pattern as onlyoffice-rabbitmq.yaml's own
+# header (bitnami/rabbitmq has the same problem).
+#
+# [CORRECTED] found by actually running CI's helm-template-validate job:
+# the chart's own template refuses to RENDER AT ALL for an image outside
+# its hardcoded "recognized" allowlist ("Original containers have been
+# substituted for unrecognized ones... Unrecognized images:
+# docker.io/bitnamilegacy/mysql:..." - a real `helm template`/`helm
+# upgrade --install` failure, not just a warning - see
+# github.com/bitnami/charts/issues/30850, same as
+# onlyoffice-rabbitmq.yaml's identical fix). This is Bitnami's own
+# documented escape hatch for exactly this situation (a legitimate,
+# pinned, verified-by-us image outside their allowlist).
+global:
+  security:
+    allowInsecureImages: true
+
+image:
+  repository: bitnamilegacy/mysql
+
 auth:
   database: seafile_db
   username: seafile
