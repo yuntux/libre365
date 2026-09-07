@@ -29,6 +29,21 @@
 # - confirm with `kubectl get svc -n libre365 -l
 # app.kubernetes.io/instance=seafile-mysql` at deployment time.
 
+# [CORRECTED] found by actually running dev-cluster/deploy.sh (flagged
+# earlier as `seafile-mysql-0 Init:ImagePullBackOff` without a root cause
+# at the time - root-caused now): the chart's own default
+# `image.repository: bitnami/mysql` 404s outright. Confirmed directly
+# against the Docker Hub registry API: `bitnami/mysql` has ZERO tags
+# published at all (unlike bitnami/postgresql, bitnami/redis,
+# bitnami/memcached, which still carry hundreds of historical tags) -
+# same "moved behind Bitnami Secure Images" story as
+# ../manifests/keycloak.yaml's own header, just for a different image.
+# `bitnamilegacy/mysql` carries the exact same tag (confirmed: HTTP 200
+# on its manifest) - same fix pattern as onlyoffice-rabbitmq.yaml's own
+# header (bitnami/rabbitmq has the same problem).
+image:
+  repository: bitnamilegacy/mysql
+
 auth:
   database: seafile_db
   username: seafile

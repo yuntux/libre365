@@ -29,6 +29,21 @@
 # confirm with `kubectl get svc -n libre365 -l
 # app.kubernetes.io/instance=onlyoffice-rabbitmq` at deployment time.
 
+# [CORRECTED] found by actually running dev-cluster/deploy.sh: the
+# chart's own default `image.repository: bitnami/rabbitmq` 404s outright
+# - "docker.io/bitnami/rabbitmq:4.1.3-debian-12-r1: not found" -
+# ImagePullBackOff on the pod's own "prepare-plugins-dir" init container
+# (which reuses this same image). Confirmed directly against the Docker
+# Hub registry API: `bitnami/rabbitmq` has ZERO tags published at all
+# (unlike bitnami/postgresql, bitnami/redis, bitnami/memcached, which
+# still carry hundreds of historical tags) - same "moved behind Bitnami
+# Secure Images" story as ../../manifests/keycloak.yaml's own header,
+# just for a different image. `bitnamilegacy/rabbitmq` carries the exact
+# same tag (confirmed: HTTP 200 on its manifest) - same fix pattern as
+# seafile-mysql.yaml's own header (bitnami/mysql has the same problem).
+image:
+  repository: bitnamilegacy/rabbitmq
+
 auth:
   username: onlyoffice
   existingPasswordSecret: onlyoffice-rabbitmq-secret
