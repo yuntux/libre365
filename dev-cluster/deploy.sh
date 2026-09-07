@@ -153,6 +153,34 @@ else
 fi
 kubectl config use-context "k3d-${CLUSTER_NAME}"
 
+# [ADDED] found live on a user's VM: right after a VM reboot (or under
+# real disk/memory pressure from this many charts running at once - see
+# this script's own dev-cluster/README.md notes on VM sizing), k3d's
+# node containers take a little while to fully restabilize (containerd/
+# CNI reinitializing), during which the kubelet applies disk-pressure/
+# memory-pressure taints that block ALL scheduling cluster-wide. Without
+# this check, that surfaced as a cryptic "0/3 nodes are available: ...
+# untolerated taint(s)" deep inside a later step's `kubectl wait` call,
+# with nothing pointing at the real cause. Checked once, up front, with
+# a clear diagnostic if it doesn't clear in time - a real VM resource
+# constraint at that point, not something this script can fix for you.
+echo "==> 3.5/14 Node health preflight"
+kubectl wait --for=condition=Ready node --all --timeout=120s
+node_wait_start=$(date +%s)
+while kubectl get nodes -o jsonpath='{.items[*].spec.taints[*].key}' | grep -qE 'disk-pressure|memory-pressure'; do
+  if [ $(( $(date +%s) - node_wait_start )) -gt 180 ]; then
+    cat <<'EOF'
+    ! Node(s) still under disk-pressure/memory-pressure after 3 minutes -
+      this is a real VM resource constraint, not a repo bug. Free up disk
+      space (e.g. `docker image prune -af`) or memory, then re-run this
+      script. See dev-cluster/README.md for more on VM sizing.
+EOF
+    exit 1
+  fi
+  echo "    node(s) under disk-pressure/memory-pressure, waiting for the kubelet to clear it..."
+  sleep 5
+done
+
 echo "==> 4/14 namespace"
 kubectl apply -f infra/k8s/manifests/namespace.yaml
 
