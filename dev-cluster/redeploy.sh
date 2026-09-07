@@ -45,6 +45,25 @@ target="$1"
 
 is_in() { local needle="$1"; shift; for x in "$@"; do [ "$x" = "$needle" ] && return 0; done; return 1; }
 
+# Same recovery wrapper as deploy.sh's own `helm_install` - see that
+# script's comment on it for the full story (a hook failure leaves a
+# release stuck in "failed", which a later `helm upgrade --install`
+# treats as a genuine upgrade and runs upgrade-only hooks that then fail
+# too).
+helm_install() {
+  local release="$1"
+  shift
+  local status
+  status="$(helm status "$release" -n "$NAMESPACE" 2>/dev/null | awk -F': ' '/^STATUS:/{print $2}' || true)"
+  case "$status" in
+    failed | pending-install | pending-upgrade | pending-rollback)
+      echo "    release '${release}' is stuck in '${status}' state from a previous run - uninstalling it first (--no-hooks) for a clean install"
+      helm uninstall "$release" -n "$NAMESPACE" --no-hooks || true
+      ;;
+  esac
+  helm upgrade --install "$release" "$@"
+}
+
 if is_in "$target" "${CONNECTORS[@]}"; then
   echo "==> Rebuilding connector '${target}'"
   docker build -t "libre365/${target}:dev" "connectors/${target}"
@@ -92,9 +111,9 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
   extra_args=()
   [ "$target" = "novu" ] && extra_args=(--skip-schema-validation)
   if [ -n "$chart_version" ]; then
-    helm upgrade --install "$target" "$chart" --version "$chart_version" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
+    helm_install "$target" "$chart" --version "$chart_version" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
   else
-    helm upgrade --install "$target" "$chart" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
+    helm_install "$target" "$chart" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
   fi
   echo "==> Force-deleting its pod(s) so the new values are picked up immediately"
   kubectl delete pod -n "$NAMESPACE" -l "app.kubernetes.io/instance=${target}" --grace-period=0 --force --ignore-not-found
