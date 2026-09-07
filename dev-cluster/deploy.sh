@@ -165,6 +165,33 @@ kubectl config use-context "k3d-${CLUSTER_NAME}"
 # a clear diagnostic if it doesn't clear in time - a real VM resource
 # constraint at that point, not something this script can fix for you.
 echo "==> 3.5/14 Node health preflight"
+# [ADDED] found live on a user's VM: containerd creates a short-lived
+# "lease" for every image pull attempt, to protect its in-flight content
+# from garbage collection while the pull is running - by default it
+# expires 24h after creation, whether the pull succeeded, failed, or the
+# image was later removed entirely. Re-running this script many times in
+# one session (retrying a broken chart, waiting out a slow pull, etc., all
+# real recurring events on this script's own history - see the comments
+# throughout step 8/14) creates one of these leases per attempt, and they
+# pile up faster than the 24h expiry clears them. Confirmed live: one node
+# alone carried 23GB of orphaned overlayfs snapshot layers pinned by
+# ~20 stale leases, invisible to both `crictl images` (only 3.6GB of
+# actually-referenced images) and `crictl rmi --prune` (which only reaps
+# unreferenced IMAGES, not leases) - none of it tied to any currently
+# running pod. Only the numbered/random-suffix leases carrying
+# containerd's own `containerd.io/gc.expire` label are removed here -
+# confirmed live that's exactly the pull-tracking kind; every other lease
+# (named by a real container ID, no gc.expire label) backs a live
+# container's own snapshot and is left untouched. Removing a stale lease
+# doesn't free space by itself - it just drops the pin, so containerd's
+# normal GC can reclaim the now-unreferenced content on its own right
+# after. `|| true` throughout: a node with no stale leases (or, on the
+# very first run, no nodes yet) is the common case, not an error.
+for node in $(docker ps --filter "name=^k3d-${CLUSTER_NAME}-" --format '{{.Names}}' 2>/dev/null); do
+  for lease in $(docker exec "$node" ctr -n k8s.io leases ls 2>/dev/null | awk '$3 ~ /gc\.expire/ {print $1}'); do
+    docker exec "$node" ctr -n k8s.io leases rm "$lease" >/dev/null 2>&1 || true
+  done
+done
 kubectl wait --for=condition=Ready node --all --timeout=120s
 node_wait_start=$(date +%s)
 while kubectl get nodes -o jsonpath='{.items[*].spec.taints[*].key}' | grep -qE 'disk-pressure|memory-pressure'; do
