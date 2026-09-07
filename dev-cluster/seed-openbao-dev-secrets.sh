@@ -51,6 +51,18 @@ bao_kv_put "libre365/onlyoffice-redis" password=devonly-changeme-onlyoffice-redi
 bao_kv_put "libre365/novu-mongodb" root-password=devonly-changeme-novu-mongo
 bao_kv_put "libre365/novu" api-key=devonly-changeme-novu-api-key
 bao_kv_put "libre365/seaweedfs" s3-access-key=devonly-seaweedfs-access s3-secret-key=devonly-changeme-seaweedfs-secret admin-user=admin admin-password=devonly-changeme-seaweedfs-admin
-bao_kv_put "libre365/seafile-mysql" password=devonly-changeme-seafile-mysql
+# [CORRECTED] "password" alone used to be the only property here, a guess
+# later found wrong by actually running dev-cluster/deploy.sh - the real
+# seafile-mysql-secret/seafile-secret ExternalSecrets (external-secrets.yaml)
+# need all 3 bitnami/mysql key names, plus a separate libre365/seafile path
+# for Seafile's own non-MySQL credentials (see that file's own comments).
+bao_kv_put "libre365/seafile-mysql" \
+  root-password=devonly-changeme-seafile-mysql-root \
+  password=devonly-changeme-seafile-mysql \
+  replication-password=devonly-changeme-seafile-mysql-repl
+bao_kv_put "libre365/seafile" \
+  oidc-client-secret=devonly-changeme-seafile-oidc \
+  jwt-private-key=devonly-changeme-seafile-jwt \
+  admin-password=devonly-changeme-seafile-admin
 
 echo "==> Done. External Secrets Operator should sync these into real Secrets within its next poll interval."

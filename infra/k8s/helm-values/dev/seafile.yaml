@@ -8,25 +8,22 @@
 #   helm upgrade --install seafile seafile-charts/ce -n libre365-dev \
 #     -f seafile.yaml -f dev/seafile.yaml
 #
-# Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are
-# exactly the ones already used in seafile.yaml.
+# [CORRECTED] the real chart nests everything under a top-level `seafile:`
+# key (`seafile.extraResources`, not top-level `resources:`) - see
+# ../seafile.yaml's own header for the full story, verified against the
+# chart's real source.
 
-# Already single-node in the base file (Community edition, 1.4 L.141); restated here
-# for clarity as this overlay stands in place of any sizing consideration.
-replicaCount: 1
+seafile:
+  # Base file requests 2 cores / 8Gi (sized for real data volume + sync traffic, 1.4
+  # L.136) — far more than a local dev instance with a handful of test files needs.
+  extraResources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
 
-# Base file requests 2 cores / 8Gi (sized for real data volume + sync traffic, 1.4
-# L.136) — far more than a local dev instance with a handful of test files needs.
-resources:
-  requests:
-    cpu: "500m"
-    memory: "1Gi"
-  limits:
-    cpu: "1"
-    memory: "2Gi"
-
-# mysql.enabled / memcached.enabled (base file) are left untouched: they are
-# functional requirements of Seafile CE, not HA/clustering-only toggles, and no
-# `mysql.primary.resources` / `memcached.resources` key is attested anywhere in this
-# repo for this specific community chart, so none is guessed here — left at the
-# chart's own defaults (unverifiable third-party schema, no network access to confirm).
+  configs:
+    seafileDataVolume:
+      storage: 10Gi

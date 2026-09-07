@@ -213,8 +213,14 @@ services:
       image: seafileltd/seafile-mc
     helm:
       file: infra/k8s/helm-values/seafile.yaml
-      image_repository: seafileltd/seafile-mc
-      tag_path: .image.tag
+      # [CORRECTED] no tag_path/image_repository here: the real
+      # haiwen/seafile-helm-chart `ce` chart has no split
+      # `image.repository`/`image.tag` pair at all (found by actually
+      # running dev-cluster/deploy.sh, then verifying the chart's real
+      # source) - its image is one combined "repo:tag" string,
+      # `seafile.configs.image` in seafile.yaml, which
+      # scripts/sync_platform.py's generic two-field patcher can't target.
+      # Kept in sync with `version` above BY HAND in seafile.yaml itself.
 
   onlyoffice:
     # study 1.5 - >= 9.4 is a decision explicitly settled by the study
