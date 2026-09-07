@@ -1,78 +1,109 @@
 # Component: Vikunja — task management (study 1.6 L.228-229)
-# Chart: no Vikunja-dedicated Helm chart is published upstream. Values
-# below are written in the repository's own "chart-like" convention, to be
-# adapted to a generic app-template chart (e.g. `bjw-s-labs/helm-charts`)
-# or a raw manifest at deployment time.
+# Chart used: `vikunja`, published by the Vikunja project itself
+#   (go-vikunja/helm-chart, formerly hosted at kolaente.dev before moving
+#   to GitHub).
+#   OCI registry: oci://ghcr.io/go-vikunja/helm-chart/vikunja
+#   (no `helm repo add` - not an index.yaml-based repo, pinned by
+#   `--version` at install time, same pattern as Novu - see
+#   dev-cluster/deploy.sh/redeploy.sh)
+#
+# [CORRECTED, substantially] found by actually running dev-cluster/deploy.sh
+# ("Error: repo vikunja not found" - deploy.sh referenced a `helm repo add
+# vikunja` step that never existed at all), then verifying this chart's
+# real source directly (github.com/go-vikunja/helm-chart) rather than
+# guessing further - this file used to be written in this repository's own
+# "chart-like" convention with an explicit note that no real chart had
+# ever been matched against it. That convention turned out to not match
+# the real chart at all:
+# - This chart is built on the bjw-s "common" library chart
+#   (bjw-s-labs/helm-charts) - EVERYTHING lives under a single top-level
+#   `vikunja:` key (`image`, `persistence`, `ingress`, `configMaps`,
+#   `env`, plus any key from the common library chart itself, e.g.
+#   `controllers`) - there is no top-level `replicaCount:`/`resources:`/
+#   `postgresql:` at all.
+# - This chart has NO bundled database of its own (unlike the previous,
+#   fictional `postgresql: {enabled: true}` block) - it defaults to
+#   SQLite with a PersistentVolumeClaim, and only talks to an external
+#   MySQL/PostgreSQL via plain `VIKUNJA_DATABASE_*` env vars (Vikunja's
+#   own config-options convention, verified against its real
+#   config.yml.sample). Provisioned here as its own standalone release,
+#   vikunja-postgres.yaml (bitnami/postgresql) - see dev-cluster/deploy.sh.
+# - The previous OIDC provider block, keyed by an arbitrary name
+#   ("libre365"), was fictional: Vikunja's `auth.openid.providers` is a
+#   LIST addressed by index (`VIKUNJA_AUTH_OPENID_PROVIDERS_0_NAME`, ...),
+#   not a map keyed by provider name - confirmed against Vikunja's own
+#   config.yml.sample. This also resolves the previous file's own
+#   [UNCERTAIN] note about needing a mounted config.yml stub for a named
+#   provider key to be recognized: no such concept exists, so no stub is
+#   needed - env vars alone are sufficient with the index-based names.
 #
 # 1.6 L.229 — 2-4 cores / 4 GB RAM sizing sufficient for both 100 and 2000 users
 # (barring massive API/automation usage): no dedicated 100/2000 variant, a single
 # values file suffices here, unlike Synapse/OnlyOffice/Keycloak whose sizing really
 # grows with scale.
 
-replicaCount: 2
+vikunja:
+  image:
+    repository: vikunja/vikunja
+    tag: "2.6.0"
 
-image:
-  repository: vikunja/vikunja
-  tag: "2.6.0"
+  controllers:
+    main:
+      replicas: 2
+      containers:
+        main:
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "4Gi"
 
-resources:
-  requests:
-    cpu: "1"
-    memory: "2Gi"
-  limits:
-    cpu: "4"
-    memory: "4Gi"
+  persistence:
+    data:
+      enabled: true
+      size: 20Gi
+      storageClass: ""
+    # SQLite persistence disabled: an external PostgreSQL is used instead
+    # (env.VIKUNJA_DATABASE_TYPE below), so there's no local database file
+    # to persist.
+    database:
+      enabled: false
 
-# [UNCERTAIN]: Vikunja's OpenID provider config is a map keyed by an
-# arbitrary provider key (`PROVIDERS_<key>_...`, "libre365" below), not a
-# numeric index. Vikunja's generated config docs state that a provider key
-# must also be declared in a mounted `config.yml` for its environment-
-# variable overrides to be recognized at all - a pure-env-var setup (as
-# below, no config file) may not be sufficient on its own. Since no real
-# Helm chart for Vikunja exists to confirm a field name for mounting a
-# config.yml stub through, this is flagged rather than guessed: whichever
-# raw manifest/generic chart is adopted at deployment time must mount a
-# `config.yml` containing at least
-# `auth: {openid: {providers: {libre365: {}}}}` alongside these env vars.
+  env:
+    VIKUNJA_SERVICE_PUBLICURL: "https://taches.libre365.example.org"
+    VIKUNJA_SERVICE_ENABLECALDAV: "true" # 1.6 table — native calendar integration
 
-env:
-  VIKUNJA_SERVICE_PUBLICURL: "https://taches.libre365.example.org"
-  VIKUNJA_SERVICE_ENABLECALDAV: "true" # 1.6 table — native calendar integration
-  # 1.7 — Keycloak SSO (native Vikunja OIDC). Provider key "libre365" must
-  # match the config.yml stub mounted per the comment above.
-  VIKUNJA_AUTH_OPENID_ENABLED: "true"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_NAME: "Libre365 SSO"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_AUTHURL: "https://sso.libre365.example.org/realms/libre365"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_CLIENTID: "vikunja"
-  VIKUNJA_AUTH_OPENID_PROVIDERS_LIBRE365_CLIENTSECRET:
-    valueFrom:
-      secretKeyRef:
-        name: vikunja-oidc-secret
-        key: client-secret
+    VIKUNJA_DATABASE_TYPE: "postgres"
+    VIKUNJA_DATABASE_HOST: "vikunja-postgres-postgresql"
+    VIKUNJA_DATABASE_DATABASE: "vikunja"
+    VIKUNJA_DATABASE_USER: "vikunja"
+    VIKUNJA_DATABASE_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: vikunja-postgres-secret
+          key: password
 
-postgresql:
-  enabled: true
-  auth:
-    database: vikunja
-    existingSecret: vikunja-postgres-secret
+    # 1.7 — Keycloak SSO (native Vikunja OIDC), the first (and only, index
+    # 0) configured provider.
+    VIKUNJA_AUTH_OPENID_ENABLED: "true"
+    VIKUNJA_AUTH_OPENID_PROVIDERS_0_NAME: "Libre365 SSO"
+    VIKUNJA_AUTH_OPENID_PROVIDERS_0_AUTHURL: "https://sso.libre365.example.org/realms/libre365"
+    VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTID: "vikunja"
+    VIKUNJA_AUTH_OPENID_PROVIDERS_0_CLIENTSECRET:
+      valueFrom:
+        secretKeyRef:
+          name: vikunja-oidc-secret
+          key: client-secret
 
-persistence:
-  files:
-    enabled: true
-    size: 20Gi
-    storageClass: ""
-
-# Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
-# see ../manifests/caddy.yaml's header comment for the full rationale.
-ingress:
-  enabled: false
-  className: ""
-  hosts:
-    - host: taches.libre365.example.org
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: vikunja-tls
+  # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
+  # see ../manifests/caddy.yaml's header comment for the full rationale.
+  ingress:
+    main:
+      enabled: false
       hosts:
-        - taches.libre365.example.org
+        - host: taches.libre365.example.org
+          paths:
+            - path: /
+      tls: []

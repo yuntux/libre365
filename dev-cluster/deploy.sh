@@ -45,6 +45,14 @@ KEYCLOAK_VERSION="26.7.3"
 # install time, not resolved through a repo's own index.
 NOVU_CHART="oci://ghcr.io/nova-edge/charts/novu"
 NOVU_CHART_VERSION="0.2.1"
+# [CORRECTED] found by actually running this script ("Error: repo vikunja
+# not found" - a `helm repo add vikunja` that was never added at all, for
+# a chart never actually matched against its real schema either - see
+# infra/k8s/helm-values/vikunja.yaml's own header for the full story).
+# go-vikunja/helm-chart is also an OCI artifact, same pinning pattern as
+# Novu above.
+VIKUNJA_CHART="oci://ghcr.io/go-vikunja/helm-chart/vikunja"
+VIKUNJA_CHART_VERSION="2.3.0"
 
 echo "==> 1/14 Prerequisites (docker, kubectl, helm, k3d)"
 # Installs whatever is missing, using each project's own official install
@@ -296,7 +304,13 @@ helm upgrade --install onlyoffice-redis bitnami/redis -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-redis.yaml -f infra/k8s/helm-values/dev/onlyoffice-redis.yaml
 helm upgrade --install onlyoffice onlyoffice/docs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice.yaml -f infra/k8s/helm-values/dev/onlyoffice.yaml
-helm upgrade --install vikunja vikunja/vikunja -n "$NAMESPACE" \
+# vikunja-postgres: the real go-vikunja/helm-chart `vikunja` chart has no
+# bundled database of its own (defaults to SQLite) - see
+# infra/k8s/helm-values/vikunja-postgres.yaml's header for the full story.
+# Installed before `vikunja` itself since it depends on it by hostname.
+helm upgrade --install vikunja-postgres bitnami/postgresql -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/vikunja-postgres.yaml -f infra/k8s/helm-values/dev/vikunja-postgres.yaml
+helm upgrade --install vikunja "$VIKUNJA_CHART" --version "$VIKUNJA_CHART_VERSION" -n "$NAMESPACE" \
   -f infra/k8s/helm-values/vikunja.yaml -f infra/k8s/helm-values/dev/vikunja.yaml
 helm upgrade --install seaweedfs seaweedfs/seaweedfs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seaweedfs.yaml -f infra/k8s/helm-values/dev/seaweedfs.yaml
