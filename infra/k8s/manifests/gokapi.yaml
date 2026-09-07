@@ -67,6 +67,26 @@ data:
     #!/bin/sh
     set -eu
 
+    # [ADDED] found live on a user's VM: in the k3d dev cluster,
+    # GOKAPI_OAUTH_ISSUER below resolves to caddy-dev, which terminates
+    # TLS with Caddy's own internal CA (see infra/k8s/manifests/dev/
+    # caddy.yaml) rather than a publicly-trusted one - Gokapi's OIDC
+    # discovery call would otherwise fail x509 verification, and unlike
+    # oauth2-proxy, Gokapi has no "skip TLS verification" flag at all
+    # (checked its own docs/advanced.rst). Built BEFORE the config.json
+    # early-exit below since the main container needs this bundle on
+    # EVERY start, not just this container's first run. Harmless/no-op in
+    # production: /etc/gokapi-ca-input/ca.crt only exists when the
+    # "caddy-dev-ca" ConfigMap does (dev-cluster/trust-caddy-dev-ca.sh,
+    # never applied outside the k3d dev cluster) - the resulting bundle
+    # is then just a byte-for-byte copy of the image's own default one.
+    CA_BUNDLE="${GOKAPI_CA_BUNDLE_DIR}/ca-bundle.crt"
+    cp /etc/ssl/certs/ca-certificates.crt "$CA_BUNDLE"
+    if [ -f /etc/gokapi-ca-input/ca.crt ]; then
+      cat /etc/gokapi-ca-input/ca.crt >> "$CA_BUNDLE"
+      echo "Trusting caddy-dev's internal CA (dev-cluster/trust-caddy-dev-ca.sh) in addition to the default CA bundle"
+    fi
+
     CONFIG_FILE="${GOKAPI_CONFIG_DIR}/config.json"
 
     if [ -f "$CONFIG_FILE" ]; then
@@ -193,6 +213,12 @@ spec:
               value: "admin@libre365.example.org"
             - name: GOKAPI_PUBLIC_URL
               value: "https://depot.libre365.example.org"
+            # [ADDED] see bootstrap.sh's own comment above - unset/unused
+            # outside the k3d dev cluster.
+            - name: GOKAPI_CA_BUNDLE_DIR
+              value: "/etc/gokapi-ca"
+            - name: SSL_CERT_FILE
+              value: "/etc/gokapi-ca/ca-bundle.crt"
           volumeMounts:
             - name: gokapi-data
               mountPath: /app/data
@@ -202,6 +228,11 @@ spec:
               subPath: config
             - name: gokapi-setup-bootstrap
               mountPath: /etc/gokapi-bootstrap
+            - name: gokapi-ca-bundle
+              mountPath: /etc/gokapi-ca
+            - name: caddy-dev-ca
+              mountPath: /etc/gokapi-ca-input
+              readOnly: true
       containers:
         - name: gokapi
           image: f0rc3/gokapi:v2.2.4
@@ -214,6 +245,12 @@ spec:
               value: "/app/data"
             - name: GOKAPI_PORT
               value: "53842"
+            # [ADDED] see bootstrap.sh's own comment above - this
+            # container only READS the bundle the initContainer already
+            # built (same emptyDir, see the volume below); unset/unused
+            # outside the k3d dev cluster.
+            - name: SSL_CERT_FILE
+              value: "/etc/gokapi-ca/ca-bundle.crt"
           resources:
             requests:
               cpu: "250m"
@@ -228,6 +265,8 @@ spec:
             - name: gokapi-config
               mountPath: /app/config
               subPath: config
+            - name: gokapi-ca-bundle
+              mountPath: /etc/gokapi-ca
       volumes:
         - name: gokapi-data
           persistentVolumeClaim:
@@ -242,6 +281,19 @@ spec:
           configMap:
             name: gokapi-setup-bootstrap
             defaultMode: 0o555
+        # [ADDED] see bootstrap.sh's own comment above - populated by the
+        # initContainer, read by the main container; ephemeral by design
+        # (rebuilt from scratch, identically, on every pod start).
+        - name: gokapi-ca-bundle
+          emptyDir: {}
+        # [ADDED] optional: this ConfigMap only exists in the k3d dev
+        # cluster (dev-cluster/trust-caddy-dev-ca.sh) - `optional: true`
+        # makes the mount resolve to an empty directory instead of
+        # failing when it doesn't exist (production).
+        - name: caddy-dev-ca
+          configMap:
+            name: caddy-dev-ca
+            optional: true
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

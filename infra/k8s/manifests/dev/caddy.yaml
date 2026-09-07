@@ -317,10 +317,34 @@ spec:
             - name: caddyfile
               mountPath: /etc/caddy/Caddyfile
               subPath: Caddyfile
+            # [ADDED] found live on a user's VM: Caddy's internal CA
+            # (`local_certs`, this file's own header comment) is generated
+            # into /data/caddy/pki on first use and reused after that -
+            # without a persistent volume here, a pod restart silently
+            # generates a NEW CA, invalidating every certificate any other
+            # pod was already trusting (see dev-cluster/trust-caddy-dev-ca.sh,
+            # gokapi.yaml) until that trust is redistributed and those pods
+            # restarted too.
+            - name: caddy-data
+              mountPath: /data
       volumes:
         - name: caddyfile
           configMap:
             name: caddy-dev-caddyfile
+        - name: caddy-data
+          persistentVolumeClaim:
+            claimName: caddy-dev-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: caddy-dev-data
+  namespace: libre365
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
 ---
 apiVersion: v1
 kind: Service
