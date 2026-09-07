@@ -56,19 +56,65 @@
     otp_policy_algorithm: "{{ keycloak_realm_otp_policy_algorithm }}"
     otp_policy_digits: "{{ keycloak_realm_otp_policy_digits }}"
     otp_policy_period: "{{ keycloak_realm_otp_policy_period }}"
-    # WebAuthn/FIDO2 policy — second factor AND passwordless primary factor
-    # (passkey), see 1.7: "both as a second factor and as a primary
-    # passwordless factor".
-    web_authn_policy_rp_entity_name: "{{ keycloak_realm_display_name }}"
-    web_authn_policy_rp_id: "{{ libre365_domain }}"
-    web_authn_policy_signature_algorithms:
-      - "ES256"
-      - "RS256"
-    web_authn_policy_user_verification_requirement: "preferred"
-    web_authn_policy_passwordless_rp_entity_name: "{{ keycloak_realm_display_name }}"
-    web_authn_policy_passwordless_rp_id: "{{ libre365_domain }}"
     state: present
   no_log: true # avoids logging the admin password passed in plaintext in the module's parameters
+
+# [CORRECTED] found live on a user's VM: community.general.keycloak_realm
+# (any version within requirements.yml's >=8.0.0,<10.0.0 pin) has NO
+# web_authn_policy_* parameters at all - "Unsupported parameters" listing
+# every single realm field it DOES support, none of them WebAuthn-related
+# - confirmed directly against the module's own real error output, then
+# against community.general's real CHANGELOG.rst (main and stable-10
+# branches): no keycloak_realm changelog entry ever mentions WebAuthn.
+# Keycloak's own REST API has supported these RealmRepresentation fields
+# (webAuthnPolicyRpEntityName etc.) for years - this is a gap in the
+# Ansible module's own parameter coverage, not a Keycloak limitation, so
+# worked around here with three plain REST calls (token -> GET -> PUT)
+# instead of waiting on the module to add them. GET-then-merge-then-PUT
+# (not a partial PUT) since Keycloak's realm update endpoint expects the
+# full RealmRepresentation, not a partial patch.
+- name: "Obtain an admin access token (WebAuthn policy REST calls below)"
+  ansible.builtin.uri:
+    url: "{{ keycloak_base_url }}/realms/{{ keycloak_admin_realm }}/protocol/openid-connect/token"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: password
+      client_id: admin-cli
+      username: "{{ keycloak_admin_user }}"
+      password: "{{ keycloak_admin_password }}"
+    status_code: 200
+  register: keycloak_admin_token
+  no_log: true
+
+- name: "Fetch the current {{ keycloak_realm_name }} realm representation"
+  ansible.builtin.uri:
+    url: "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm_name }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ keycloak_admin_token.json.access_token }}"
+    status_code: 200
+  register: keycloak_realm_representation
+  no_log: true
+
+- name: "Apply the WebAuthn/FIDO2 policy — second factor AND passwordless primary factor (passkey), see study 1.7: 'both as a second factor and as a primary passwordless factor'"
+  ansible.builtin.uri:
+    url: "{{ keycloak_base_url }}/admin/realms/{{ keycloak_realm_name }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ keycloak_admin_token.json.access_token }}"
+    body_format: json
+    body: >-
+      {{ keycloak_realm_representation.json | combine({
+        'webAuthnPolicyRpEntityName': keycloak_realm_display_name,
+        'webAuthnPolicyRpId': libre365_domain,
+        'webAuthnPolicySignatureAlgorithms': ['ES256', 'RS256'],
+        'webAuthnPolicyUserVerificationRequirement': 'preferred',
+        'webAuthnPolicyPasswordlessRpEntityName': keycloak_realm_display_name,
+        'webAuthnPolicyPasswordlessRpId': libre365_domain,
+      }) }}
+    status_code: 204
+  no_log: true
 
 - name: "Explicitly enable WebAuthn and WebAuthn Passwordless in the browser flow"
   community.general.keycloak_authentication:
