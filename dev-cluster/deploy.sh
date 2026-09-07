@@ -607,7 +607,6 @@ for name in "${CONNECTORS[@]}"; do
   k3d image import "libre365/${name}:dev" -c "$CLUSTER_NAME"
 done
 kubectl apply -f infra/k8s/manifests/connectors/
-kubectl apply -f infra/k8s/manifests/gokapi.yaml
 kubectl apply -f infra/k8s/manifests/dev/caddy.yaml
 kubectl rollout status deployment/caddy-dev -n "$NAMESPACE" --timeout=60s
 
@@ -620,6 +619,18 @@ echo "==> 12/14 CoreDNS: resolve every platform.yaml domain to caddy-dev (study 
 # patch-coredns-hosts.sh's own header for the full rationale and its one
 # unverified assumption (k3d's default Corefile layout).
 "$(dirname "${BASH_SOURCE[0]}")/patch-coredns-hosts.sh" "$NAMESPACE"
+
+# [ADDED] found live on a user's VM: caddy-dev now terminates TLS with
+# its own internal CA (see infra/k8s/manifests/dev/caddy.yaml) - Gokapi
+# has no "skip TLS verification" flag (unlike oauth2-proxy below), so it
+# needs to actually trust that CA. Must run, and gokapi.yaml must be
+# applied, only AFTER this ConfigMap exists: it's mounted as an
+# `optional` volume (see gokapi.yaml's own comment), which only gets
+# (re-)evaluated when the POD itself is (re-)created, not on every
+# container restart inside an existing pod - applying gokapi.yaml first
+# would otherwise permanently miss it for that pod's lifetime.
+"$(dirname "${BASH_SOURCE[0]}")/trust-caddy-dev-ca.sh" "$NAMESPACE"
+kubectl apply -f infra/k8s/manifests/gokapi.yaml
 
 echo "==> 13/14 oauth2-proxy: Keycloak SSO gates for OnlyOffice/Novu (study 1.7)"
 # Installed only now, not alongside the other Helm releases above: both
