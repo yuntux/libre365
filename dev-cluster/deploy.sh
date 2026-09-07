@@ -303,6 +303,29 @@ kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resour
 # mismatch (quarkus.operator-sdk.controllers.<name>.namespaces, one
 # specific namespace instead of the "current namespace only" sentinel),
 # not a version/CRD gap like the four `kubectl apply`s above.
+# [ADDED] confirmed live right after the env-var change above went in:
+# retargeting the informers at "$NAMESPACE" isn't enough on its own - the
+# upstream manifest's RoleBindings (one per controller, granting each
+# ClusterRole - e.g. `keycloakcontroller-cluster-role` - only within the
+# RoleBinding's OWN namespace, "default", same landing-namespace story as
+# the Deployment itself) never granted the operator's ServiceAccount any
+# access to "$NAMESPACE" at all. Without this, the operator crash-loops
+# immediately on startup: "keycloaks.k8s.keycloak.org is forbidden: User
+# \"system:serviceaccount:default:keycloak-operator\" cannot list
+# resource \"keycloaks\" ... in the namespace \"libre365\"" (403, straight
+# from the API server, not a bug in the operator itself). Mirrors the
+# same four RoleBindings into "$NAMESPACE", pointing at the same
+# ClusterRoles and the same ServiceAccount (cross-namespace subject
+# reference - RBAC allows a RoleBinding's subject to live in a different
+# namespace than the binding itself) - `kubectl create ... --dry-run=client
+# -o yaml | kubectl apply -f -` for idempotency (`kubectl create` alone
+# fails on a second run with "already exists").
+for role in keycloakcontroller-cluster-role keycloakrealmimportcontroller-cluster-role \
+            keycloaksamlclientcontroller-cluster-role keycloakoidcclientcontroller-cluster-role; do
+  kubectl create rolebinding "${role}-${NAMESPACE}" \
+    --clusterrole="$role" --serviceaccount=default:keycloak-operator \
+    -n "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+done
 kubectl set env deployment/keycloak-operator -n default \
   QUARKUS_OPERATOR_SDK_CONTROLLERS_KEYCLOAKCONTROLLER_NAMESPACES="$NAMESPACE" \
   QUARKUS_OPERATOR_SDK_CONTROLLERS_KEYCLOAKREALMIMPORTCONTROLLER_NAMESPACES="$NAMESPACE" \
