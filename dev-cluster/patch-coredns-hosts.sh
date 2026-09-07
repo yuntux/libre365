@@ -58,11 +58,23 @@ for key, sub in domains['subdomains'].items():
         print(f'{sub}.{base}')
 ")
 
-HOSTS_BLOCK="    hosts {\n"
+# [CORRECTED] found live on a user's VM: `"...{\n"` inside a plain
+# double-quoted bash string does NOT produce a real newline - it's the two
+# literal characters backslash+n (bash only expands `\n` that way inside
+# `$'...'` ANSI-C quoting, or via printf). CoreDNS's Corefile parser
+# tokenizes on real whitespace/newlines, so the whole `hosts { ... }`
+# block ended up as ONE line with literal "\n" text in it - "{\n" fused
+# into a single token the parser never recognized as an opening brace,
+# while the later real "}" (separated by actual spacing already in this
+# script) WAS tokenized correctly - hence CoreDNS's own real error:
+# "Unexpected '}' because no matching opening brace", crash-looping the
+# entire cluster's DNS (not just this hosts lookup - every in-cluster
+# Service name, including OpenBao's own, stopped resolving).
+HOSTS_BLOCK=$'    hosts {\n'
 while IFS= read -r domain; do
-  HOSTS_BLOCK+="        ${CADDY_DEV_IP} ${domain}\n"
+  HOSTS_BLOCK+="        ${CADDY_DEV_IP} ${domain}"$'\n'
 done <<< "$DOMAINS"
-HOSTS_BLOCK+="        fallthrough\n    }"
+HOSTS_BLOCK+=$'        fallthrough\n    }'
 
 CURRENT_COREFILE=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
 
