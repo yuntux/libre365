@@ -91,8 +91,41 @@ mongodb:
   auth:
     existingSecret: novu-mongodb-secret
 
+# [CORRECTED] found live on a user's VM: this chart's bundled
+# `bitnami/redis` dependency's own default `image.repository:
+# bitnami/redis` pins an old tag (7.4.3-debian-12-r0) that 404s outright
+# - "docker.io/bitnami/redis:7.4.3-debian-12-r0: not found" -
+# ImagePullBackOff looping on `novu-redis-master-0` for many minutes,
+# starving the kubelet's pod-worker queue and slowing down unrelated
+# pods elsewhere in the cluster. Same "moved behind Bitnami Secure
+# Images" story as onlyoffice-rabbitmq.yaml/seafile-mysql.yaml's own
+# headers, but note this is a DIFFERENT failure mode from those: the
+# `bitnami/redis` repository itself still has hundreds of live tags
+# (confirmed via the Docker Hub registry API, and already working live
+# for onlyoffice-redis.yaml's own current/recent tag) - it's specifically
+# this OLD pinned tag that was pruned from the free tier, not the whole
+# repository. `bitnamilegacy/redis` carries the exact same tag
+# (confirmed: HTTP 200 on its manifest).
+#
+# [KNOWN TECH DEBT] bitnamilegacy is a frozen, unmaintained snapshot (no
+# future security patches on this copy) - a stopgap to unblock dev, not
+# a long-term choice. Migrating this repo's Bitnami-chart dependencies
+# (postgresql x5, mysql, rabbitmq, redis, mongodb, memcached) to
+# officially-maintained images is tracked as separate follow-up work,
+# same reasoning already applied to Keycloak (switched to
+# quay.io/keycloak/keycloak entirely - see ../manifests/keycloak.yaml).
+# RabbitMQ specifically was investigated first: the official RabbitMQ
+# Cluster Operator (ghcr.io/rabbitmq/cluster-operator, manages the
+# official docker.io/library/rabbitmq image directly, verified against
+# its real CRD) is the natural replacement chart-wise, but it auto-
+# generates its own default-user credentials rather than accepting a
+# pre-supplied username/password the way this repo's OpenBao/
+# ExternalSecret pattern expects everywhere else - a real architecture
+# change, not a drop-in swap, so out of scope for tonight's unblock.
 redis:
   enabled: true
+  image:
+    repository: bitnamilegacy/redis
 
 # [CORRECTED] moved from a bare top-level `env:` (silently ignored by the
 # real chart - its values.yaml has no such key) to `global.env`, the actual
@@ -107,6 +140,17 @@ global:
     API_ROOT_URL: "https://notifications.libre365.example.org/api"
     WS_URL: "wss://notifications.libre365.example.org"
     FRONT_BASE_URL: "https://notifications.libre365.example.org"
+  # [CORRECTED] `global` values are shared across a parent chart and all
+  # its subcharts by Helm's own convention - this reaches the bundled
+  # `redis` (and `mongodb`) dependencies above without needing to repeat
+  # it per-subchart. Required alongside `redis.image.repository`: the
+  # bitnami/redis subchart's own template refuses to render at all for
+  # an image outside its hardcoded "recognized" allowlist otherwise (same
+  # `common.errors.insecureImages` check as onlyoffice-rabbitmq.yaml's
+  # own header - verified against that chart's real template/helper
+  # source, not guessed).
+  security:
+    allowInsecureImages: true
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
 # see ../manifests/caddy.yaml's header comment for the full rationale.
