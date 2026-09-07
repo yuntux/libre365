@@ -1,0 +1,51 @@
+# Component: RabbitMQ for OnlyOffice Document Server inter-instance messaging —
+# standalone release (study 1.5 L.198)
+# Chart used: bitnami/rabbitmq
+#   Helm repo: https://charts.bitnami.com/bitnami
+#   chart    : rabbitmq
+#
+# [ADDED] found missing by actually running dev-cluster/deploy.sh: the real
+# `ONLYOFFICE/Kubernetes-Docs` `docs` chart has a THIRD external dependency
+# beyond PostgreSQL/Redis (see onlyoffice-postgres.yaml/onlyoffice-redis.yaml's
+# own headers for those two) - an AMQP broker (RabbitMQ or ActiveMQ),
+# addressed via `connections.amqp*` (../onlyoffice.yaml). Its default
+# `connections.amqpExistingSecret: "rabbitmq"` pointed at a Secret that never
+# existed, which only surfaces once `docservice`'s image has actually been
+# pulled and Kubernetes tries to start the container - not caught by the
+# earlier pre-install DB-migration Job fix (PostgreSQL/Redis) at all, since
+# AMQP isn't touched by that Job: `Error: secret "rabbitmq" not found` ->
+# `CreateContainerConfigError`. Consistent with this component's own header
+# comment (1.5 L.198 - "Document Server cluster + load balancer + Redis"):
+# RabbitMQ is what the clustered `docservice`/`converter` Deployments use to
+# coordinate with each other, not an optional add-on.
+#
+# [UNCERTAIN, not verified against a live `helm install` from this sandboxed
+# environment]: the exact Service hostname this chart's fullname template
+# produces for the `onlyoffice-rabbitmq` release name -
+# ../onlyoffice.yaml's `connections.amqpHost` assumes "onlyoffice-rabbitmq"
+# unchanged (release name already contains the chart name "rabbitmq", so
+# bitnami's common.names.fullname helper should return the release name
+# as-is, same reasoning already confirmed live for onlyoffice-redis) -
+# confirm with `kubectl get svc -n libre365 -l
+# app.kubernetes.io/instance=onlyoffice-rabbitmq` at deployment time.
+
+auth:
+  username: onlyoffice
+  existingPasswordSecret: onlyoffice-rabbitmq-secret
+  # existingSecretPasswordKey left at the chart's own default
+  # ("rabbitmq-password") - see external-secrets.yaml's
+  # onlyoffice-rabbitmq-secret entry, same convention as
+  # onlyoffice-redis-secret/redis-password.
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: ""

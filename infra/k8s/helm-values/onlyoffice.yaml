@@ -72,6 +72,26 @@ connections:
   redisExistingSecret: onlyoffice-redis-secret
   redisSecretKeyName: redis-password
 
+  # [ADDED] found missing by actually running dev-cluster/deploy.sh: the
+  # chart's own default `amqpExistingSecret: "rabbitmq"` pointed at a
+  # Secret that was never provisioned - `docservice`'s container never
+  # even started ("Error: secret 'rabbitmq' not found" ->
+  # CreateContainerConfigError), a failure invisible until the image had
+  # actually finished pulling (unrelated to the pre-install DB-migration
+  # Job, which never touches AMQP at all). See
+  # onlyoffice-rabbitmq.yaml's own header for the full story - this
+  # chart requires an AMQP broker unconditionally (RabbitMQ or ActiveMQ),
+  # matching this component's own header comment (1.5 L.198 - "Document
+  # Server cluster + load balancer + Redis").
+  amqpType: rabbitmq
+  amqpHost: onlyoffice-rabbitmq
+  amqpPort: "5672"
+  amqpVhost: "/"
+  amqpUser: onlyoffice
+  amqpProto: amqp
+  amqpExistingSecret: onlyoffice-rabbitmq-secret
+  amqpSecretKeyName: rabbitmq-password
+
 jwt:
   enabled: true
   existingSecret: onlyoffice-jwt-secret
