@@ -37,6 +37,7 @@ echo "==> Seeding dev-only dummy secrets into OpenBao ($OPENBAO_POD)"
 bao_kv_put "libre365/synapse" oidc-client-secret=devonly-changeme-synapse-oidc
 bao_kv_put "libre365/vikunja" oidc-client-secret=devonly-changeme-vikunja-oidc
 bao_kv_put "libre365/onlyoffice" jwt-secret=devonly-changeme-onlyoffice-jwt
+bao_kv_put "libre365/onlyoffice-postgres" password=devonly-changeme-onlyoffice-pg postgres-password=devonly-changeme-onlyoffice-pg-super
 bao_kv_put "libre365/external-dns-ovh" \
   application-key=devonly-changeme-ovh-app-key \
   application-secret=devonly-changeme-ovh-app-secret \

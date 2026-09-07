@@ -1,0 +1,17 @@
+# Dev-speed hardening overlay — k3d local dev tier (docker-compose -> k3d migration).
+# This is an ADDITIONAL -f file layered on top of the base chart values.
+#
+# Usage:
+#   helm upgrade --install onlyoffice-redis bitnami/redis -n libre365-dev \
+#     -f onlyoffice-redis.yaml -f dev/onlyoffice-redis.yaml
+
+master:
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"

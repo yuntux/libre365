@@ -112,7 +112,9 @@ instead of a separate cascade file.
 | Seafile | chart `ce` published by `haiwen` (Seafile's own GitHub org) — has no bundled MySQL/cache of its own (confirmed by actually running `dev-cluster/deploy.sh`), see `seafile-mysql`/`seafile-memcached` below | https://haiwen.github.io/seafile-helm-chart/repo ([UNCERTAIN]: found via that org's own README, but this sandboxed environment's egress proxy blocks `*.github.io` outright, so the index.yaml itself was never independently fetched - the previous URL here, `seafile-charts.github.io/seafile-charts`, was fabricated and 404s) |
 | Seafile MySQL | `mysql` (bitnami) — standalone release, the `ce` chart above requires an externally-provisioned MySQL | https://charts.bitnami.com/bitnami |
 | Seafile Memcached | `memcached` (bitnami) — standalone release, same reason as Seafile MySQL above | https://charts.bitnami.com/bitnami |
-| OnlyOffice Document Server | chart `docs` published by ONLYOFFICE itself | https://download.onlyoffice.com/charts/stable ([UNCERTAIN], same reason as Seafile above - found via github.com/ONLYOFFICE/Kubernetes-Docs' own README, egress-blocked from independently fetching the index.yaml; the previous URL here, `onlyoffice.github.io/docs-cloud-chart`, was fabricated and 404s) |
+| OnlyOffice Document Server | chart `docs` published by ONLYOFFICE itself — has no bundled PostgreSQL/Redis of its own (confirmed by actually running `dev-cluster/deploy.sh`), see `onlyoffice-postgres`/`onlyoffice-redis` below | https://download.onlyoffice.com/charts/stable ([UNCERTAIN], same reason as Seafile above - found via github.com/ONLYOFFICE/Kubernetes-Docs' own README, egress-blocked from independently fetching the index.yaml; the previous URL here, `onlyoffice.github.io/docs-cloud-chart`, was fabricated and 404s) |
+| OnlyOffice PostgreSQL | `postgresql` (bitnami) — standalone release, the `docs` chart above requires an externally-provisioned PostgreSQL | https://charts.bitnami.com/bitnami |
+| OnlyOffice Redis | `redis` (bitnami) — standalone release, same reason as OnlyOffice PostgreSQL above | https://charts.bitnami.com/bitnami |
 | Vikunja | no official chart confirmed to exist (see `vikunja.yaml`'s header) — "chart-like" values manifest, to be adapted to a generic app-template chart or a raw manifest | — |
 | Keycloak | no Helm chart — official Keycloak Operator CR (`../manifests/keycloak.yaml`), `bitnami/postgresql` for its now-standalone database | Operator: raw kubectl apply (see that file's header); Postgres: https://charts.bitnami.com/bitnami |
 | Gokapi | no official chart — raw manifest (`../manifests/gokapi.yaml`) | — |
@@ -166,6 +168,8 @@ helm upgrade --install keycloak-postgres bitnami/postgresql -n libre365 -f keycl
 
 # Component with a scale overlay (example: 100-user target)
 helm upgrade --install synapse ananace-charts/matrix-synapse -n libre365 -f synapse.yaml -f synapse-100.yaml
+helm upgrade --install onlyoffice-postgres bitnami/postgresql -n libre365 -f onlyoffice-postgres.yaml
+helm upgrade --install onlyoffice-redis bitnami/redis -n libre365 -f onlyoffice-redis.yaml
 helm upgrade --install onlyoffice onlyoffice/docs -n libre365 -f onlyoffice.yaml -f onlyoffice-100.yaml
 
 # Keycloak: Operator CR, not a Helm release - see ../manifests/keycloak.yaml's

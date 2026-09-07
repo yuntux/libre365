@@ -1,0 +1,50 @@
+# Component: Redis for OnlyOffice Document Server session storage — standalone
+# release (study 1.5 L.198)
+# Chart used: bitnami/redis
+#   Helm repo: https://charts.bitnami.com/bitnami
+#   chart    : redis
+#
+# [ADDED] found missing by actually running dev-cluster/deploy.sh: the real
+# `ONLYOFFICE/Kubernetes-Docs` `docs` chart has NO bundled Redis of its own
+# either - it only ever talks to an externally-provisioned Redis, addressed
+# via `connections.redisHost` (see ../onlyoffice.yaml's own header for the
+# full story). The previous `redis: {enabled: true, ...}` block in this
+# repo's onlyoffice.yaml looked like a legitimate bitnami/redis subchart
+# toggle (and its `redis.master.resources` key path IS a real bitnami/redis
+# path) but the chart itself has no such dependency at all - that whole
+# block was silently ignored by Helm. This release is that Redis, promoted
+# to its own top-level release, same pattern as onlyoffice-postgres.yaml.
+#
+# 1.5 L.198 — single instance (no HA/sentinel): session storage for a
+# Document Server cluster, not a data store requiring replication for this
+# study's scope.
+#
+# [UNCERTAIN, not verified against a live `helm install` from this
+# sandboxed environment]: the exact Service hostname this chart's fullname
+# template produces for the `onlyoffice-redis` release name -
+# ../onlyoffice.yaml's `connections.redisHost` assumes
+# "onlyoffice-redis-master" (release name already contains the chart name
+# "redis", so bitnami's common.names.fullname helper should return the
+# release name unchanged, plus the architecture-specific "-master" suffix)
+# - confirm with `kubectl get svc -n libre365 -l
+# app.kubernetes.io/instance=onlyoffice-redis` at deployment time.
+
+architecture: standalone
+
+auth:
+  enabled: true
+  existingSecret: onlyoffice-redis-secret
+  existingSecretPasswordKey: redis-password
+
+master:
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""

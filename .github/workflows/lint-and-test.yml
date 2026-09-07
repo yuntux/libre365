@@ -213,6 +213,8 @@ jobs:
             "seafile-mysql|bitnami/mysql||seafile-mysql.yaml,dev/seafile-mysql.yaml"
             "seafile-memcached|bitnami/memcached||seafile-memcached.yaml,dev/seafile-memcached.yaml"
             "seafile|seafile-charts/ce||seafile.yaml,dev/seafile.yaml"
+            "onlyoffice-postgres|bitnami/postgresql||onlyoffice-postgres.yaml,dev/onlyoffice-postgres.yaml"
+            "onlyoffice-redis|bitnami/redis||onlyoffice-redis.yaml,dev/onlyoffice-redis.yaml"
             "onlyoffice|onlyoffice/docs||onlyoffice.yaml,dev/onlyoffice.yaml"
             "onlyoffice|onlyoffice/docs||onlyoffice.yaml,onlyoffice-100.yaml"
             "onlyoffice|onlyoffice/docs||onlyoffice.yaml,onlyoffice-2000.yaml"

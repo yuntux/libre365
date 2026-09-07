@@ -31,7 +31,7 @@ CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-menti
 # `kubectl apply -f infra/k8s/manifests/dev/keycloak.yaml` (the dev-sized
 # CR deploy.sh itself applies, not the production one), the same way as
 # gokapi/caddy's raw manifests (also not covered by this script).
-HELM_CHARTS=(keycloak-postgres synapse element-web seafile-mysql seafile-memcached seafile onlyoffice vikunja seaweedfs peertube novu external-dns openbao external-secrets)
+HELM_CHARTS=(keycloak-postgres synapse element-web seafile-mysql seafile-memcached seafile onlyoffice-postgres onlyoffice-redis onlyoffice vikunja seaweedfs peertube novu external-dns openbao external-secrets)
 
 usage() {
   echo "Usage: $0 <connector-name|helm-release-name>"
@@ -65,6 +65,8 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
     seafile-mysql) chart="bitnami/mysql" ;;
     seafile-memcached) chart="bitnami/memcached" ;;
     seafile) chart="seafile-charts/ce" ;;
+    onlyoffice-postgres) chart="bitnami/postgresql" ;;
+    onlyoffice-redis) chart="bitnami/redis" ;;
     onlyoffice) chart="onlyoffice/docs" ;;
     vikunja) chart="vikunja/vikunja" ;;
     seaweedfs) chart="seaweedfs/seaweedfs" ;;

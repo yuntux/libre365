@@ -10,34 +10,71 @@
 #   egress proxy blocks download.onlyoffice.com outright, so the index.yaml
 #   itself was never independently fetched - confirm on first real run.
 #
+# [CORRECTED, substantially] found by actually running dev-cluster/deploy.sh
+# ("failed pre-install: 1 error occurred: timed out waiting for the
+# condition" - the chart's pre-install DB-migration Job hung trying to
+# reach a nonexistent database), then verifying this chart's real source
+# directly (github.com/ONLYOFFICE/Kubernetes-Docs, values.yaml and
+# templates/) rather than guessing further. This chart's real schema is
+# very different from what this file previously assumed:
+# - There is no single top-level `image:` key: the chart deploys TWO
+#   separate components, `docservice` and `converter`, each with its own
+#   `<component>.image.{registry,repository,tag}` (defaulting to
+#   onlyoffice/docs-docservice-de / onlyoffice/docs-converter-de) - only
+#   the shared `images.tag` (global default tag) is set below, per-
+#   component repository/registry left at chart defaults.
+# - This chart has NO bundled PostgreSQL or Redis of its own (unlike what
+#   the previous `redis: {enabled: true, ...}` block assumed) - it only
+#   ever talks to an externally-provisioned PostgreSQL and Redis, addressed
+#   through the `connections:` block below. Provisioned here as their own
+#   standalone releases: onlyoffice-postgres.yaml (bitnami/postgresql) and
+#   onlyoffice-redis.yaml (bitnami/redis) - see dev-cluster/deploy.sh.
+# - `env.JWT_ENABLED`/`env.JWT_SECRET` as a plain env map were fictional:
+#   this chart has no top-level `env:` field at all. JWT config is the
+#   `jwt:` block below; the actual secret is injected wholesale via
+#   envFrom (see templates/deployments/docservice.yaml's
+#   `ds.jwt.secretName` helper) - `jwt.existingSecret` must therefore point
+#   at a Secret containing the literal env var names the container expects
+#   (JWT_ENABLED/JWT_SECRET/JWT_HEADER/JWT_IN_BODY), not an arbitrary key -
+#   see onlyoffice-jwt-secret's own ExternalSecret entry
+#   (../manifests/external-secrets.yaml) for how those are assembled.
+# - `persistence.data`/`service.port: 80` don't exist either: the real
+#   schema is a flat `persistence:` (used for the Document Server's main
+#   data volume, `persistence.storageClass`/`persistence.size`) plus
+#   `persistence.buffer`/`persistence.runtimeConfig`/`persistence.customResources`
+#   sub-volumes, and `service.port` defaults to 8888, not 80.
+#
 # 1.5 L.198 — target architecture chosen FROM THE INITIAL DESIGN: Document Server
 # cluster + load balancer + Redis (session storage), rather than a single instance to
-# be evolved later — simpler to plan for in infra than to retrofit.
+# be evolved later — simpler to plan for in infra than to retrofit. This chart's own
+# `docservice`/`converter` split (two independently-scaled Deployments) is exactly
+# that clustered architecture, not something bolted on afterwards.
 #
-# Convention: this file carries the common values (image, Redis, Seafile WOPI
-# integration/official connector); the numeric sizing (replicas/resources) is in the
+# Convention: this file carries the common values (image tag, DB/Redis connections,
+# JWT); the numeric sizing (docservice/converter replicas+resources) is in the
 # onlyoffice-100.yaml / onlyoffice-2000.yaml overlays.
 
-image:
-  repository: onlyoffice/documentserver
-  tag: "9.4"
+images:
+  tag: "9.4.1-1"
 
-# 1.5 L.198 — explicit cluster: several Document Server replicas behind a load
-# balancer (ClusterIP Service + Ingress), with shared Redis for the session.
-redis:
+connections:
+  dbType: postgres
+  dbHost: onlyoffice-postgres-postgresql
+  dbUser: onlyoffice
+  dbPort: "5432"
+  dbName: onlyoffice
+  dbExistingSecret: onlyoffice-postgres-secret
+  dbSecretKeyName: password
+
+  redisConnectorName: redis
+  redisHost: onlyoffice-redis-master
+  redisPort: "6379"
+  redisExistingSecret: onlyoffice-redis-secret
+  redisSecretKeyName: redis-password
+
+jwt:
   enabled: true
-  architecture: standalone
-  auth:
-    enabled: true
-    existingSecret: onlyoffice-redis-secret
-
-env:
-  JWT_ENABLED: "true"
-  JWT_SECRET:
-    valueFrom:
-      secretKeyRef:
-        name: onlyoffice-jwt-secret
-        key: secret
+  existingSecret: onlyoffice-jwt-secret
   # 2.6 L.469 — `document.permissions.chat: false`: this parameter is set at the
   # level of the CONFIG OF EACH DOCUMENT opened (JS config passed at opening time by
   # the integrator), not at the global Document Server level — Document Server does
@@ -48,26 +85,18 @@ env:
   # (2.6 L.469-473).
 
 persistence:
-  data:
-    enabled: true
-    size: 20Gi
-    storageClass: ""
+  size: 20Gi
+  storageClass: ""
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8888
 
 # Disabled: Caddy (../manifests/caddy.yaml) is the sole public entry point -
 # see ../manifests/caddy.yaml's header comment for the full rationale.
 ingress:
   enabled: false
-  className: ""
-  hosts:
-    - host: office.libre365.example.org
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: onlyoffice-tls
-      hosts:
-        - office.libre365.example.org
+  host: office.libre365.example.org
+  path: "/"
+  ssl:
+    enabled: false
