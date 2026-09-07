@@ -193,6 +193,12 @@ _BARE_DOMAIN_PATTERNS = {
         # Ingress host).
         r'(value:\s*"admin@)[^"]*(")',
     ],
+    REPO_ROOT / "infra/k8s/helm-values/seafile.yaml": [
+        # Same bare-base-domain "admin@<base>" pattern as gokapi.yaml above
+        # (INIT_SEAFILE_ADMIN_EMAIL, required by this chart's own
+        # presetEnv while initMode is true - see this file's own header).
+        r'(INIT_SEAFILE_ADMIN_EMAIL:\s*"admin@)[^"]*(")',
+    ],
 }
 
 # Every file containing a subdomain-prefixed public domain name (see
