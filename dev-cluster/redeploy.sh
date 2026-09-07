@@ -28,9 +28,10 @@ CLUSTER_NAME="libre365-dev"
 CONNECTORS=(notification-hub unified-search presence-aggregator onlyoffice-mentions peertube-ingest)
 # Keycloak itself is NOT in this list: it's an Operator CR now, not a Helm
 # release (see infra/k8s/manifests/keycloak.yaml) - iterate on it with
-# `kubectl apply -f infra/k8s/manifests/keycloak.yaml`, the same way as
+# `kubectl apply -f infra/k8s/manifests/dev/keycloak.yaml` (the dev-sized
+# CR deploy.sh itself applies, not the production one), the same way as
 # gokapi/caddy's raw manifests (also not covered by this script).
-HELM_CHARTS=(keycloak-postgres synapse element-web seafile onlyoffice vikunja seaweedfs peertube novu external-dns openbao external-secrets)
+HELM_CHARTS=(keycloak-postgres synapse element-web seafile-mysql seafile-memcached seafile onlyoffice-postgres onlyoffice-redis onlyoffice-rabbitmq onlyoffice vikunja-postgres vikunja seaweedfs peertube novu external-dns openbao external-secrets)
 
 usage() {
   echo "Usage: $0 <connector-name|helm-release-name>"
@@ -44,6 +45,25 @@ target="$1"
 
 is_in() { local needle="$1"; shift; for x in "$@"; do [ "$x" = "$needle" ] && return 0; done; return 1; }
 
+# Same recovery wrapper as deploy.sh's own `helm_install` - see that
+# script's comment on it for the full story (a hook failure leaves a
+# release stuck in "failed", which a later `helm upgrade --install`
+# treats as a genuine upgrade and runs upgrade-only hooks that then fail
+# too).
+helm_install() {
+  local release="$1"
+  shift
+  local status
+  status="$(helm status "$release" -n "$NAMESPACE" 2>/dev/null | awk -F': ' '/^STATUS:/{print $2}' || true)"
+  case "$status" in
+    failed | pending-install | pending-upgrade | pending-rollback)
+      echo "    release '${release}' is stuck in '${status}' state from a previous run - uninstalling it first (--no-hooks) for a clean install"
+      helm uninstall "$release" -n "$NAMESPACE" --no-hooks || true
+      ;;
+  esac
+  helm upgrade --install "$release" "$@"
+}
+
 if is_in "$target" "${CONNECTORS[@]}"; then
   echo "==> Rebuilding connector '${target}'"
   docker build -t "libre365/${target}:dev" "connectors/${target}"
@@ -56,21 +76,55 @@ elif is_in "$target" "${HELM_CHARTS[@]}"; then
   base="infra/k8s/helm-values/${target}.yaml"
   dev_overlay="infra/k8s/helm-values/dev/${target}.yaml"
   chart=""
+  chart_version=""
   case "$target" in
     keycloak-postgres) chart="bitnami/postgresql" ;;
     synapse) chart="ananace-charts/matrix-synapse" ;;
-    element-web) chart="ananace-charts/matrix-element-web" ;;
-    seafile) chart="seafile-charts/seafile-ce" ;;
-    onlyoffice) chart="onlyoffice/docs-cloud" ;;
-    vikunja) chart="vikunja/vikunja" ;;
+    element-web) chart="ananace-charts/element-web" ;;
+    seafile-mysql) chart="bitnami/mysql" ;;
+    seafile-memcached) chart="bitnami/memcached" ;;
+    seafile) chart="seafile-charts/ce" ;;
+    onlyoffice-postgres) chart="bitnami/postgresql" ;;
+    onlyoffice-redis) chart="bitnami/redis" ;;
+    onlyoffice-rabbitmq) chart="bitnami/rabbitmq" ;;
+    # [CORRECTED] found by actually running this script: the chart's own
+    # `ds-files`/`ds-runtime-config` PVCs hardcode `accessModes:
+    # [ReadWriteMany]`, which k3d's `local-path` StorageClass cannot
+    # provision - see infra/k8s/manifests/dev/onlyoffice-storage.yaml's
+    # header for the full story. Applied here too (not just deploy.sh)
+    # since this script can install `onlyoffice` standalone on a cluster
+    # where deploy.sh never ran that step - the statically pre-provisioned
+    # PVCs it references via `persistence.existingClaim` must already
+    # exist before the release itself.
+    onlyoffice) chart="onlyoffice/docs"; kubectl apply -f infra/k8s/manifests/dev/onlyoffice-storage.yaml ;;
+    vikunja-postgres) chart="bitnami/postgresql" ;;
+    # No `helm repo add vikunja` exists (never did - see deploy.sh's own
+    # comment) - this is the real go-vikunja/helm-chart OCI artifact,
+    # pinned by --version since OCI references aren't resolved through a
+    # repo's own index like every other chart here.
+    vikunja) chart="oci://ghcr.io/go-vikunja/helm-chart/vikunja"; chart_version="2.3.0" ;;
     seaweedfs) chart="seaweedfs/seaweedfs" ;;
     peertube) chart="peertube-helm/peertube" ;;
-    novu) chart="novu/novu" ;;
+    # No official Novu chart exists at all (see deploy.sh's own comment) -
+    # this is the community OCI chart, pinned by --version since OCI
+    # references aren't resolved through a repo's own index like every
+    # other chart here.
+    novu) chart="oci://ghcr.io/nova-edge/charts/novu"; chart_version="0.2.1" ;;
     external-dns) chart="external-dns/external-dns" ;;
     openbao) chart="openbao/openbao" ;;
     external-secrets) chart="external-secrets/external-secrets" ;;
   esac
-  helm upgrade --install "$target" "$chart" -n "$NAMESPACE" -f "$base" -f "$dev_overlay"
+  # --skip-schema-validation for novu only - see deploy.sh's own comment on
+  # its `helm upgrade --install novu` line: every published version of this
+  # community chart ships a values.schema.json with a real authoring bug
+  # that fails schema validation unconditionally, regardless of values.
+  extra_args=()
+  [ "$target" = "novu" ] && extra_args=(--skip-schema-validation)
+  if [ -n "$chart_version" ]; then
+    helm_install "$target" "$chart" --version "$chart_version" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
+  else
+    helm_install "$target" "$chart" -n "$NAMESPACE" "${extra_args[@]}" -f "$base" -f "$dev_overlay"
+  fi
   echo "==> Force-deleting its pod(s) so the new values are picked up immediately"
   kubectl delete pod -n "$NAMESPACE" -l "app.kubernetes.io/instance=${target}" --grace-period=0 --force --ignore-not-found
 

@@ -141,11 +141,13 @@ services:
     helm:
       file: infra/k8s/helm-values/synapse.yaml
       image_repository: matrixdotorg/synapse
-      # ananace-chart/matrix-synapse chart: everything related to Synapse is
-      # nested under the `synapse:` root key (workers, oidc, federation...) —
-      # the image override follows the same convention rather than a root
-      # `.image.tag`, which this chart doesn't have.
-      tag_path: synapse.image.tag
+      # [CORRECTED] `image:` is a TOP-LEVEL key in ananace-chart/matrix-synapse
+      # (verified directly against the chart's real values.yaml after a live
+      # deployment failure - "workers"/"serverName" turned out to be
+      # similarly misplaced throughout infra/k8s/helm-values/synapse*.yaml,
+      # see that file's own header for the full story) - NOT nested under
+      # `synapse:` as this comment used to claim.
+      tag_path: image.tag
 
   element_web:
     version: "v1.12.27" # study 1.2
@@ -211,8 +213,14 @@ services:
       image: seafileltd/seafile-mc
     helm:
       file: infra/k8s/helm-values/seafile.yaml
-      image_repository: seafileltd/seafile-mc
-      tag_path: .image.tag
+      # [CORRECTED] no tag_path/image_repository here: the real
+      # haiwen/seafile-helm-chart `ce` chart has no split
+      # `image.repository`/`image.tag` pair at all (found by actually
+      # running dev-cluster/deploy.sh, then verifying the chart's real
+      # source) - its image is one combined "repo:tag" string,
+      # `seafile.configs.image` in seafile.yaml, which
+      # scripts/sync_platform.py's generic two-field patcher can't target.
+      # Kept in sync with `version` above BY HAND in seafile.yaml itself.
 
   onlyoffice:
     # study 1.5 - >= 9.4 is a decision explicitly settled by the study
@@ -225,14 +233,28 @@ services:
       image: onlyoffice/documentserver
     helm:
       file: infra/k8s/helm-values/onlyoffice.yaml
-      image_repository: onlyoffice/documentserver
-      tag_path: .image.tag
+      # [CORRECTED] no tag_path/image_repository here: the real
+      # ONLYOFFICE/Kubernetes-Docs `docs` chart has no single top-level
+      # `image:` at all (found by actually running dev-cluster/deploy.sh,
+      # then verifying the chart's real source) - it deploys `docservice`/
+      # `converter` as two separately-imaged components, both defaulting
+      # to the shared `images.tag` (onlyoffice.yaml), which
+      # scripts/sync_platform.py's generic two-field patcher can't target.
+      # Kept in sync with `version` above BY HAND in onlyoffice.yaml
+      # itself - note the k8s image tags follow a different, more precise
+      # scheme (e.g. "9.4.1-1") than this bare "9.4" (used by the
+      # docker-compose dev tier's monolithic onlyoffice/documentserver
+      # image instead).
 
   vikunja:
     # study 1.6 - matches the real vikunja/vikunja Docker Hub tag (no "v"
-    # prefix). Since 1.0.0-rc0, the OpenID provider config uses a map keyed
-    # by an arbitrary provider name rather than a numeric index - see
-    # vikunja.yaml's own comments for what that means for this deployment.
+    # prefix), and the real go-vikunja/helm-chart's own Chart.yaml
+    # appVersion. [CORRECTED] the previous comment here claimed the OpenID
+    # provider config uses a map keyed by an arbitrary provider name -
+    # found wrong by actually running dev-cluster/deploy.sh then verifying
+    # Vikunja's own config.yml.sample: `auth.openid.providers` is a LIST
+    # addressed by index (VIKUNJA_AUTH_OPENID_PROVIDERS_0_...) - see
+    # vikunja.yaml's own header for the full story.
     version: "2.6.0"
     ports: { VIKUNJA_PORT: 3456 }
     compose:
@@ -240,7 +262,13 @@ services:
     helm:
       file: infra/k8s/helm-values/vikunja.yaml
       image_repository: vikunja/vikunja
-      tag_path: .image.tag
+      # [CORRECTED] the real chart nests image.tag/image.repository under
+      # a top-level `vikunja:` key (see vikunja.yaml's own header) -
+      # tag_path adjusted accordingly (sync_platform.py's dot-path patcher
+      # supports arbitrary nesting depth, so this one IS compatible,
+      # unlike Seafile/OnlyOffice's combined-string/split-component
+      # schemas).
+      tag_path: vikunja.image.tag
 
   gokapi:
     # study 1.8 - OIDC is configured non-interactively via
@@ -308,27 +336,58 @@ services:
       # synchronize).
 
   novu:
-    # study 2.1 - production notification hub (official Helm chart), also
-    # deployed as-is (with the infra/k8s/helm-values/dev/novu.yaml
-    # dev-hardening overlay) on the k3d dev cluster - see
-    # dev-cluster/README.md. No docker-compose service (Novu was never meant
-    # to run outside Kubernetes here; a hand-rolled HTTP mock used to fill
-    # that gap in docker-compose, replaced once the k3d dev cluster made a
-    # real chart deployment available - see the description of the whole
-    # dev tier for the tradeoff this closed). The official Novu chart
-    # manages the images of its sub-components (api/worker/ws/web) itself,
-    # with no single usable `image.tag` field here: not synchronized by this
-    # script — the chart version (`--version` on `helm upgrade`) remains the
-    # reference to pin separately on the day of the actual deployment.
+    # study 2.1 - production notification hub, also deployed as-is (with
+    # the infra/k8s/helm-values/dev/novu.yaml dev-hardening overlay) on the
+    # k3d dev cluster - see dev-cluster/README.md. No docker-compose service
+    # (Novu was never meant to run outside Kubernetes here; a hand-rolled
+    # HTTP mock used to fill that gap in docker-compose, replaced once the
+    # k3d dev cluster made a real chart deployment available - see the
+    # description of the whole dev tier for the tradeoff this closed).
+    #
+    # [CORRECTED] Novu has NO official Helm chart at all - found while
+    # actually running dev-cluster/deploy.sh ("novuhq/helm-charts" 404s, no
+    # such repository exists under the novuhq GitHub org). The chart
+    # actually used (see infra/k8s/helm-values/novu.yaml's own header) is
+    # Nova-Edge/novu-chart, a low-adoption community project that itself
+    # disclaims official Novu support, published as an OCI artifact -
+    # pinned by NOVU_CHART/NOVU_CHART_VERSION shell variables in
+    # dev-cluster/deploy.sh (same pattern as KEYCLOAK_VERSION there), not
+    # here: OCI references are pinned by `--version` at install time, not
+    # resolved through a repo's own index the way every other chart's
+    # `helm repo add` + implicit-latest works.
+    # This chart manages the images of its sub-components (api/worker/ws/
+    # web) itself, with no single usable `image.tag` field here either: not
+    # synchronized by this script.
     ports: { NOVU_API_PORT: 13000 }
     compose: null
     helm: null
 
   grommunio_dev:
-    version: "core-c9" # dev/test image only, see study 4.3
-    ports: { GROMMUNIO_DEV_HTTP_PORT: 8443 }
+    # [CORRECTED] the image/tag below used to be "grommunio/gromox-container:
+    # core-c9" - that repository does not exist on Docker Hub at all (a real
+    # `docker compose up` fails immediately with "pull access denied...
+    # repository does not exist"), found while actually running this stack.
+    # The real image, verified against grommunio/gromox-container's own
+    # docker-compose.yml (github.com/grommunio/gromox-container) and Docker
+    # Hub's tag list API for grommunio/gromox-core, is "grommunio/gromox-core"
+    # - version below is the most recent tag that repository has ever
+    # published (verified via the Docker Hub API, not guessed); grommunio only
+    # publishes early/experimental tags for this image (0.1 through 0.3, all
+    # against openSUSE Leap 15.x base images) - [UNCERTAIN] whether a more
+    # current one exists that Docker Hub's public tag-list API doesn't
+    # surface, not otherwise verifiable from this sandboxed environment.
+    version: "0.3-opensuse-leap-15-4" # dev/test image only, see study 4.3
+    ports:
+      GROMMUNIO_DEV_HTTP_PORT: 8443
+      # Added because the test suite (tests/integration/test_mail_grommunio.py)
+      # actually needs SMTP/IMAP reachable on localhost for its send/receive
+      # scenario (study 5.5) - the previous version of this file only ever
+      # exposed the admin port, so that test could never have passed against
+      # this compose stack even once the image name above is fixed.
+      GROMMUNIO_DEV_SMTP_PORT: 587
+      GROMMUNIO_DEV_IMAP_PORT: 993
     compose:
-      image: grommunio/gromox-container
+      image: grommunio/gromox-core
     helm: null # study 4.3: Proxmox VM appliance in production, never a
       # Kubernetes container - no equivalent Helm file to synchronize.
 

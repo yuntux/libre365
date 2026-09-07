@@ -7,22 +7,14 @@
 #   helm upgrade --install synapse ananace-charts/matrix-synapse -n libre365-dev \
 #     -f synapse.yaml -f dev/synapse.yaml
 #
-# Key paths reused below are exactly the ones already used in synapse.yaml /
-# synapse-100.yaml / synapse-2000.yaml (nested under `synapse:`, per the
-# ananace-chart convention). No key not already attested elsewhere in this repo for
-# this chart has been introduced.
+# Key paths reused below are the real ones this chart actually defines,
+# verified against its source (gitlab.com/ananace/charts,
+# charts/matrix-synapse) after a live deployment failure - see
+# ../synapse.yaml's own header for the full story. `workers:` in particular
+# is a TOP-LEVEL key here, not nested under `synapse:` as an earlier version
+# of this file assumed.
 
 synapse:
-  # 1.2 L.89 — the base synapse.yaml turns on "workers" mode (federation-sender,
-  # federation-reader, synchrotron x2, generic-workers x2, media-repository), which
-  # is the production architecture target but means 7+ extra pods to schedule and
-  # wait on in a local k3d cluster for no functional benefit in dev (a single
-  # Synapse process handles the load of a handful of dev users just fine).
-  # Disabled here for dev speed using the same `workers.enabled` toggle the base
-  # file already sets to true.
-  workers:
-    enabled: false
-
   resources:
     requests:
       cpu: "250m"
@@ -30,6 +22,25 @@ synapse:
     limits:
       cpu: "500m"
       memory: "1Gi"
+
+# 1.2 L.89 — the base synapse.yaml turns on every worker (federation-sender,
+# generic-worker, synchrotron, media-repository), which is the production
+# architecture target but means several extra pods to schedule and wait on
+# in a local k3d cluster for no functional benefit in dev (a single Synapse
+# process handles the load of a handful of dev users just fine). Disabled
+# here per worker (no single top-level "workers.enabled" toggle exists in
+# this chart - see ../synapse.yaml's own header) - overriding just the
+# `enabled` field on each worker Helm already deep-merges over the base
+# file's own definition of it.
+workers:
+  federation_sender:
+    enabled: false
+  generic_worker:
+    enabled: false
+  media_repository:
+    enabled: false
+  synchrotron:
+    enabled: false
 
 postgresql:
   primary:

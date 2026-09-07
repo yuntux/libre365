@@ -4,72 +4,116 @@
 #   chart    : matrix-synapse
 # Possible chart alternative: matrix-org/synapse (official Element helm chart, less
 # complete on workers mode) — ananace-chart chosen here because it natively exposes
-# the decomposition into workers (federation-sender, synchrotron, generic workers)
-# required by the architecture target adopted in 1.2 L.89.
+# the decomposition into workers (federation-sender, generic workers, plus the
+# chart's own documented pattern for splitting out specialized generic workers
+# like a sync-handling one) required by the architecture target adopted in 1.2 L.89.
 #
 # Sizing convention (see README.md): this file carries the COMMON values (image,
 # OIDC, workers mode enabled); the numeric sizing values (resources, replicas) are
 # in the synapse-100.yaml / synapse-2000.yaml overlays, applied second on the helm
 # command line (-f synapse.yaml -f synapse-100.yaml).
+#
+# [CORRECTED, substantially] found by actually running dev-cluster/deploy.sh
+# ("A valid serverName is required") then verifying this chart's real
+# values.yaml/templates/secrets.yaml directly (gitlab.com/ananace/charts,
+# charts/matrix-synapse) rather than guessing further:
+# - `serverName` is a TOP-LEVEL key (was wrongly nested under a fictional
+#   `matrix:` block that doesn't exist anywhere in this chart's schema).
+# - `workers:` is a TOP-LEVEL key (was nested under `synapse:`), and none of
+#   "federationSender"/"federationReader"/"synchrotron"/"genericWorkers"/
+#   "mediaRepository" are its real key names or even all real toggleable
+#   worker types - see below.
+# - `image:` is a TOP-LEVEL key (was nested under `synapse:`).
+# - There is no chart-native `oidc:` block at all: OIDC goes through
+#   `extraConfig.oidc_providers`, real Synapse homeserver.yaml syntax the
+#   chart passes through as-is (Ref in the chart's own values.yaml:
+#   github.com/matrix-org/synapse/blob/develop/docs/sample_config.yaml).
+# - The previous `client_secret: {secretName: ..., secretKey: ...}` was
+#   fictional: verified directly against this chart's templates/secrets.yaml
+#   - `extraSecrets` is dumped through `toYaml` with zero special-casing for
+#   a secretName/secretKey dict, so that value would have been written
+#   literally into Synapse's own config as a YAML object, which Synapse's
+#   OIDC config expects to be a plain string. Synapse's own native
+#   `client_secret_path` (reads the secret from a mounted file) is the real,
+#   correct way to avoid inlining the plaintext value - wired below via the
+#   chart's real `synapse.extraVolumes`/`extraVolumeMounts`, mounting the
+#   same `synapse-oidc-secret` (infra/k8s/manifests/external-secrets.yaml,
+#   sourced from OpenBao) every other part of this repo already assumes.
 
-matrix:
-  serverName: matrix.libre365.example.org
+serverName: matrix.libre365.example.org
+publicServerName: matrix.libre365.example.org
+
+image:
+  tag: v1.160.0
+  repository: matrixdotorg/synapse
+
+# 1.7 — Federated SSO toward Keycloak, the component chosen for the whole
+# stack. infra/ansible/playbooks/matrix.yml used to render a second,
+# disconnected OIDC config into a ConfigMap this chart never actually read
+# (found during an earlier review: that ConfigMap wasn't referenced by any
+# `extraConfig`/volume anywhere), with a different, wrong client_id
+# ("synapse" instead of the real Keycloak client "matrix-synapse" below) -
+# removed rather than fixed twice.
+extraConfig:
+  oidc_providers:
+    - idp_id: keycloak
+      idp_name: "Libre365 SSO"
+      issuer: "https://sso.libre365.example.org/realms/libre365"
+      client_id: "matrix-synapse"
+      client_secret_path: /etc/synapse/oidc/client-secret
+      scopes: ["openid", "profile", "email"]
+      user_mapping_provider:
+        config:
+          localpart_template: "{{ user.preferred_username }}"
+          display_name_template: "{{ user.name }}"
 
 synapse:
-  # 1.2 L.89 — "workers" mode chosen as the architecture target from the start (rather
-  # than a later evolution), to split federation / sync / message sending across
-  # several processes and absorb growth without rethinking the Matrix architecture.
-  workers:
-    enabled: true
-    federationSender:
-      enabled: true
-      replicaCount: 1
-    federationReader:
-      enabled: true
-      replicaCount: 1
-    synchrotron:
-      enabled: true
-      replicaCount: 2
-    genericWorkers:
-      enabled: true
-      replicaCount: 2
-    mediaRepository:
-      enabled: true
-      replicaCount: 1
+  # Mounts the synapse-oidc-secret Kubernetes Secret (see the header comment
+  # above) as a file, read by extraConfig.oidc_providers' client_secret_path
+  # - the chart has no first-class "reference an existing Secret" mechanism
+  # of its own for extraConfig values, so this is the standard Kubernetes
+  # way to hand a container a value from a Secret without ever inlining it
+  # into a ConfigMap/values file. The Secret's own key is "client-secret"
+  # (see external-secrets.yaml) - `items` renames it to the plain filename
+  # `client_secret_path` above expects.
+  extraVolumes:
+    - name: synapse-oidc-secret
+      secret:
+        secretName: synapse-oidc-secret
+        items:
+          - key: client-secret
+            path: client-secret
+  extraVolumeMounts:
+    - name: synapse-oidc-secret
+      mountPath: /etc/synapse/oidc
+      readOnly: true
 
-  # 1.7 — Federated SSO toward Keycloak, the component chosen for the whole
-  # stack. This chart-native block is the ONLY OIDC config for Synapse -
-  # infra/ansible/playbooks/matrix.yml used to render a second, disconnected
-  # OIDC config into a ConfigMap this chart never actually reads (found
-  # during review: that ConfigMap wasn't referenced by any `extraConfig`/
-  # volume anywhere), with a different, wrong client_id ("synapse" instead
-  # of the real Keycloak client "matrix-synapse" below) - removed rather
-  # than fixed twice. client-secret comes from synapse-oidc-secret
-  # (infra/k8s/manifests/external-secrets.yaml, sourced from OpenBao), the
-  # same ExternalSecret/OpenBao pattern every other OIDC client in this
-  # stack uses - never hand this value in plaintext.
-  oidc:
+# 1.2 L.89 — "workers" mode chosen as the architecture target from the start
+# (rather than a later evolution), to split federation-sending, /sync
+# handling and general message-sending across several processes and absorb
+# growth without rethinking the Matrix architecture. Only
+# federation_sender/media_repository/generic_worker are this chart's own
+# built-in toggleable worker types (verified against its real values.yaml);
+# "synchrotron" below is NOT one of those - it's this chart's own documented
+# pattern (its values.yaml ships the exact same block, commented out, as an
+# example) for splitting a specific concern (the /sync endpoint) out of the
+# generic worker into its own scalable deployment.
+workers:
+  federation_sender:
     enabled: true
-    providers:
-      - idp_id: keycloak
-        idp_name: "Libre365 SSO"
-        issuer: "https://sso.libre365.example.org/realms/libre365"
-        client_id: "matrix-synapse"
-        client_secret:
-          secretName: synapse-oidc-secret
-          secretKey: client-secret
-        scopes: ["openid", "profile", "email"]
-        user_mapping_provider:
-          config:
-            localpart_template: "{{ user.preferred_username }}"
-            display_name_template: "{{ user.name }}"
-
-  federation:
+  generic_worker:
     enabled: true
-
-  image:
-    tag: v1.160.0
-    repository: matrixdotorg/synapse
+  media_repository:
+    enabled: true
+  synchrotron:
+    enabled: true
+    generic: true
+    listeners: [client]
+    csPaths:
+      - "/_matrix/client/(v2_alpha|r0|v3)/sync$"
+      - "/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$"
+      - "/_matrix/client/(api/v1|r0|v3)/initialSync$"
+      - "/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$"
 
 postgresql:
   enabled: true

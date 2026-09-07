@@ -106,28 +106,39 @@ instead of a separate cascade file.
 | Component | Chart | Helm repo |
 |---|---|---|
 | Synapse (Matrix) | `matrix-synapse` (ananace-chart) | https://ananace.gitlab.io/charts |
-| Element Web | `matrix-element-web` (ananace-chart) | https://ananace.gitlab.io/charts |
+| Element Web | `element-web` (ananace-chart) | https://ananace.gitlab.io/charts |
 | Element Call | no official chart — "chart-like" values manifest, to be adapted as raw | — |
 | Visio (LaSuite Meet) | `suitenumerique/meet` if published, otherwise raw manifest | https://github.com/suitenumerique/meet |
-| Seafile | community chart `seafile-ce` | https://seafile-charts.github.io/seafile-charts (to be confirmed) |
-| OnlyOffice Document Server | community chart `docs-cloud` | https://onlyoffice.github.io/docs-cloud-chart (to be confirmed) |
-| Vikunja | no official chart confirmed to exist (see `vikunja.yaml`'s header) — "chart-like" values manifest, to be adapted to a generic app-template chart or a raw manifest | — |
+| Seafile | chart `ce` published by `haiwen` (Seafile's own GitHub org) — has no bundled MySQL/cache of its own (confirmed by actually running `dev-cluster/deploy.sh`), see `seafile-mysql`/`seafile-memcached` below | https://haiwen.github.io/seafile-helm-chart/repo ([UNCERTAIN]: found via that org's own README, but this sandboxed environment's egress proxy blocks `*.github.io` outright, so the index.yaml itself was never independently fetched - the previous URL here, `seafile-charts.github.io/seafile-charts`, was fabricated and 404s) |
+| Seafile MySQL | `mysql` (bitnami) — standalone release, the `ce` chart above requires an externally-provisioned MySQL | https://charts.bitnami.com/bitnami |
+| Seafile Memcached | `memcached` (bitnami) — standalone release, same reason as Seafile MySQL above | https://charts.bitnami.com/bitnami |
+| OnlyOffice Document Server | chart `docs` published by ONLYOFFICE itself — has no bundled PostgreSQL/Redis/AMQP broker of its own (confirmed by actually running `dev-cluster/deploy.sh`), see `onlyoffice-postgres`/`onlyoffice-redis`/`onlyoffice-rabbitmq` below | https://download.onlyoffice.com/charts/stable ([UNCERTAIN], same reason as Seafile above - found via github.com/ONLYOFFICE/Kubernetes-Docs' own README, egress-blocked from independently fetching the index.yaml; the previous URL here, `onlyoffice.github.io/docs-cloud-chart`, was fabricated and 404s) |
+| OnlyOffice PostgreSQL | `postgresql` (bitnami) — standalone release, the `docs` chart above requires an externally-provisioned PostgreSQL | https://charts.bitnami.com/bitnami |
+| OnlyOffice Redis | `redis` (bitnami) — standalone release, same reason as OnlyOffice PostgreSQL above | https://charts.bitnami.com/bitnami |
+| OnlyOffice RabbitMQ | `rabbitmq` (bitnami) — standalone release, the `docs` chart above requires an externally-provisioned AMQP broker (its default `connections.amqpExistingSecret` pointed at a Secret that was never provisioned, only surfacing once `docservice`'s container actually tried to start — confirmed by actually running `dev-cluster/deploy.sh`) | https://charts.bitnami.com/bitnami |
+| Vikunja | `vikunja` (go-vikunja/helm-chart, published by the Vikunja project itself) — has no bundled database of its own (defaults to SQLite; confirmed by actually running `dev-cluster/deploy.sh`), see `vikunja-postgres` below | OCI artifact, not an index.yaml repo: `oci://ghcr.io/go-vikunja/helm-chart/vikunja`, pinned by `--version` (see `vikunja.yaml`'s own header) |
+| Vikunja PostgreSQL | `postgresql` (bitnami) — standalone release, the `vikunja` chart above requires an externally-provisioned database to avoid SQLite | https://charts.bitnami.com/bitnami |
 | Keycloak | no Helm chart — official Keycloak Operator CR (`../manifests/keycloak.yaml`), `bitnami/postgresql` for its now-standalone database | Operator: raw kubectl apply (see that file's header); Postgres: https://charts.bitnami.com/bitnami |
 | Gokapi | no official chart — raw manifest (`../manifests/gokapi.yaml`) | — |
 | SeaweedFS | `seaweedfs` (official, in-tree chart) | https://seaweedfs.github.io/seaweedfs/helm |
-| PeerTube | community chart `peertube` | https://peertube-helm.github.io/charts (to be confirmed) |
+| PeerTube | no official chart (PeerTube itself publishes none) — community chart `peertube` (`zendet/peertube-helm`, 7 GitHub stars) | https://zendet.github.io/peertube-helm/ ([UNCERTAIN], same egress-blocked-from-github.io reason as Seafile/OnlyOffice above; the previous URL here, `peertube-helm.github.io/charts`, was fabricated and 404s) |
 | Caddy | no dedicated chart — raw manifest (`../manifests/caddy.yaml`), custom xcaddy image with an HTML injection plugin | — |
-| Novu | `novu` (official Novu chart) | https://novuhq.github.io/helm-charts |
+| Novu | no official chart exists at all (verified: `novuhq/helm-charts` doesn't exist, its gh-pages 404s) — community chart `Nova-Edge/novu-chart`, low-adoption, explicitly not officially supported by the Novu team; installed with `--skip-schema-validation` (every published version's bundled `values.schema.json` has its own authoring bug — see `novu.yaml`'s own header) | OCI artifact, not an index.yaml repo: `oci://ghcr.io/nova-edge/charts/novu`, pinned by `--version` (see `novu.yaml`'s own header) |
 | external-dns | `external-dns` (kubernetes-sigs) | https://kubernetes-sigs.github.io/external-dns/ |
 | OpenBao | `openbao` (OpenBao project) | https://openbao.github.io/openbao-helm/ (not independently verified from this sandbox — see `openbao.yaml`'s own header comment) |
 | External Secrets Operator | `external-secrets` (external-secrets project, CNCF) | https://charts.external-secrets.io |
 
-Charts marked "to be confirmed" had no single identified official source at
-the time of writing (August/September 2026): several community forks exist
-depending on the component. Systematic fallback planned to a raw manifest
-derived from the official Docker image if no maintained chart is available
-at the time of actual deployment. `external-dns.yaml`'s OVH webhook-provider
-image carries the same caveat — see that file's header comment.
+Charts marked "[UNCERTAIN]" (Seafile, OnlyOffice, PeerTube) had their
+`helm repo add` URL found via the publisher's own current GitHub README
+(fetched directly, which works), but the actual `index.yaml` behind that
+URL could not be independently fetched from this sandboxed environment
+(its egress proxy blocks `*.github.io` and most custom domains outright,
+`EGRESS_BLOCKED` on every attempt) - confirm on first real run, same as
+Novu. This replaces an earlier, weaker version of this same caveat: the 3
+URLs previously here were outright fabricated (never real at any point,
+not just "unverified") and 404 immediately - found by actually running
+`dev-cluster/deploy.sh`. `external-dns.yaml`'s OVH webhook-provider image
+carries a similar caveat — see that file's header comment.
 
 ## Typical deployment command
 
@@ -136,24 +147,35 @@ image carries the same caveat — see that file's header comment.
 helm repo add ananace-charts https://ananace.gitlab.io/charts
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm
-helm repo add novu https://novuhq.github.io/helm-charts
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+helm repo add seafile-charts https://haiwen.github.io/seafile-helm-chart/repo
+helm repo add onlyoffice https://download.onlyoffice.com/charts/stable
+helm repo add peertube-helm https://zendet.github.io/peertube-helm/
 helm repo update
+# Novu: no `helm repo add` - see its table row above, it's an OCI artifact.
 
 # Namespace
 kubectl apply -f ../manifests/namespace.yaml
 
 # Component with no scale overlay
-helm upgrade --install seafile seafile-charts/seafile-ce -n libre365 -f seafile.yaml
+helm upgrade --install seafile-mysql bitnami/mysql -n libre365 -f seafile-mysql.yaml
+helm upgrade --install seafile-memcached bitnami/memcached -n libre365 -f seafile-memcached.yaml
+kubectl apply -f ../manifests/seafile-extra-env.yaml
+helm upgrade --install seafile seafile-charts/ce -n libre365 -f seafile.yaml
 helm upgrade --install seaweedfs seaweedfs/seaweedfs -n libre365 -f seaweedfs.yaml
 helm upgrade --install peertube peertube-helm/peertube -n libre365 -f peertube.yaml
-helm upgrade --install novu novu/novu -n libre365 -f novu.yaml
-helm upgrade --install element-web ananace-charts/matrix-element-web -n libre365 -f element-web.yaml
+helm upgrade --install novu oci://ghcr.io/nova-edge/charts/novu --version 0.2.1 -n libre365 -f novu.yaml
+helm upgrade --install vikunja-postgres bitnami/postgresql -n libre365 -f vikunja-postgres.yaml
+helm upgrade --install vikunja oci://ghcr.io/go-vikunja/helm-chart/vikunja --version 2.3.0 -n libre365 -f vikunja.yaml
+helm upgrade --install element-web ananace-charts/element-web -n libre365 -f element-web.yaml
 helm upgrade --install keycloak-postgres bitnami/postgresql -n libre365 -f keycloak-postgres.yaml
 
 # Component with a scale overlay (example: 100-user target)
 helm upgrade --install synapse ananace-charts/matrix-synapse -n libre365 -f synapse.yaml -f synapse-100.yaml
-helm upgrade --install onlyoffice onlyoffice/docs-cloud -n libre365 -f onlyoffice.yaml -f onlyoffice-100.yaml
+helm upgrade --install onlyoffice-postgres bitnami/postgresql -n libre365 -f onlyoffice-postgres.yaml
+helm upgrade --install onlyoffice-redis bitnami/redis -n libre365 -f onlyoffice-redis.yaml
+helm upgrade --install onlyoffice-rabbitmq bitnami/rabbitmq -n libre365 -f onlyoffice-rabbitmq.yaml
+helm upgrade --install onlyoffice onlyoffice/docs -n libre365 -f onlyoffice.yaml -f onlyoffice-100.yaml
 
 # Keycloak: Operator CR, not a Helm release - see ../manifests/keycloak.yaml's
 # header for the operator install command (kubectl apply, cluster-scoped)

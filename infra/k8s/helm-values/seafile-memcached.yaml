@@ -1,0 +1,31 @@
+# Component: Memcached for Seafile CE — standalone release (study 1.4)
+# Chart used: bitnami/memcached
+#   Helm repo: https://charts.bitnami.com/bitnami
+#   chart    : memcached
+#
+# [ADDED] found missing by actually running dev-cluster/deploy.sh: the real
+# `haiwen/seafile-helm-chart` `ce` chart has no bundled cache subchart
+# either (see ../seafile-mysql.yaml's header for the same finding about
+# MySQL) - Seafile only ever talks to an externally-provisioned Redis OR
+# Memcached, selected via `CACHE_PROVIDER`/`MEMCACHED_HOST` in
+# ../seafile.yaml. Memcached chosen here (matches the previous, fictional
+# `memcached.enabled: true` toggle's intent) since it needs no persistence
+# or auth for Seafile's caching use case - verified against bitnami/
+# memcached's own values.yaml: `auth.enabled: false` by default, no
+# password required.
+#
+# [UNCERTAIN, not verified against a live `helm install` from this
+# sandboxed environment]: the exact Service hostname this chart's fullname
+# template produces for the `seafile-memcached` release name -
+# ../seafile.yaml's `env.MEMCACHED_HOST` assumes "seafile-memcached"
+# (release name already contains the chart name "memcached") - confirm
+# with `kubectl get svc -n libre365 -l
+# app.kubernetes.io/instance=seafile-memcached` at deployment time.
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "250m"
+    memory: "256Mi"

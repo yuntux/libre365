@@ -1,0 +1,46 @@
+# Component: PostgreSQL for OnlyOffice Document Server — standalone release (study 1.5)
+# Chart used: bitnami/postgresql
+#   Helm repo: https://charts.bitnami.com/bitnami
+#   chart    : postgresql
+#
+# [ADDED] found missing by actually running dev-cluster/deploy.sh: the real
+# `ONLYOFFICE/Kubernetes-Docs` `docs` chart has NO bundled database of its
+# own (unlike what this file's earlier `redis:`-only setup implied) - its
+# pre-install Job (templates/jobs/pre-install.yaml, "DB migration") tried
+# to reach the chart's own default `connections.dbHost: postgresql`, which
+# doesn't exist here, and timed out ("failed pre-install: 1 error
+# occurred: timed out waiting for the condition"). See ../onlyoffice.yaml's
+# own header for the full story on that chart's real `connections:`
+# schema. Same "promote a bundled dependency to its own top-level release"
+# pattern already used for keycloak-postgres.yaml.
+#
+# [UNCERTAIN, not verified against a live `helm install` from this
+# sandboxed environment]: the exact Service hostname this chart's fullname
+# template produces for the `onlyoffice-postgres` release name -
+# ../onlyoffice.yaml's `connections.dbHost` assumes
+# "onlyoffice-postgres-postgresql" (release name does NOT already contain
+# the chart name "postgresql", so bitnami's common.names.fullname helper
+# should append it, same as keycloak-postgres) - confirm with `kubectl get
+# svc -n libre365 -l app.kubernetes.io/instance=onlyoffice-postgres` at
+# deployment time.
+
+auth:
+  database: onlyoffice
+  username: onlyoffice
+  existingSecret: onlyoffice-postgres-secret
+  # Bitnami postgresql chart's default existingSecret key names - "password"
+  # for the `username` user above, "postgres-password" for the superuser.
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1"
+    memory: "2Gi"
+
+primary:
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""

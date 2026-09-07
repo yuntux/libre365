@@ -1,12 +1,25 @@
 # Component: Element Web — Matrix client (study 1.2 L.84)
-# Chart used: ananace-chart/matrix-element-web (https://ananace.gitlab.io/charts)
+# Chart used: ananace-chart/element-web (https://ananace.gitlab.io/charts)
 #   Helm repo: https://ananace.gitlab.io/charts
-#   chart    : matrix-element-web
+#   chart    : element-web
 # (community chart; no official chart maintained by Element/New Vector to date)
 #
 # No dedicated 100/2000 variant: Element Web is a stateless static (SPA) client, its
 # sizing only varies by the number of frontend replicas (see the bottom of the file)
 # and not by CPU/RAM (negligible load, served as static files).
+#
+# [CORRECTED] found by actually running dev-cluster/deploy.sh: the chart name
+# itself was wrong ("matrix-element-web" doesn't exist in the ananace-charts
+# index; the real chart directory/name is "element-web"). While re-verifying
+# this chart's real source (gitlab.com/ananace/charts, charts/element-web)
+# after that failure, found a second, silent bug: `defaultServer.url` and
+# `defaultServer.name` are top-level, REQUIRED keys the chart itself uses to
+# build config.json's `default_server_config` block (templates/configuration.yaml)
+# - the previous `config.default_server_config` below was not just misplaced,
+# it would have been silently dropped entirely (the chart's own generated
+# default_server_config dict wins over `.Values.config` on that specific key
+# via a `merge` where the chart's own dict is the merge destination) while
+# also failing to satisfy the chart's `required` check on defaultServer.url/name.
 
 replicaCount: 2
 
@@ -14,14 +27,12 @@ image:
   repository: vectorim/element-web
   tag: "v1.12.27"
 
-config:
-  default_server_config:
-    "m.homeserver":
-      base_url: "https://matrix.libre365.example.org"
-      server_name: "libre365.example.org"
-    "m.identity_server":
-      base_url: "https://vector.im"
+defaultServer:
+  url: "https://matrix.libre365.example.org"
+  name: "libre365.example.org"
+  identity_url: "https://vector.im"
 
+config:
   # 2.4 L.427-436 — MatrixRTC / Element Call natively embedded as a room widget,
   # LiveKit backend (1.3 L.107). Element Call now ships bundled inside the
   # Element Web package itself rather than being reached at a configured

@@ -1,0 +1,82 @@
+# Component: MySQL for Seafile CE — standalone release (study 1.4)
+# Chart used: bitnami/mysql
+#   Helm repo: https://charts.bitnami.com/bitnami
+#   chart    : mysql
+#
+# [ADDED] found missing by actually running dev-cluster/deploy.sh: the real
+# `haiwen/seafile-helm-chart` `ce` chart (github.com/haiwen/seafile-helm-chart,
+# template/13.0/ce) has NO bundled MySQL/MariaDB subchart at all - unlike
+# what ../helm-values/seafile.yaml used to assume (a fictional
+# `mysql.enabled: true` toggle). It only ever talks to an
+# externally-provisioned MySQL, addressed via the SEAFILE_MYSQL_DB_HOST env
+# var (see seafile.yaml). This release is that external MySQL, the same
+# "promote a bundled dependency to its own top-level release" pattern
+# already used for keycloak-postgres.yaml (see that file's own header).
+#
+# Seafile's own init scripts create the 3 databases it needs (ccnet_db,
+# seafile_db, seahub_db) itself at first boot, using the root user/password
+# below (INIT_SEAFILE_MYSQL_ROOT_PASSWORD in seafile-secret) - `auth.database`
+# only needs to name ONE of them for this chart to accept `auth.username`/
+# `auth.password` at all; the "seafile" app user gets granted access to the
+# other two by Seafile's own init, not by this chart.
+#
+# [UNCERTAIN, not verified against a live `helm install` from this
+# sandboxed environment]: the exact Service hostname this chart's fullname
+# template produces for the `seafile-mysql` release name -
+# ../seafile.yaml's `env.SEAFILE_MYSQL_DB_HOST` assumes "seafile-mysql"
+# (release name already contains the chart name "mysql", so bitnami's
+# common.names.fullname helper should return the release name unchanged)
+# - confirm with `kubectl get svc -n libre365 -l
+# app.kubernetes.io/instance=seafile-mysql` at deployment time.
+
+# [CORRECTED] found by actually running dev-cluster/deploy.sh (flagged
+# earlier as `seafile-mysql-0 Init:ImagePullBackOff` without a root cause
+# at the time - root-caused now): the chart's own default
+# `image.repository: bitnami/mysql` 404s outright. Confirmed directly
+# against the Docker Hub registry API: `bitnami/mysql` has ZERO tags
+# published at all (unlike bitnami/postgresql, bitnami/redis,
+# bitnami/memcached, which still carry hundreds of historical tags) -
+# same "moved behind Bitnami Secure Images" story as
+# ../manifests/keycloak.yaml's own header, just for a different image.
+# `bitnamilegacy/mysql` carries the exact same tag (confirmed: HTTP 200
+# on its manifest) - same fix pattern as onlyoffice-rabbitmq.yaml's own
+# header (bitnami/rabbitmq has the same problem).
+#
+# [CORRECTED] found by actually running CI's helm-template-validate job:
+# the chart's own template refuses to RENDER AT ALL for an image outside
+# its hardcoded "recognized" allowlist ("Original containers have been
+# substituted for unrecognized ones... Unrecognized images:
+# docker.io/bitnamilegacy/mysql:..." - a real `helm template`/`helm
+# upgrade --install` failure, not just a warning - see
+# github.com/bitnami/charts/issues/30850, same as
+# onlyoffice-rabbitmq.yaml's identical fix). This is Bitnami's own
+# documented escape hatch for exactly this situation (a legitimate,
+# pinned, verified-by-us image outside their allowlist).
+global:
+  security:
+    allowInsecureImages: true
+
+image:
+  repository: bitnamilegacy/mysql
+
+auth:
+  database: seafile_db
+  username: seafile
+  existingSecret: seafile-mysql-secret
+
+# [CORRECTED] bitnami/mysql nests `resources` under `primary:`, unlike
+# bitnami/postgresql (used by keycloak-postgres.yaml), which takes it at
+# the top level - verified directly against bitnami/mysql's own
+# values.yaml rather than assumed by analogy.
+primary:
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: ""

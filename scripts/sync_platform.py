@@ -168,7 +168,14 @@ def sub_domain(text: str, subdomain: str, new_base: str) -> str:
 # anchor doesn't apply here since there is no subdomain.
 _BARE_DOMAIN_PATTERNS = {
     REPO_ROOT / "infra/k8s/helm-values/element-web.yaml": [
-        r'(server_name:\s*")[^"]*(")',
+        # [CORRECTED] this used to target `"m.homeserver".server_name` under
+        # a `config.default_server_config` key that never existed in the
+        # real chart's schema (see element-web.yaml's own header, found by
+        # actually running dev-cluster/deploy.sh): the real, top-level
+        # field is `defaultServer.name`. Anchored on the whole
+        # `defaultServer:` block (not a bare `name:\s*"`) since that key
+        # name alone is far too generic to safely regex-replace on its own.
+        r'(defaultServer:\s*\n\s*url:\s*"[^"]*"\s*\n\s*name:\s*")[^"]*(")',
     ],
     REPO_ROOT / "infra/k8s/helm-values/element-call.yaml": [
         r'(name:\s*DEFAULT_HOMESERVER\s*\n\s*value:\s*")[^"]*(")',
@@ -185,6 +192,12 @@ _BARE_DOMAIN_PATTERNS = {
         # "<subdomain>.<base>" occurrence in this same file, e.g. the
         # Ingress host).
         r'(value:\s*"admin@)[^"]*(")',
+    ],
+    REPO_ROOT / "infra/k8s/helm-values/seafile.yaml": [
+        # Same bare-base-domain "admin@<base>" pattern as gokapi.yaml above
+        # (INIT_SEAFILE_ADMIN_EMAIL, required by this chart's own
+        # presetEnv while initMode is true - see this file's own header).
+        r'(INIT_SEAFILE_ADMIN_EMAIL:\s*"admin@)[^"]*(")',
     ],
 }
 
@@ -583,6 +596,33 @@ def compute_k3d_config_change(platform: dict) -> list[Change]:
         "      # NodePorts, instead of forcing yet another port remapping.",
         f"      - arg: --kube-apiserver-arg=service-node-port-range={cluster['node_port_range']}",
         "        nodeFilters: [\"server:*\"]",
+        "      # [CORRECTED] found by actually running dev-cluster/deploy.sh: its",
+        "      # 14 Helm releases pull several images each in quick succession,",
+        "      # which trips the kubelet's own default image-pull rate limit (5",
+        "      # QPS, burst 10) - pods land in ImagePullBackOff with \"pull QPS",
+        "      # exceeded\" even though the registry itself is fine. That default",
+        "      # protects a registry from many NODES' aggregate pull traffic in a",
+        "      # real fleet; on a solo dev cluster pulling this many images this",
+        "      # fast, it just self-inflicts throttling. 0 disables the limit",
+        "      # entirely (kubelet's own --registry-qps semantics: \"If 0,",
+        "      # unlimited\") - applied to every node since k3d's server also",
+        "      # schedules workloads here (no separate control-plane taint).",
+        "      - arg: --kubelet-arg=registry-qps=0",
+        "        nodeFilters: [\"server:*\", \"agent:*\"]",
+        "      # [CORRECTED] found by actually running dev-cluster/deploy.sh: the",
+        "      # kubelet's own default disk-pressure eviction threshold",
+        "      # (imagefs.available<15%, nodefs.available<10%) taints EVERY node",
+        "      # NoSchedule the moment a solo dev VM's disk crosses that",
+        "      # percentage - which happens easily on a small VM running this",
+        "      # many Helm releases' worth of images/PVs at once, well before the",
+        "      # disk is anywhere near actually full. That default protects a",
+        "      # real production node from filling up entirely; on a dev cluster",
+        "      # it just self-inflicts scheduling deadlock long before there's a",
+        "      # genuine emergency. Lowered (not disabled - still a real safety",
+        "      # margin against actually running out of space), applied to every",
+        "      # node for the same reason as registry-qps above.",
+        "      - arg: --kubelet-arg=eviction-hard=imagefs.available<5%,nodefs.available<5%",
+        "        nodeFilters: [\"server:*\", \"agent:*\"]",
         "  kubeconfig:",
         "    updateDefaultKubeconfig: true",
         "    switchCurrentContext: true",

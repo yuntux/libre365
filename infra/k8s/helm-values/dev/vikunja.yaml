@@ -5,24 +5,25 @@
 # top" role for the dev tier.
 #
 # Usage:
-#   helm upgrade --install vikunja vikunja/vikunja -n libre365-dev \
-#     -f vikunja.yaml -f dev/vikunja.yaml
+#   helm upgrade --install vikunja oci://ghcr.io/go-vikunja/helm-chart/vikunja \
+#     --version 2.3.0 -n libre365-dev -f vikunja.yaml -f dev/vikunja.yaml
 #
-# Key paths reused below (`replicaCount`, `resources.requests/limits.cpu/memory`) are
-# exactly the ones already used in vikunja.yaml.
+# [CORRECTED] the real chart nests everything under a top-level `vikunja:`
+# key (`vikunja.controllers.main.replicas`/
+# `vikunja.controllers.main.containers.main.resources`, not top-level
+# `replicaCount:`/`resources:`) - see ../vikunja.yaml's own header for the
+# full story, verified against the chart's real source.
 
-replicaCount: 1
-
-resources:
-  requests:
-    cpu: "250m"
-    memory: "512Mi"
-  limits:
-    cpu: "500m"
-    memory: "1Gi"
-
-# postgresql.enabled (base file) is left untouched: no `postgresql.primary.resources`
-# key is attested anywhere in this repo for the go-vikunja/helm-charts chart
-# specifically (unlike the Bitnami-based keycloak/synapse charts), so none is guessed
-# here — left at the chart's own defaults (unverifiable third-party schema, no
-# network access to confirm).
+vikunja:
+  controllers:
+    main:
+      replicas: 1
+      containers:
+        main:
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"

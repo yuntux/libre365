@@ -1,7 +1,9 @@
 # Dev-speed hardening overlay for Novu (study 2.1) - see
 # ../../../../dev-cluster/README.md for the overall rationale. Usage:
-#   helm upgrade --install novu novu/novu -n libre365 \
-#     -f novu.yaml -f dev/novu.yaml
+#   helm upgrade --install novu oci://ghcr.io/nova-edge/charts/novu \
+#     --version 0.2.1 -n libre365 -f novu.yaml -f dev/novu.yaml
+# (no official Novu chart exists at all - see ../novu.yaml's own header for
+# why this is Nova-Edge/novu-chart, a community project, instead)
 #
 # Replaces the base file's `api`/`worker`/`ws`/`web` HA replica counts with a
 # single pod each, matching this repo's existing dev-hardening pattern (see
@@ -11,11 +13,11 @@
 # `mongodb.enabled`/`redis.enabled` (base file) are left untouched: they
 # already run as single-instance by default on this chart's own defaults
 # (no clustering toggle to turn off, unlike Synapse's `workers.enabled`),
-# and this sandboxed environment has no network
-# access to novuhq.github.io/helm-charts to verify a resource-trimming key
-# for the `mongodb`/`redis` subcharts beyond what's already used elsewhere
-# in this repo for similar subcharts - left at chart defaults rather than
-# guessed, consistent with every other overlay in this directory.
+# and this sandboxed environment has no network access to verify a
+# resource-trimming key for the `mongodb`/`redis` subcharts beyond what's
+# already used elsewhere in this repo for similar subcharts - left at
+# chart defaults rather than guessed, consistent with every other overlay
+# in this directory.
 
 api:
   replicaCount: 1

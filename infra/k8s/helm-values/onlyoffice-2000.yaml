@@ -4,25 +4,34 @@
 # increases to absorb the volume of simultaneous connections, each replica staying
 # sized as at 100 (~8 cores/16 GB), in line with the cluster's horizontal scaling
 # principle adopted in 1.5 L.198.
-# Usage: helm upgrade --install onlyoffice onlyoffice/docs-cloud -f onlyoffice.yaml -f onlyoffice-2000.yaml
-replicaCount: 4
+# Usage: helm upgrade --install onlyoffice onlyoffice/docs -f onlyoffice.yaml -f onlyoffice-2000.yaml
+#
+# [CORRECTED] see onlyoffice-100.yaml's own header: the real chart splits
+# sizing across `docservice`/`converter`, not a single top-level
+# `replicaCount`/`resources` - and has no bundled Redis at all (the
+# previous `redis.master.resources` entry here targeted a fictional
+# subchart; Redis sizing now lives in onlyoffice-redis.yaml, its own
+# standalone release, since it scales with session-storage load rather
+# than with Document Server replica count).
 
-resources:
-  requests:
-    cpu: "2"
-    memory: "4Gi"
-  limits:
-    cpu: "4"
-    memory: "8Gi"
-# i.e. ~16 cores / 32 GB RAM combined across the 4 replicas, to be refined with a
-# real load test (JMeter, 1.5 L.196) before going to production at this scale.
+docservice:
+  replicas: 4
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
 
-redis:
-  master:
-    resources:
-      requests:
-        cpu: "500m"
-        memory: "512Mi"
-      limits:
-        cpu: "1"
-        memory: "1Gi"
+converter:
+  replicas: 4
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+# i.e. ~16 cores / 32 GB RAM combined across docservice+converter, to be refined
+# with a real load test (JMeter, 1.5 L.196) before going to production at this scale.

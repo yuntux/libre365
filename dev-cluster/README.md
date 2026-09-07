@@ -34,7 +34,7 @@ something that doesn't exist in production.
 ## Novu runs the real chart here, not a mock
 
 An earlier version of this dev tier used a lightweight HTTP mock for Novu
-instead of the real `novu` chart (the reference stack — api/worker/ws/web +
+instead of a real chart (the reference stack — api/worker/ws/web +
 MongoDB + Redis — felt disproportionate for a mock whose only job was to
 expose the `POST /v1/events/trigger` shape the connectors call). That mock
 only validated that the connectors call the right endpoint with the right
@@ -43,13 +43,18 @@ retries, the actual notification center UI), which is a real gap given that
 everything else on this cluster runs its actual production chart. Now that
 the k3d cluster already pays the cost of running real Helm charts for every
 other brick, the same trade-off applies to Novu: `helm upgrade --install
-novu novu/novu -f novu.yaml -f dev/novu.yaml` (see `deploy.sh`), hardened
-like every other brick (single replica per component instead of 2, see
+novu oci://ghcr.io/nova-edge/charts/novu --version 0.2.1 -f novu.yaml -f
+dev/novu.yaml` (see `deploy.sh` - no official Novu chart exists at all,
+this is the closest community one, see `infra/k8s/helm-values/novu.yaml`'s
+own header for the full story), hardened like every other brick (single
+replica per component instead of 2, see
 `../infra/k8s/helm-values/dev/novu.yaml`). The connectors that call it
 (`notification-hub`, `onlyoffice-mentions`) reach it through the in-cluster
 Service DNS name like any other brick — see
-`infra/k8s/manifests/connectors/*.yaml`, and the caveat there about that
-Service's exact name not being verifiable from this sandboxed environment.
+`infra/k8s/manifests/connectors/*.yaml`; unlike most other Service-name
+assumptions in this repo, this one IS verified against this chart's real
+`_helpers.tpl`/`values.yaml` (`novu-api`:3000, `novu-web`:4200 with the
+`novu` release name used here), not guessed.
 
 ## Dev-speed hardening ("durcir en dev pour aller plus vite")
 
@@ -248,13 +253,23 @@ deploying that exact chart for real can confirm those.
 
 ## Usage
 
-Prerequisites: `k3d`, `kubectl`, `helm`, `docker` on `PATH`.
+Prerequisites: `k3d`, `kubectl`, `helm`, `docker` on `PATH` — `deploy.sh`'s
+own step 1/14 installs whichever of these 4 is missing (Ubuntu/Debian only,
+see its header) before doing anything else, so a fresh machine needs none
+of them pre-installed.
+
+Every image used here is multi-arch EXCEPT `grommunio/gromox-core` (verified
+against the Docker Hub API: amd64 only, no arm64 build published at all) -
+on an ARM64 host (e.g. an Apple Silicon Mac's Ubuntu VM), step 2/14
+registers QEMU user-mode emulation for it automatically (`tonistiigi/binfmt`)
+rather than failing with `exec /init: exec format error`. This only slows
+down that one container's own (already slow, ~18 internal services)
+first boot - everything else in this stack runs natively.
 
 ```bash
-# Start grommunio-dev (not part of the k3d cluster)
-docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
-
-# Bring up the k3d cluster + every other brick (Novu included) + the 5 connectors
+# Starts grommunio-dev (docker-compose, not part of the k3d cluster) AND
+# brings up the k3d cluster + every other brick (Novu included) + the 5
+# connectors, in one run
 ./dev-cluster/deploy.sh
 
 # Verify external-dns reads the Caddy Service's annotation correctly
@@ -273,8 +288,10 @@ docker compose -f dev-cluster/grommunio-dev/docker-compose.yml up -d
 # Fast inner loop after editing a Helm values file
 ./dev-cluster/redeploy.sh seaweedfs
 
-# Keycloak itself is an Operator CR, not a Helm release - re-apply directly
-kubectl apply -f infra/k8s/manifests/keycloak.yaml
+# Keycloak itself is an Operator CR, not a Helm release - re-apply the
+# dev-sized CR directly (never the production infra/k8s/manifests/keycloak.yaml
+# here - see infra/k8s/manifests/dev/keycloak.yaml's own header)
+kubectl apply -f infra/k8s/manifests/dev/keycloak.yaml
 
 # Tear the cluster down entirely
 ./dev-cluster/destroy.sh
@@ -300,6 +317,11 @@ instead of docker-compose — see `../tests/integration/README.md`.
   from the real, production `../infra/k8s/manifests/caddy.yaml` — see
   "Testing Keycloak SSO/OIDC end-to-end" above. That file's
   Deployment/Service stay hand-written.
+- `../infra/k8s/manifests/dev/keycloak.yaml` is hand-written, NOT generated:
+  unlike every Helm-backed brick, Keycloak has no `-f base -f dev/` overlay
+  to shrink production sizing, so this is a full second CR (single
+  instance, dev-sized resources) applied instead of the production one —
+  see its own header for why.
 - `deploy.sh`, `redeploy.sh`, `destroy.sh`, `lib-expose.sh`,
   `check-external-dns.sh`, `seed-openbao-dev-secrets.sh`,
   `check-external-secrets.sh`, `patch-coredns-hosts.sh`,

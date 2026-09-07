@@ -54,6 +54,11 @@ resources:
     cpu: "200m"
     memory: "128Mi"
 
+# [CORRECTED] found by actually running dev-cluster/deploy.sh (surfaced via
+# the new CI helm-template-validate job, not a live cluster this time):
+# `service.port` no longer exists in the official chart - renamed to
+# `service.portNumber` (verified against oauth2-proxy/manifests' own
+# values.yaml).
 service:
   type: ClusterIP
-  port: 4180
+  portNumber: 4180
