@@ -203,6 +203,15 @@ echo "==> 6/14 Keycloak Operator (cluster-scoped CRDs + controller, study 1.7)"
 # script. Cluster-scoped (not namespaced), safe to re-run.
 kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/keycloaks.k8s.keycloak.org-v1.yml"
 kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/keycloakrealmimports.k8s.keycloak.org-v1.yml"
+# [CORRECTED] This third CRD was missing here - found by actually running
+# this script: the operator controller (below) CrashLoopBackOff'd on
+# startup with "Couldn't start informer for
+# keycloaksamlclients.k8s.keycloak.org/v2alpha1 resources ... 404 Not
+# Found", because 26.7.3's operator watches this CRD unconditionally even
+# though nothing in this repo configures SAML clients. Confirmed this file
+# exists at the pinned $KEYCLOAK_VERSION (verified: 200, unlike a guessed
+# "keycloaksamlclientscopes" filename, which 404s - there is no such CRD).
+kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/keycloaksamlclients.k8s.keycloak.org-v1.yml"
 kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/${KEYCLOAK_VERSION}/kubernetes/kubernetes.yml"
 # Real manifest (verified for 26.3.3): the "keycloak-operator" Deployment
 # declares no namespace of its own, so `kubectl apply` lands it in
