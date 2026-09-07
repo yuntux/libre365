@@ -124,8 +124,13 @@
     auth_password: "{{ keycloak_admin_password }}"
     realm: "{{ keycloak_realm_name }}"
     alias: "browser"
-    copy_from: "browser"
-    authentication_executions:
+    # [CORRECTED] found live on a user's VM: this module (unlike most
+    # other community.general.keycloak_* modules used elsewhere in this
+    # file) doesn't alias these two parameters to snake_case - confirmed
+    # against its own real "Unsupported parameters" error, which lists
+    # `copyFrom`/`authenticationExecutions` as the only accepted spelling.
+    copyFrom: "browser"
+    authenticationExecutions:
       - providerId: "webauthn-authenticator"
         requirement: "ALTERNATIVE"
       - providerId: "webauthn-authenticator-passwordless"
