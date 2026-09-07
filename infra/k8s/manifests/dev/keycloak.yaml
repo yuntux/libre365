@@ -17,7 +17,9 @@
 # session) and a single-digit-hundreds-of-Mi request/low-Gi limit (Keycloak
 # on Quarkus runs a single small realm comfortably in that range) bring it
 # in line with every other brick's dev footprint.
-apiVersion: k8s.keycloak.org/v2alpha1
+# [CORRECTED] apiVersion was v2alpha1 - see ../keycloak.yaml's own header
+# for the full story (found by actually running dev-cluster/deploy.sh).
+apiVersion: k8s.keycloak.org/v2beta1
 kind: Keycloak
 metadata:
   name: keycloak
