@@ -71,6 +71,18 @@ metadata:
   namespace: libre365
 spec:
   image: quay.io/keycloak/keycloak:26.7.3
+  # [ADDED] found live on a user's VM (dev cluster, same Operator/image as
+  # here): the Operator defaults to starting the server with `--optimized`,
+  # which assumes a custom image pre-built via `kc.sh build` (the
+  # Operator's own best-practice image customization workflow) - the plain
+  # `quay.io/keycloak/keycloak` image above was never built that way, so
+  # the container crash-loops immediately: "The '--optimized' flag was
+  # used for first ever server start. Please don't use this flag for the
+  # first startup or use 'kc.sh build' to build the server first."
+  # `startOptimized: false` is the Operator's own documented field for
+  # exactly this case (a stock/unbuilt image) - confirmed against the real
+  # Keycloak Operator docs, not guessed.
+  startOptimized: false
   # 1.7 L.271 — HA from the initial target: 2 instances at the 100-user
   # scale, same reasoning as the retired keycloak-100.yaml/keycloak-2000.yaml
   # Helm overlays (sizing driven by connections/second, not total users -
