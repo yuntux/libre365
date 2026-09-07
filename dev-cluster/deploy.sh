@@ -286,6 +286,28 @@ kubectl apply -f "https://raw.githubusercontent.com/keycloak/keycloak-k8s-resour
 # declares no namespace of its own, so `kubectl apply` lands it in
 # whatever namespace the current context defaults to ("default" here,
 # k3d's own default - this script never changes it) - NOT "$NAMESPACE".
+# [ADDED] found live on a user's VM: step 9/14's `kubectl wait
+# --for=condition=Ready keycloak/keycloak` timed out with ZERO events on
+# the CR and no Pod ever created for it - not a slow reconcile, the
+# operator was never even looking at it. Root cause, confirmed against
+# the real manifest: all four of its controllers ship with
+# `QUARKUS_OPERATOR_SDK_CONTROLLERS_*_NAMESPACES=JOSDK_WATCH_CURRENT` -
+# the Java Operator SDK's own sentinel for "only the namespace the
+# operator itself runs in" (here, "default", per the comment above) - so
+# a CR applied into any OTHER namespace (every CR this repo applies goes
+# into "$NAMESPACE", i.e. "libre365") is invisible to it: no informer
+# watches it, so no reconcile, no status, no events, ever. The upstream
+# manifest's assumption (operator and its CRs share one namespace) just
+# doesn't match this repo's layout (one shared operator, app resources in
+# their own namespace) - this is the SDK's own documented fix for that
+# mismatch (quarkus.operator-sdk.controllers.<name>.namespaces, one
+# specific namespace instead of the "current namespace only" sentinel),
+# not a version/CRD gap like the four `kubectl apply`s above.
+kubectl set env deployment/keycloak-operator -n default \
+  QUARKUS_OPERATOR_SDK_CONTROLLERS_KEYCLOAKCONTROLLER_NAMESPACES="$NAMESPACE" \
+  QUARKUS_OPERATOR_SDK_CONTROLLERS_KEYCLOAKREALMIMPORTCONTROLLER_NAMESPACES="$NAMESPACE" \
+  QUARKUS_OPERATOR_SDK_CONTROLLERS_KEYCLOAKSAMLCLIENTCONTROLLER_NAMESPACES="$NAMESPACE" \
+  QUARKUS_OPERATOR_SDK_CONTROLLERS_KEYCLOAKOIDCCLIENTCONTROLLER_NAMESPACES="$NAMESPACE"
 kubectl rollout status deployment/keycloak-operator -n default --timeout=120s 2>/dev/null || \
   echo "    ! could not confirm the operator controller's Deployment - inspect \`kubectl get deploy -A -l app.kubernetes.io/name=keycloak-operator\` if the next step fails."
 
