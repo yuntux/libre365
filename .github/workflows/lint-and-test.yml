@@ -135,6 +135,115 @@ jobs:
         run: |
           yamllint -d '{extends: relaxed, rules: {line-length: disable}}' infra/k8s
 
+  helm-template-validate:
+    name: helm template Helm values against their real charts
+    runs-on: ubuntu-latest
+    # [ADDED] the yamllint job above only ever checked generic YAML syntax,
+    # never that a values file's keys actually exist in the chart it's
+    # meant for - an entire class of bug (a wrong chart name, a key nested
+    # under a fictional parent, a required field missing) only ever
+    # surfaced when a live user actually ran `helm install` on a real
+    # cluster (dev-cluster/deploy.sh), several times over in a single
+    # evening. `helm template` renders a chart fully offline (no cluster
+    # needed) and fails loudly on exactly those errors, so this job is
+    # the same check, just running here instead of on someone's VM.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for infra/k8s/helm-values
+        id: check
+        run: |
+          if [ -d "infra/k8s/helm-values" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::infra/k8s/helm-values not present yet - job skipped."
+          fi
+
+      - name: Install helm
+        if: steps.check.outputs.present == 'true'
+        uses: azure/setup-helm@v4
+
+      - name: Add Helm repos
+        if: steps.check.outputs.present == 'true'
+        # Same repos/URLs as dev-cluster/deploy.sh's own "5/14 Helm repos"
+        # step - kept in sync by hand (both are a handful of lines, no
+        # single source of truth exists yet for this list). The
+        # `|| true` on the 3 "to be confirmed" repos matches deploy.sh's
+        # own reasoning in that step's comment: if one of these moved, the
+        # `helm template` calls below fail loudly instead, which is the
+        # point of this job.
+        run: |
+          helm repo add ananace-charts https://ananace.gitlab.io/charts
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add seaweedfs https://seaweedfs.github.io/seaweedfs/helm
+          helm repo add seafile-charts https://haiwen.github.io/seafile-helm-chart/repo || true
+          helm repo add onlyoffice https://download.onlyoffice.com/charts/stable || true
+          helm repo add peertube-helm https://zendet.github.io/peertube-helm/ || true
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add openbao https://openbao.github.io/openbao-helm/ || true
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo add oauth2-proxy https://oauth2-proxy.github.io/manifests
+          helm repo update
+
+      - name: helm template every release against its real chart
+        if: steps.check.outputs.present == 'true'
+        working-directory: infra/k8s/helm-values
+        # One entry per real `helm upgrade --install` in
+        # dev-cluster/deploy.sh's "8/14 Helm releases" step (plus
+        # openbao/external-secrets/oauth2-proxy from steps 6/7/13) -
+        # `release|chart|version|values-files|extra-args` (values-files
+        # comma-separated, applied in order, mirroring `-f a.yaml -f
+        # b.yaml`; extra-args is one flag, e.g. novu's
+        # --skip-schema-validation - see deploy.sh's own comment on that
+        # release for why). NOT included: element-call.yaml/
+        # visio-meet.yaml/vikunja.yaml - documented in README.md as "no
+        # official chart confirmed to exist" placeholders, not actually
+        # `helm upgrade --install`-ed anywhere yet.
+        run: |
+          set -euo pipefail
+          releases=(
+            "openbao|openbao/openbao||openbao.yaml,dev/openbao.yaml"
+            "external-secrets|external-secrets/external-secrets||external-secrets.yaml,dev/external-secrets.yaml"
+            "keycloak-postgres|bitnami/postgresql||keycloak-postgres.yaml,dev/keycloak-postgres.yaml"
+            "synapse|ananace-charts/matrix-synapse||synapse.yaml,dev/synapse.yaml"
+            "synapse|ananace-charts/matrix-synapse||synapse.yaml,synapse-100.yaml"
+            "synapse|ananace-charts/matrix-synapse||synapse.yaml,synapse-2000.yaml"
+            "element-web|ananace-charts/element-web||element-web.yaml,dev/element-web.yaml"
+            "seafile-mysql|bitnami/mysql||seafile-mysql.yaml,dev/seafile-mysql.yaml"
+            "seafile-memcached|bitnami/memcached||seafile-memcached.yaml,dev/seafile-memcached.yaml"
+            "seafile|seafile-charts/ce||seafile.yaml,dev/seafile.yaml"
+            "onlyoffice|onlyoffice/docs||onlyoffice.yaml,dev/onlyoffice.yaml"
+            "onlyoffice|onlyoffice/docs||onlyoffice.yaml,onlyoffice-100.yaml"
+            "onlyoffice|onlyoffice/docs||onlyoffice.yaml,onlyoffice-2000.yaml"
+            "seaweedfs|seaweedfs/seaweedfs||seaweedfs.yaml,dev/seaweedfs.yaml"
+            "peertube|peertube-helm/peertube||peertube.yaml,dev/peertube.yaml"
+            "novu|oci://ghcr.io/nova-edge/charts/novu|0.2.1|novu.yaml,dev/novu.yaml|--skip-schema-validation"
+            "external-dns|external-dns/external-dns||external-dns.yaml,dev/external-dns.yaml"
+            "oauth2-proxy-onlyoffice|oauth2-proxy/oauth2-proxy||oauth2-proxy-onlyoffice.yaml"
+            "oauth2-proxy-novu|oauth2-proxy/oauth2-proxy||oauth2-proxy-novu.yaml"
+          )
+          fail=0
+          for entry in "${releases[@]}"; do
+            IFS='|' read -r release chart version files extra <<<"$entry"
+            f_args=()
+            IFS=',' read -ra file_list <<<"$files"
+            for f in "${file_list[@]}"; do
+              f_args+=(-f "$f")
+            done
+            version_args=()
+            [ -n "$version" ] && version_args=(--version "$version")
+            extra_args=()
+            [ -n "$extra" ] && extra_args=("$extra")
+            echo "::group::helm template ${release} ${chart} (${files})"
+            if ! helm template "$release" "$chart" "${version_args[@]}" "${extra_args[@]}" "${f_args[@]}" >/dev/null; then
+              echo "::error::helm template failed for release '${release}' (${chart}, ${files})"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$fail"
+
   connectors:
     name: Python connectors (install + tests)
     runs-on: ubuntu-latest
