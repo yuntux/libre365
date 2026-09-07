@@ -18,6 +18,21 @@
 # but its actual runtime behavior has not been exercised against a live
 # cluster from this sandboxed environment.
 #
+# [CORRECTED] found by the new helm-template-validate CI check (not a live
+# cluster this time): EVERY published version of this chart through 0.2.1
+# (the one pinned here) ships a values.schema.json with a real authoring
+# bug of its own - its "service" schema nests `"required": ["type"]` one
+# level too deep, inside "properties" instead of alongside it (confirmed
+# directly against github.com/Nova-Edge/novu-chart's tagged
+# charts/novu/values.schema.json for both novu-v0.2.0 and novu-v0.2.1).
+# JSON Schema then reads "required" as a property NAME needing its own
+# sub-schema, and an array isn't a valid one there - so Helm's metaschema
+# validation of the chart's OWN schema file fails unconditionally, before
+# even looking at anything in this values file. Not fixable from here:
+# dev-cluster/deploy.sh/redeploy.sh install this release with
+# `--skip-schema-validation` to work around it (see deploy.sh's own
+# comment on that line for the full story).
+#
 # 2.1 L.382 — Novu chosen for the notification center UI and multi-channel
 # infrastructure; ingestion (Matrix Application Service webhook connectors,
 # Grommunio webhook/IMAP, Seafile webhook, Vikunja webhook) is the real development
