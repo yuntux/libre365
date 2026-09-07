@@ -8,6 +8,21 @@
   hosts: keycloak
   connection: local
   gather_facts: false
+  # [ADDED] found live on a user's VM: ansible.cfg sets `become = True`
+  # globally (needed for the REAL remote-host playbooks - grommunio.yml,
+  # os-hardening.yml, etc. - that actually install/configure system
+  # packages) - this play never touches the local machine's privileged
+  # state at all, it only calls Keycloak's admin REST API over HTTP via
+  # community.general.keycloak_* modules. Inheriting `become: True`
+  # anyway made every task here try to `sudo` locally for no reason,
+  # which failed outright the moment the invoking user's shell had no
+  # cached/passwordless sudo session: "sudo: interactive authentication
+  # is required". `become: false` opts this play out explicitly, the
+  # same "no privilege escalation needed" reasoning as
+  # seafile.yml/openbao-config.yml/onlyoffice.yml's identical `connection:
+  # local` REST-API-only pattern (same latent bug, not yet hit live -
+  # fixed alongside this one rather than left for the next report).
+  become: false
   vars_files:
     - ../group_vars/all.yml
   roles:

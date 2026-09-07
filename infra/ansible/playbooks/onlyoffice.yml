@@ -14,6 +14,12 @@
   hosts: onlyoffice
   connection: local
   gather_facts: false
+  # [ADDED] same fix as playbooks/keycloak-realm.yml's own comment: this
+  # play only shells out to `kubectl` as the invoking user - no local
+  # privileged action - ansible.cfg's global `become = True` (meant for
+  # the real remote-host playbooks) made it try to `sudo` locally for
+  # nothing.
+  become: false
   vars_files:
     - ../group_vars/all.yml
   vars:
