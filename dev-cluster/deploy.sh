@@ -368,6 +368,17 @@ helm_install onlyoffice-postgres bitnami/postgresql -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-postgres.yaml -f infra/k8s/helm-values/dev/onlyoffice-postgres.yaml
 helm_install onlyoffice-redis bitnami/redis -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice-redis.yaml -f infra/k8s/helm-values/dev/onlyoffice-redis.yaml
+# [ADDED] found missing by actually running this script: the chart also
+# requires an AMQP broker unconditionally (its own default
+# `connections.amqpExistingSecret: "rabbitmq"` pointed at a Secret that
+# was never provisioned) - a failure only visible once `docservice`'s
+# image had actually finished pulling ("Error: secret 'rabbitmq' not
+# found" -> CreateContainerConfigError), unrelated to the pre-install
+# Job above (which never touches AMQP). See
+# infra/k8s/helm-values/onlyoffice-rabbitmq.yaml's own header for the
+# full story.
+helm_install onlyoffice-rabbitmq bitnami/rabbitmq -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/onlyoffice-rabbitmq.yaml -f infra/k8s/helm-values/dev/onlyoffice-rabbitmq.yaml
 # [CORRECTED] found by actually running this script: the chart's own
 # `ds-files`/`ds-runtime-config` PVCs hardcode `accessModes:
 # [ReadWriteMany]`, which k3d's `local-path` StorageClass cannot provision

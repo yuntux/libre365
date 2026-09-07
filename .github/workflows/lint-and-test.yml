@@ -217,6 +217,7 @@ jobs:
             "seafile|seafile-charts/ce||seafile.yaml,dev/seafile.yaml"
             "onlyoffice-postgres|bitnami/postgresql||onlyoffice-postgres.yaml,dev/onlyoffice-postgres.yaml"
             "onlyoffice-redis|bitnami/redis||onlyoffice-redis.yaml,dev/onlyoffice-redis.yaml"
+            "onlyoffice-rabbitmq|bitnami/rabbitmq||onlyoffice-rabbitmq.yaml,dev/onlyoffice-rabbitmq.yaml"
             "onlyoffice|onlyoffice/docs||onlyoffice.yaml,dev/onlyoffice.yaml"
             "onlyoffice|onlyoffice/docs||onlyoffice.yaml,onlyoffice-100.yaml"
             "onlyoffice|onlyoffice/docs||onlyoffice.yaml,onlyoffice-2000.yaml"
