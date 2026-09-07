@@ -36,7 +36,28 @@ echo "==> Seeding dev-only dummy secrets into OpenBao ($OPENBAO_POD)"
 
 bao_kv_put "libre365/synapse" oidc-client-secret=devonly-changeme-synapse-oidc
 bao_kv_put "libre365/vikunja" oidc-client-secret=devonly-changeme-vikunja-oidc
-bao_kv_put "libre365/onlyoffice" jwt-secret=devonly-changeme-onlyoffice-jwt
+# [ADDED] found live on a user's VM: oauth2-proxy-onlyoffice/-novu and
+# gokapi's own init container all crash-looped with "secret ... not
+# found" - external-secrets.yaml's onlyoffice-oidc-secret/novu-oidc-secret/
+# gokapi-oidc-secret ExternalSecrets were never seeded here at all,
+# unlike synapse/vikunja/seafile's own oidc-client-secret above. Same
+# known limitation as those three: this dummy value won't match
+# Keycloak's own auto-generated client secret (infra/ansible/roles/
+# keycloak_realm never sets an explicit client_secret - see that role's
+# own "Retrieve the generated secret" task), so the real OIDC login flow
+# still won't authenticate end-to-end - out of scope to fix here, this
+# only unblocks the pods from crash-looping on Secret creation.
+bao_kv_put "libre365/gokapi" oidc-client-secret=devonly-changeme-gokapi-oidc
+# oauth2-proxy validates its own cookie secret strictly (must decode to
+# 16/24/32 raw bytes) - a free-text "devonly-changeme-*" string like the
+# rest of this file uses would crash the container with a DIFFERENT
+# error ("cookie_secret must be 16, 24, or 32 bytes"). base64 of a
+# 32-byte string instead, still an obviously-fake dev-only value.
+bao_kv_put "libre365/onlyoffice" \
+  jwt-secret=devonly-changeme-onlyoffice-jwt \
+  oidc-client-id=onlyoffice \
+  oidc-client-secret=devonly-changeme-onlyoffice-oidc \
+  oauth2-proxy-cookie-secret=ZGV2b25seS1vbmx5b2ZmaWNlLWNvb2tpZS0zMmJ5dGU=
 bao_kv_put "libre365/onlyoffice-postgres" password=devonly-changeme-onlyoffice-pg postgres-password=devonly-changeme-onlyoffice-pg-super
 bao_kv_put "libre365/external-dns-ovh" \
   application-key=devonly-changeme-ovh-app-key \
@@ -51,7 +72,11 @@ bao_kv_put "libre365/visio-meet-postgres" password=devonly-changeme-visio-pg pos
 bao_kv_put "libre365/onlyoffice-redis" password=devonly-changeme-onlyoffice-redis
 bao_kv_put "libre365/onlyoffice-rabbitmq" password=devonly-changeme-onlyoffice-rabbitmq
 bao_kv_put "libre365/novu-mongodb" root-password=devonly-changeme-novu-mongo
-bao_kv_put "libre365/novu" api-key=devonly-changeme-novu-api-key
+bao_kv_put "libre365/novu" \
+  api-key=devonly-changeme-novu-api-key \
+  oidc-client-id=novu \
+  oidc-client-secret=devonly-changeme-novu-oidc \
+  oauth2-proxy-cookie-secret=ZGV2b25seS1ub3Z1LWNvb2tpZS1zZWNyZXQtMzJieXQ=
 bao_kv_put "libre365/seaweedfs" s3-access-key=devonly-seaweedfs-access s3-secret-key=devonly-changeme-seaweedfs-secret admin-user=admin admin-password=devonly-changeme-seaweedfs-admin
 # [CORRECTED] "password" alone used to be the only property here, a guess
 # later found wrong by actually running dev-cluster/deploy.sh - the real
