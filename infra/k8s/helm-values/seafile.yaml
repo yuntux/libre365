@@ -76,6 +76,16 @@ seafile:
   env:
     SEAFILE_SERVER_HOSTNAME: "files.libre365.example.org"
 
+    # [CORRECTED] found by actually running dev-cluster/deploy.sh with the
+    # fix above applied: templates/seafile-env.yaml's presetEnv entry for
+    # INIT_SEAFILE_ADMIN_EMAIL has no `.value` default and only allows an
+    # empty string once `initMode` is false - while `initMode: true` (first
+    # boot, see above), it's required. The admin PASSWORD does not need an
+    # entry here: INIT_SEAFILE_ADMIN_PASSWORD isn't part of this chart's
+    # presetEnv list at all, it flows straight from seafile-secret via
+    # `existingSecret`'s envFrom (see below) instead.
+    INIT_SEAFILE_ADMIN_EMAIL: "admin@libre365.example.org"
+
     # 1.4 — external MySQL, see seafile-mysql.yaml (this chart has no
     # bundled database of its own).
     SEAFILE_MYSQL_DB_HOST: "seafile-mysql"
