@@ -21,11 +21,26 @@
 # deploy.sh on every invocation, matching this directory's existing
 # idempotency convention.
 #
+# [CORRECTED] found live on a user's VM: k3d's own default Corefile
+# already declares a `hosts /etc/coredns/NodeHosts { ttl 60; reload 15s;
+# fallthrough }` block in the same `.:53 { }` server block, and CoreDNS's
+# `hosts` plugin can only be instantiated ONCE per server block ("plugin/
+# hosts: this plugin can only be used once per Server Block" - CoreDNS's
+# own real, hard limitation). This script used to insert a brand-new,
+# SEPARATE `hosts { }` block, which crash-looped CoreDNS outright once the
+# earlier newline-quoting bug (see git history) was fixed and stopped
+# masking this. Fixed by merging our inline entries INTO the existing
+# `hosts /etc/coredns/NodeHosts { ... }` block instead: the plugin's real
+# syntax is `hosts [FILE [ZONES...]] { [INLINE...] no_reverse fallthrough
+# [ZONES...] reload DURATION ttl DURATION }` - a FILE argument and inline
+# entries are meant to coexist in the very same block (verified against
+# CoreDNS's own plugin/hosts README), so no second block is needed at all.
+#
 # Unverified from this sandboxed environment (no live k3d cluster
 # available here to actually run this against): the exact k3d/Rancher
-# default Corefile layout this sed-based insertion assumes (a `.:53 {`
-# block whose FIRST line is a plugin directive - k3d's shipped default at
-# the time of writing) - inspect
+# default Corefile layout this insertion assumes (a `hosts
+# /etc/coredns/NodeHosts { ... }` block present in the main `.:53 { }`
+# server block - k3d's shipped default at the time of writing) - inspect
 # `kubectl get configmap coredns -n kube-system -o yaml` and adjust the
 # insertion point below if a future k3d version's default Corefile differs.
 
@@ -70,38 +85,50 @@ for key, sub in domains['subdomains'].items():
 # "Unexpected '}' because no matching opening brace", crash-looping the
 # entire cluster's DNS (not just this hosts lookup - every in-cluster
 # Service name, including OpenBao's own, stopped resolving).
-HOSTS_BLOCK=$'    hosts {\n'
+# Plain inline entries only (no `hosts { }` wrapper of our own - see the
+# header comment above on why: they get merged into k3d's EXISTING `hosts
+# /etc/coredns/NodeHosts { ... }` block instead of forming a second one).
+HOSTS_LINES=""
 while IFS= read -r domain; do
-  HOSTS_BLOCK+="        ${CADDY_DEV_IP} ${domain}"$'\n'
+  HOSTS_LINES+="        ${CADDY_DEV_IP} ${domain}"$'\n'
 done <<< "$DOMAINS"
-HOSTS_BLOCK+=$'        fallthrough\n    }'
 
 CURRENT_COREFILE=$(kubectl get configmap coredns -n kube-system -o jsonpath='{.data.Corefile}')
 
 if echo "$CURRENT_COREFILE" | grep -qF "$MARKER_BEGIN"; then
-  # Replace the existing block between the markers (idempotent re-run).
+  # Replace the existing entries between the markers (idempotent re-run) -
+  # they already live inside the pre-existing `hosts { ... }` block from a
+  # previous run, so no re-insertion relative to that block is needed.
   NEW_COREFILE=$(python3 -c "
 import sys
 begin, end = sys.argv[1], sys.argv[2]
-block = sys.argv[3]
+lines = sys.argv[3]
 text = sys.stdin.read()
 before, _, rest = text.partition(begin)
 _, _, after = rest.partition(end)
-sys.stdout.write(before + begin + '\n' + block + '\n' + end + after)
-" "$MARKER_BEGIN" "$MARKER_END" "$HOSTS_BLOCK" <<< "$CURRENT_COREFILE")
+sys.stdout.write(before + begin + '\n' + lines + end + after)
+" "$MARKER_BEGIN" "$MARKER_END" "$HOSTS_LINES" <<< "$CURRENT_COREFILE")
 else
-  # First run: insert right after the opening ".:53 {" of the main server
-  # block - see this script's header comment on the one thing that's
-  # assumed, not independently verified, about k3d's default Corefile.
+  # First run: merge our entries into the EXISTING `hosts ... { ... }`
+  # block's opening brace (k3d's own default `hosts /etc/coredns/NodeHosts
+  # { ttl 60; reload 15s; fallthrough }`) rather than declaring a second,
+  # separate `hosts` block - CoreDNS only allows one `hosts` plugin
+  # instantiation per server block. The plugin's own syntax allows a FILE
+  # argument and inline host entries side by side in the same block, so
+  # this is the plugin's intended, documented use - not a workaround.
   NEW_COREFILE=$(python3 -c "
+import re
 import sys
 begin, end = sys.argv[1], sys.argv[2]
-block = sys.argv[3]
+lines = sys.argv[3]
 text = sys.stdin.read()
-marker = '.:53 {'
-idx = text.index(marker) + len(marker)
-sys.stdout.write(text[:idx] + '\n' + begin + '\n' + block + '\n' + end + text[idx:])
-" "$MARKER_BEGIN" "$MARKER_END" "$HOSTS_BLOCK" <<< "$CURRENT_COREFILE")
+match = re.search(r'\bhosts\b[^\n{]*\{', text)
+if not match:
+    sys.stderr.write('patch-coredns-hosts.sh: no existing \"hosts { ... }\" block found in the Corefile to merge into\n')
+    sys.exit(1)
+idx = match.end()
+sys.stdout.write(text[:idx] + '\n' + begin + '\n' + lines + end + text[idx:])
+" "$MARKER_BEGIN" "$MARKER_END" "$HOSTS_LINES" <<< "$CURRENT_COREFILE")
 fi
 
 kubectl create configmap coredns -n kube-system \
