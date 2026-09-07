@@ -104,6 +104,28 @@ jwt:
   # JSON of every document opened from Seafile. Documented here for reference
   # (2.6 L.469-473).
 
+# [ADDED] found live on a user's VM: the chart's default `wopi.keys.generation:
+# true` runs a `wopi-keys-gen` pre-install/pre-upgrade hook Job regardless of
+# `wopi.enabled` (false by default, and never turned on here - WOPI is not a
+# feature this repo uses) - a genuinely slow cold pull of its own image
+# (`onlyoffice/docs-utils`, never fetched by anything else this chart
+# installs) that has, at least once, ended in the hook's pod reporting
+# "MountVolume.SetUp failed ... configmap \"wopi-keys\" not found" even
+# though the chart's own `wopi-keys-gen.yaml` ConfigMap hook-weight (-2) runs
+# strictly before the Job's (-1) - root cause not fully pinned down (possibly
+# an interaction with this repo's own `helm_install()` stuck-release safety
+# net in dev-cluster/deploy.sh racing an in-progress hook wait), but since
+# this repo never enables WOPI, generating (and, on every uninstall,
+# deleting - `wopiKeysDeletion.job.enabled`, true by default) these keys is
+# pure overhead and one more way for an unrelated hook to block the whole
+# release. Both switched off entirely rather than chased further.
+wopi:
+  keys:
+    generation: false
+wopiKeysDeletion:
+  job:
+    enabled: false
+
 persistence:
   size: 20Gi
   storageClass: ""
