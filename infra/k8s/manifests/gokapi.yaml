@@ -254,6 +254,16 @@ spec:
     requests:
       storage: 200Gi
 ---
+# [CORRECTED] found live on a user's VM ("spec.ingressClassName: Invalid
+# value: ''" - k8s rejects an empty string, only a real class name or the
+# field's total absence are valid): this file used to also define its own
+# Ingress for depot.libre365.example.org, but Caddy (../manifests/caddy.yaml,
+# ../manifests/dev/caddy.yaml) already routes that exact hostname to this
+# Service - Caddy is the sole public entry point for every component in
+# this repo (see e.g. novu.yaml's own header for the same rationale). That
+# Ingress was a genuine duplicate of Caddy's own route, not a
+# harder-to-notice version of the same bug - removed entirely rather than
+# just fixing the invalid field.
 apiVersion: v1
 kind: Service
 metadata:
@@ -267,26 +277,3 @@ spec:
   ports:
     - port: 80
       targetPort: 53842
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: gokapi
-  namespace: libre365
-spec:
-  ingressClassName: ""
-  tls:
-    - hosts:
-        - depot.libre365.example.org
-      secretName: gokapi-tls
-  rules:
-    - host: depot.libre365.example.org
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: gokapi
-                port:
-                  number: 80
