@@ -626,10 +626,18 @@ echo "==> 13/14 oauth2-proxy: Keycloak SSO gates for OnlyOffice/Novu (study 1.7)
 # fetch their OIDC discovery document from the realm's public domain at
 # startup and would otherwise fail before CoreDNS could resolve it (see
 # step 12/14 just above).
+# [ADDED] found live on a user's VM: the dev overlay (`-f dev/...`) skips
+# TLS verification against caddy-dev's own internal CA (see
+# infra/k8s/helm-values/dev/oauth2-proxy-onlyoffice.yaml's own comment) -
+# without it, oauth2-proxy's OIDC discovery call fails, first with "no
+# route to host" before infra/k8s/manifests/dev/caddy.yaml served real
+# TLS on :443 at all, then with an x509 trust error once it did.
 helm_install oauth2-proxy-onlyoffice oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
-  -f infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml
+  -f infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml \
+  -f infra/k8s/helm-values/dev/oauth2-proxy-onlyoffice.yaml
 helm_install oauth2-proxy-novu oauth2-proxy/oauth2-proxy -n "$NAMESPACE" \
-  -f infra/k8s/helm-values/oauth2-proxy-novu.yaml
+  -f infra/k8s/helm-values/oauth2-proxy-novu.yaml \
+  -f infra/k8s/helm-values/dev/oauth2-proxy-novu.yaml
 
 echo "==> 14/14 Production caddy.yaml's Service + exposing services as NodePort"
 # Applies the REAL infra/k8s/manifests/caddy.yaml as-is - not to run

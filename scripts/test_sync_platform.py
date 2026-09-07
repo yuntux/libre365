@@ -365,13 +365,22 @@ def test_dev_caddyfile_strips_html_injection_but_keeps_forward_auth():
     assert "oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180" in dev_text
 
 
-def test_dev_caddyfile_forces_plain_http_on_domain_addresses_but_not_snippets():
+def test_dev_caddyfile_keeps_automatic_https_via_local_certs():
+    # [CORRECTED] found live on a user's VM: domain site addresses used to
+    # be forced to plain "http://" (no real public DNS for ACME here) -
+    # but every OIDC config (Keycloak, oauth2-proxy, Vikunja, Synapse)
+    # hits "https://<domain>" unconditionally, dev and production alike,
+    # so that also broke every real server-to-server HTTPS call in dev
+    # ("no route to host" - no TLS listener at all). Automatic HTTPS now
+    # stays on (bare site addresses, same as production), backed by
+    # Caddy's own internal CA (`local_certs`) instead of ACME.
     dev_text = sync_platform._dev_caddyfile_from_production(_SAMPLE_PROD_CADDYFILE)
 
-    assert "http://chat.libre365.example.org {" in dev_text
-    assert "http://office.libre365.example.org {" in dev_text
-    assert "http://matrix.libre365.example.org:8448 {" in dev_text
-    assert "http://(banner_assets)" not in dev_text
+    assert "local_certs" in dev_text
+    assert "http://" not in dev_text
+    assert "\nchat.libre365.example.org {" in dev_text
+    assert "\noffice.libre365.example.org {" in dev_text
+    assert "\nmatrix.libre365.example.org:8448 {" in dev_text
     assert "(banner_assets) {" in dev_text
 
 
@@ -418,7 +427,7 @@ def test_compute_dev_caddy_change_regenerates_from_the_production_caddyfile(tmp_
 
     assert len(changes) == 1
     desired = changes[0].desired
-    assert "http://sso.libre365.example.org {" in desired
+    assert "sso.libre365.example.org {" in desired
     assert "stale placeholder content" not in desired
     assert "header comment, preserved untouched" in desired
     assert "kind: Deployment" in desired
@@ -446,7 +455,7 @@ def test_compute_dev_caddy_change_regenerates_for_a_different_base_domain(tmp_pa
 
     changes = sync_platform.compute_dev_caddy_change(platform)
 
-    assert "http://sso.new-base.example.net {" in changes[0].desired
+    assert "sso.new-base.example.net {" in changes[0].desired
     assert "libre365.example.org" not in changes[0].desired
 
 

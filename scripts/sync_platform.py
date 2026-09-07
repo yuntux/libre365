@@ -909,21 +909,40 @@ def _dev_caddyfile_from_production(caddyfile_text: str) -> str:
     OnlyOffice/Novu oauth2-proxy gates and finding nothing in dev could
     exercise them).
 
-    Only strips what the dev environment genuinely cannot run - domain
-    site addresses, `forward_auth`/`route` SSO gates, and every backend
-    hostname stay byte-for-byte the same values used in production
-    (nothing new is hard-coded for "dev" here):
+    Only strips/swaps what the dev environment genuinely cannot run -
+    domain site addresses, `forward_auth`/`route` SSO gates, and every
+    backend hostname stay byte-for-byte the same values used in
+    production (nothing new is hard-coded for "dev" here):
 
-    - `injection` directives and the `order injection after encode`
-      global option: both need the custom xcaddy-built HTML-injection
+    - `injection` directives: need the custom xcaddy-built HTML-injection
       plugin baked into production's Caddy image, which cannot be built
       or pulled from this sandboxed/local dev environment (see this
       file's own header comment). Dev loses the injected top bar, not the
       routing underneath it.
-    - Automatic HTTPS on every domain site address, forced to plain
-      `http://` instead: there is no real public DNS for
-      `*.<domains.base>` to obtain a certificate for from a local
-      cluster - left on, Caddy would hang retrying ACME issuance forever.
+    - The `order injection after encode` global option is replaced with
+      `local_certs` (still a single global options block, still the
+      first thing in the file) - see below.
+
+    [CORRECTED] found live on a user's VM: every OIDC-driven component's
+    config (Keycloak's own KC_HOSTNAME, Vikunja/Synapse's issuer/authurl,
+    oauth2-proxy's oidc-issuer-url) uses `https://<domain>` unconditionally
+    - the SAME value in dev and production, deliberately never hard-coded
+    to a dev-only alternative (see docs/oidc.md). An earlier version of
+    this function forced every site address to plain `http://` instead of
+    leaving Caddy's automatic HTTPS on, reasoning that no real public DNS
+    exists locally for ACME issuance - true, but that also meant NOTHING
+    in this cluster could reach `https://sso.libre365.example.org` at
+    all: oauth2-proxy's own OIDC discovery call failed outright with
+    "no route to host" (no listener on :443 whatsoever), the same way
+    Vikunja/Synapse would once they got that far. Fixed by keeping site
+    addresses bare (automatic HTTPS stays ON, exactly like production)
+    and adding `local_certs` to the global options block: Caddy's own
+    documented mechanism to have automatic HTTPS issue certificates from
+    its INTERNAL CA instead of ACME/Let's Encrypt - no public DNS or
+    Internet access needed, still real TLS on :443. Callers inside the
+    cluster then need to trust (or skip verifying) that internal CA - see
+    infra/k8s/helm-values/dev/oauth2-proxy-*.yaml's own comment for how
+    oauth2-proxy does that.
 
     `forward_auth`/`route` (the OnlyOffice/Novu SSO gates, study 1.7) are
     both Caddy built-ins since 2.7 - not part of the unavailable custom
@@ -934,20 +953,11 @@ def _dev_caddyfile_from_production(caddyfile_text: str) -> str:
     """
     text = re.sub(
         r"\{\s*#[^\n]*\n\s*order injection after encode\s*\n\}\s*\n*",
-        "",
+        "{\n    local_certs\n}\n\n",
         caddyfile_text,
         count=1,
     )
     text = re.sub(r"\n[ \t]*injection\s*\{[^}]*\}", "", text)
-    # A line that is ONLY "<hostname[:port]> {" - matched structurally (not
-    # against any specific domain name, so this keeps working regardless of
-    # platform.yaml's domains.base) - excludes snippet definitions like
-    # "(banner_assets) {", which start with "(".
-    text = re.sub(
-        r"(?m)^([a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?(?::\d+)?)[ \t]*\{[ \t]*$",
-        r"http://\1 {",
-        text,
-    )
     return text
 
 

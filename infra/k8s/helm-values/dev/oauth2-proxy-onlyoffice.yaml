@@ -1,0 +1,23 @@
+# Dev-only overlay - k3d local dev tier. This is an ADDITIONAL -f file
+# layered on top of oauth2-proxy-onlyoffice.yaml.
+#
+# Usage:
+#   helm upgrade --install oauth2-proxy-onlyoffice oauth2-proxy/oauth2-proxy \
+#     -n libre365 -f oauth2-proxy-onlyoffice.yaml -f dev/oauth2-proxy-onlyoffice.yaml
+#
+# [ADDED] found live on a user's VM: oauth2-proxy's `oidc-issuer-url`
+# (oauth2-proxy-onlyoffice.yaml) is `https://sso.libre365.example.org` -
+# the SAME value used in production, deliberately never hard-coded to a
+# dev-only alternative (see docs/oidc.md). In the k3d dev cluster, that
+# hostname resolves to caddy-dev (see dev-cluster/patch-coredns-hosts.sh),
+# which now really does terminate TLS there via Caddy's own internal CA
+# (see infra/k8s/manifests/dev/caddy.yaml's own comment on `local_certs`)
+# instead of a real, publicly-trusted one - a plain OIDC discovery call
+# from inside the cluster would otherwise fail x509 verification against
+# the pod's system trust store, which has no reason to trust Caddy's
+# internal CA. `--ssl-insecure-skip-verify` is oauth2-proxy's own
+# documented flag for exactly this ("skip validation of certificates
+# presented when using HTTPS providers") - dev-only, never applied to the
+# production oauth2-proxy-onlyoffice.yaml file itself.
+extraArgs:
+  ssl-insecure-skip-verify: "true"
