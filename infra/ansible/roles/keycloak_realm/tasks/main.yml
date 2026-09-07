@@ -116,7 +116,7 @@
   register: keycloak_clients_result
 
 - name: "Retrieve the generated secret for each confidential client"
-  community.general.keycloak_client_secret_info:
+  community.general.keycloak_clientsecret_info:
     auth_keycloak_url: "{{ keycloak_base_url }}"
     auth_realm: "{{ keycloak_admin_realm }}"
     auth_username: "{{ keycloak_admin_user }}"
