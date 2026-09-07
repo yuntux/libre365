@@ -233,8 +233,18 @@ services:
       image: onlyoffice/documentserver
     helm:
       file: infra/k8s/helm-values/onlyoffice.yaml
-      image_repository: onlyoffice/documentserver
-      tag_path: .image.tag
+      # [CORRECTED] no tag_path/image_repository here: the real
+      # ONLYOFFICE/Kubernetes-Docs `docs` chart has no single top-level
+      # `image:` at all (found by actually running dev-cluster/deploy.sh,
+      # then verifying the chart's real source) - it deploys `docservice`/
+      # `converter` as two separately-imaged components, both defaulting
+      # to the shared `images.tag` (onlyoffice.yaml), which
+      # scripts/sync_platform.py's generic two-field patcher can't target.
+      # Kept in sync with `version` above BY HAND in onlyoffice.yaml
+      # itself - note the k8s image tags follow a different, more precise
+      # scheme (e.g. "9.4.1-1") than this bare "9.4" (used by the
+      # docker-compose dev tier's monolithic onlyoffice/documentserver
+      # image instead).
 
   vikunja:
     # study 1.6 - matches the real vikunja/vikunja Docker Hub tag (no "v"

@@ -284,6 +284,16 @@ helm upgrade --install seafile-memcached bitnami/memcached -n "$NAMESPACE" \
 kubectl apply -f infra/k8s/manifests/seafile-extra-env.yaml
 helm upgrade --install seafile seafile-charts/ce -n "$NAMESPACE" \
   -f infra/k8s/helm-values/seafile.yaml -f infra/k8s/helm-values/dev/seafile.yaml
+# onlyoffice-postgres/onlyoffice-redis: the real onlyoffice/docs chart has
+# no bundled database or cache of its own (found by actually running this
+# script, then verifying the chart's real source) - see
+# infra/k8s/helm-values/onlyoffice-postgres.yaml's header for the full
+# story. Installed before `onlyoffice` itself since its pre-install Job
+# (DB migration) depends on both by hostname.
+helm upgrade --install onlyoffice-postgres bitnami/postgresql -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/onlyoffice-postgres.yaml -f infra/k8s/helm-values/dev/onlyoffice-postgres.yaml
+helm upgrade --install onlyoffice-redis bitnami/redis -n "$NAMESPACE" \
+  -f infra/k8s/helm-values/onlyoffice-redis.yaml -f infra/k8s/helm-values/dev/onlyoffice-redis.yaml
 helm upgrade --install onlyoffice onlyoffice/docs -n "$NAMESPACE" \
   -f infra/k8s/helm-values/onlyoffice.yaml -f infra/k8s/helm-values/dev/onlyoffice.yaml
 helm upgrade --install vikunja vikunja/vikunja -n "$NAMESPACE" \
