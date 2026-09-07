@@ -41,6 +41,21 @@
 # just for a different image. `bitnamilegacy/rabbitmq` carries the exact
 # same tag (confirmed: HTTP 200 on its manifest) - same fix pattern as
 # seafile-mysql.yaml's own header (bitnami/mysql has the same problem).
+#
+# [CORRECTED] found by actually running CI's helm-template-validate job
+# (caught before this ever reached a live cluster, unlike everything
+# else in this file's own history): the chart's own template refuses to
+# RENDER AT ALL for an image outside its hardcoded "recognized" allowlist
+# ("Original containers have been substituted for unrecognized ones...
+# Unrecognized images: docker.io/bitnamilegacy/rabbitmq:..." - a real
+# `helm template`/`helm upgrade --install` failure, not just a warning -
+# see github.com/bitnami/charts/issues/30850). This is Bitnami's own
+# documented escape hatch for exactly this situation (a legitimate,
+# pinned, verified-by-us image outside their allowlist).
+global:
+  security:
+    allowInsecureImages: true
+
 image:
   repository: bitnamilegacy/rabbitmq
 
