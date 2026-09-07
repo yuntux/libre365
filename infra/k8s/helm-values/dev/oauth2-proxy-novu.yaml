@@ -1,0 +1,12 @@
+# Dev-only overlay - k3d local dev tier. This is an ADDITIONAL -f file
+# layered on top of oauth2-proxy-novu.yaml.
+#
+# Usage:
+#   helm upgrade --install oauth2-proxy-novu oauth2-proxy/oauth2-proxy \
+#     -n libre365 -f oauth2-proxy-novu.yaml -f dev/oauth2-proxy-novu.yaml
+#
+# See dev/oauth2-proxy-onlyoffice.yaml's own comment for the full story:
+# same fix, same reason (Keycloak, reached via caddy-dev's own internal
+# CA in the k3d dev cluster, is not in the pod's system trust store).
+extraArgs:
+  ssl-insecure-skip-verify: "true"

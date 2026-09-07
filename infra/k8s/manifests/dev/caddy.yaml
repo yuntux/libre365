@@ -10,16 +10,29 @@
 # SSO gates - discovered while trying to add a live test for the
 # OnlyOffice/Novu oauth2-proxy gates and finding nothing in dev could
 # exercise them. Generating it from the real Caddyfile instead means the
-# two can never drift apart like that again; only two things are stripped
-# because this sandboxed/local dev environment genuinely cannot run them:
-# `injection` (needs a custom xcaddy-built plugin unavailable here) and
-# automatic HTTPS (no real public DNS to get a certificate for - forced to
-# plain `http://` instead). `forward_auth`/`route` (the SSO gates) are
-# Caddy built-ins since 2.7, not part of that plugin, so they DO work here
-# unchanged - see dev-cluster/deploy.sh's CoreDNS step and
+# two can never drift apart like that again; only `injection` is stripped,
+# because it needs a custom xcaddy-built plugin unavailable in this
+# sandboxed/local dev environment. `forward_auth`/`route` (the SSO gates)
+# are Caddy built-ins since 2.7, not part of that plugin, so they DO work
+# here unchanged - see dev-cluster/deploy.sh's CoreDNS step and
 # tests/integration/conftest.py's `DomainRoutingAdapter` for how the
 # domains actually resolve to this Service, in-cluster and from the test
 # runner respectively, with no real DNS anywhere.
+#
+# [CORRECTED] found live on a user's VM: automatic HTTPS used to be forced
+# off (plain `http://` on every site) since there is no real public DNS
+# here for ACME issuance - but that also meant nothing in the cluster
+# could reach `https://<domain>` at all (every OIDC config uses that
+# scheme unconditionally, dev and production alike - see docs/oidc.md),
+# so e.g. oauth2-proxy's own OIDC discovery call failed outright with "no
+# route to host" (no TLS listener existed). Automatic HTTPS is back on
+# (site addresses are bare again, same as production), backed by Caddy's
+# own `local_certs` global option instead of ACME - its documented way to
+# issue real certificates from Caddy's INTERNAL CA, no public DNS or
+# Internet access needed. See scripts/sync_platform.py's
+# `_dev_caddyfile_from_production` docstring for the full story, and
+# infra/k8s/helm-values/dev/oauth2-proxy-*.yaml for how an in-cluster
+# OIDC client trusts (or skips verifying) that internal CA.
 #
 # The Deployment/Service below stay hand-maintained (plain
 # `caddy:2.11.4-alpine`, no plugin needed since the injection directive is
@@ -42,6 +55,10 @@ metadata:
     app.kubernetes.io/name: caddy-dev
 data:
   Caddyfile: |
+    {
+        local_certs
+    }
+
     # Serves banner.css/banner.js (caddy-html-banner ConfigMap,
     # infra/k8s/manifests/caddy-injection.yaml) at /libre365-banner/* on
     # every site the injected banner appears on - imported into each of
@@ -55,7 +72,7 @@ data:
     }
 
     # Static onboarding portal (2.5 L.454-457) — no injection, standalone page
-    http://onboarding.libre365.example.org {
+    onboarding.libre365.example.org {
         root * /srv/onboarding
         file_server
     }
@@ -66,7 +83,7 @@ data:
     # comes from the caddy-autoconfig ConfigMap below, mounted at
     # /srv/autoconfig/mail so the file lands at
     # /srv/autoconfig/mail/config-v1.1.xml. See docs/clients.md.
-    http://autoconfig.libre365.example.org {
+    autoconfig.libre365.example.org {
         root * /srv/autoconfig
         file_server
     }
@@ -75,35 +92,35 @@ data:
     # cross-cutting top bar is injected via the HTML injection plugin before
     # </body>, a DOM anchor point fragile to version upgrades (2.3 L.413) to be
     # revalidated on every update.
-    http://chat.libre365.example.org {
+    chat.libre365.example.org {
         import banner_assets
         handle {
             reverse_proxy element-web.libre365.svc.cluster.local:80
         }
     }
 
-    http://files.libre365.example.org {
+    files.libre365.example.org {
         import banner_assets
         handle {
             reverse_proxy seafile.libre365.svc.cluster.local:80
         }
     }
 
-    http://taches.libre365.example.org {
+    taches.libre365.example.org {
         import banner_assets
         handle {
             reverse_proxy vikunja.libre365.svc.cluster.local:80
         }
     }
 
-    http://videos.libre365.example.org {
+    videos.libre365.example.org {
         import banner_assets
         handle {
             reverse_proxy peertube.libre365.svc.cluster.local:9000
         }
     }
 
-    http://depot.libre365.example.org {
+    depot.libre365.example.org {
         # Colors-only injection (Tasmane branding, study 1.8) - deliberately
         # NOT the cross-app menu/search/notifications banner (banner.html):
         # Gokapi is reachable by unauthenticated external third parties
@@ -117,11 +134,11 @@ data:
     # Visio, Element Call, OnlyOffice, Keycloak, SeaweedFS Admin UI: direct reverse proxy,
     # no injection (applications embedded as a targeted widget/iframe, see 2.3 L.414,
     # or not concerned by the cross-cutting top bar).
-    http://visio.libre365.example.org {
+    visio.libre365.example.org {
         reverse_proxy visio-meet-frontend.libre365.svc.cluster.local:80
     }
 
-    http://call.libre365.example.org {
+    call.libre365.example.org {
         reverse_proxy element-call.libre365.svc.cluster.local:80
     }
 
@@ -135,7 +152,7 @@ data:
     # infra/k8s/helm-values/oauth2-proxy-onlyoffice.yaml (unverified against
     # an actual `helm install` from this sandboxed environment, same
     # category of assumption already documented for "novu-api" below).
-    http://office.libre365.example.org {
+    office.libre365.example.org {
         route /oauth2/* {
             reverse_proxy oauth2-proxy-onlyoffice.libre365.svc.cluster.local:4180
         }
@@ -148,7 +165,7 @@ data:
         }
     }
 
-    http://sso.libre365.example.org {
+    sso.libre365.example.org {
         # Keycloak Operator's auto-created Service (see
         # ../manifests/keycloak.yaml's own comment) - "keycloak-service" on
         # port 8080, not "keycloak" on port 80 the way the retired Bitnami
@@ -162,7 +179,7 @@ data:
     # servers try `https://<server_name>:8448/` directly when no
     # `.well-known/matrix/server` delegation is published — none is here,
     # so no well-known handling is added on this :443 block).
-    http://matrix.libre365.example.org {
+    matrix.libre365.example.org {
         reverse_proxy synapse.libre365.svc.cluster.local:8008
     }
 
@@ -171,7 +188,7 @@ data:
     # per site address regardless of port, so this gets its own certificate
     # exactly like the :443 block above. Requires containerPort 8448 to
     # also be exposed on this Deployment/Service (see below).
-    http://matrix.libre365.example.org:8448 {
+    matrix.libre365.example.org:8448 {
         reverse_proxy synapse.libre365.svc.cluster.local:8448
     }
 
@@ -180,13 +197,13 @@ data:
     # "seaweedfs" too, so the chart's fullname template collapses to just
     # the release name - verified in seaweedfs/seaweedfs's
     # templates/shared/_helpers.tpl) -> Service "seaweedfs-s3".
-    http://s3.libre365.example.org {
+    s3.libre365.example.org {
         reverse_proxy seaweedfs-s3.libre365.svc.cluster.local:8333
     }
 
     # SeaweedFS Admin UI (study 2.12) — no injection (administration UI,
     # not part of the cross-cutting application bar's audience).
-    http://seaweedfs-admin.libre365.example.org {
+    seaweedfs-admin.libre365.example.org {
         reverse_proxy seaweedfs-admin.libre365.example.org:23646
     }
 
@@ -200,7 +217,7 @@ data:
     # "novu-api" with the release name used here - same verification
     # already documented for the k3d dev cluster in
     # dev-cluster/lib-expose.sh.
-    http://notifications.libre365.example.org {
+    notifications.libre365.example.org {
         reverse_proxy novu-api.libre365.svc.cluster.local:3000
     }
 
@@ -212,7 +229,7 @@ data:
     # this repo's own Helm release name (helm upgrade --install
     # oauth2-proxy-novu ..., see dev-cluster/deploy.sh), not a chart-side
     # naming assumption at all.
-    http://notifications-admin.libre365.example.org {
+    notifications-admin.libre365.example.org {
         route /oauth2/* {
             reverse_proxy oauth2-proxy-novu.libre365.svc.cluster.local:4180
         }
@@ -235,7 +252,7 @@ data:
     # Only the specific paths banner.js actually calls are exposed -
     # notification-hub's /webhooks/* receivers are deliberately NOT
     # forwarded here.
-    http://api.libre365.example.org {
+    api.libre365.example.org {
         @allowed_origin header Origin "https://chat.libre365.example.org" "https://files.libre365.example.org" "https://taches.libre365.example.org" "https://videos.libre365.example.org"
         header @allowed_origin {
             Access-Control-Allow-Origin "{http.request.header.Origin}"
@@ -283,6 +300,12 @@ spec:
           image: caddy:2.11.4-alpine
           ports:
             - containerPort: 80
+            # [ADDED] found live on a user's VM: automatic HTTPS (now
+            # backed by Caddy's own internal CA via `local_certs`, see
+            # this file's own header comment) needs :443 actually
+            # reachable - oauth2-proxy's OIDC discovery call failed with
+            # "no route to host" when only :80 was exposed here.
+            - containerPort: 443
           resources:
             requests:
               cpu: "50m"
@@ -313,3 +336,6 @@ spec:
     - name: http
       port: 80
       targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
