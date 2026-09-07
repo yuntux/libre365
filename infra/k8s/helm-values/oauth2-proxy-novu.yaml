@@ -40,7 +40,11 @@ extraArgs:
   provider: keycloak-oidc
   oidc-issuer-url: "https://sso.libre365.example.org/realms/libre365"
   redirect-url: "https://notifications-admin.libre365.example.org/oauth2/callback"
-  upstreams: "http://novu-web.libre365.svc.cluster.local:4200"
+  # [CORRECTED] found live on a user's VM ("unknown flag: --upstreams" -
+  # confirmed against the binary's own --help output): oauth2-proxy's
+  # real CLI flag is singular "--upstream", not "--upstreams" - extraArgs
+  # keys are passed through to the binary verbatim as "--<key>=<value>".
+  upstream: "http://novu-web.libre365.svc.cluster.local:4200"
   email-domain: "*" # authorization stays with Keycloak realm membership, not an email allowlist
   cookie-secure: "true"
   reverse-proxy: "true" # trust Caddy's X-Forwarded-* headers (single hop, no public direct access to this Service)
