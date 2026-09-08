@@ -63,6 +63,27 @@ data:
   # real binary in a sandboxed test, confirming config.json comes out with
   # the expected Method/Encryption.Level/OAuth fields - not just read from
   # the source and assumed correct.
+  #
+  # [CORRECTED] found live on a user's VM: that sandboxed test ran Gokapi
+  # as a single, one-shot process, so it never caught this - the payload
+  # below used to set "sqlite_location" to the bare relative filename
+  # "gokapi.sqlite". Setup.go stores that verbatim as `DatabaseUrl =
+  # "sqlite://" + location` (internal/configuration/setup/Setup.go) with
+  # NO path resolution against GOKAPI_DATA_DIR at all (confirmed reading
+  # database.ParseUrl, internal/configuration/database/Database.go) - so
+  # it resolved relative to the PROCESS's own working directory, which is
+  # NOT one of the mounted, persisted volumes below, and (worse) is a
+  # SEPARATE, non-shared filesystem between this initContainer and the
+  # main "gokapi" container even though they run the same image. The
+  # initContainer's setup call (Setup.go's handleResult ->
+  # configuration.LoadFromSetup -> database.EditSuperAdmin) really did
+  # create the admin user - into that container's own, ephemeral SQLite
+  # file, discarded the moment this initContainer exits. The main
+  # container then started with a brand new, EMPTY database at that same
+  # relative path and immediately exited (cmd/gokapi/Main.go's own
+  # checkIfUserExists(): "No user found in database..."). Fixed by making
+  # the location absolute, under the same persisted GOKAPI_DATA_DIR both
+  # containers already mount.
   bootstrap.sh: |
     #!/bin/sh
     set -eu
@@ -110,7 +131,7 @@ data:
     cat > /tmp/setup_payload.json <<PAYLOAD
     [
       {"name": "dbtype_sel", "value": "0"},
-      {"name": "sqlite_location", "value": "gokapi.sqlite"},
+      {"name": "sqlite_location", "value": "${GOKAPI_DATA_DIR}/gokapi.sqlite"},
       {"name": "redis_location", "value": ""},
       {"name": "redis_prefix", "value": ""},
       {"name": "redis_user", "value": ""},
